@@ -52,7 +52,7 @@ All settings are available in the Journal's Settings tab:
 
 - **GitHub**: [Issues](https://github.com/vladislavsheludchenkov/BattleScrolls/issues)
 - **Email**: v@sheludchenkov.com
-- **Xbox EU**: @Semigroup
+- **Xbox EU**: @Semigroup1329
 
 ## License
 
