@@ -1,0 +1,84 @@
+-- Type definitions for DPS Meter Design API
+-- This file is for documentation and type checking only
+
+---@class DesignSettingDefinition
+---@field id string Unique setting identifier within the design
+---@field displayName string Human-readable name for settings UI
+---@field options (string|number)[] Available values (strings or numbers)
+---@field optionLabels string[]|nil Optional display labels for options
+---@field default string|number Default value (must be in options)
+
+---@class PersonalDesignModule
+---@field id string Unique design identifier
+---@field displayName string Human-readable name for settings UI
+---@field order number|nil Sort order (lower = first, default 100)
+---@field settings DesignSettingDefinition[]|nil Custom dropdown settings
+---@field groupAlignmentOffsetX number|nil Horizontal offset for group meter alignment (default 0). Use negative values if design has visual elements extending left of the anchor control.
+---@field groupPaddingY number|nil Vertical padding between personal and group meters (default 0). Use for designs with thick visual borders.
+---Required methods:
+---@field Initialize fun(self: PersonalDesignModule, dpsMeter: DPSMeter) Initialize the design
+---@field GetContainer fun(self: PersonalDesignModule): Control Return the container control
+---@field Render fun(self: PersonalDesignModule, calc: ArithmancerInstance, ctx: PersonalRenderContext) Render with live data
+---@field Show fun(self: PersonalDesignModule) Show the design container
+---@field Hide fun(self: PersonalDesignModule) Hide the design container
+---Optional methods:
+---@field GetBottomAnchor fun(self: PersonalDesignModule): Control|nil Control for group meter "below" positioning
+---@field GetTopAnchor fun(self: PersonalDesignModule): Control|nil Control for group meter "above" positioning
+---@field RenderPreview fun(self: PersonalDesignModule)|nil Render with sample data
+---@field OnSettingChanged fun(self: PersonalDesignModule, settingId: string, value: string|number)|nil Called when setting changes
+
+---@class GroupDesignModule
+---@field id string Unique design identifier
+---@field displayName string Human-readable name for settings UI
+---@field order number|nil Sort order (lower = first, default 100)
+---@field supportsHPS boolean|nil Whether to show HPS section for healers
+---@field settings DesignSettingDefinition[]|nil Custom dropdown settings
+---Required methods:
+---@field Initialize fun(self: GroupDesignModule, dpsMeter: DPSMeter) Initialize the design
+---@field GetContainer fun(self: GroupDesignModule): Control Return the container control
+---@field Render fun(self: GroupDesignModule, members: GroupMemberEntry[], ctx: GroupRenderContext) Render with live data
+---@field Show fun(self: GroupDesignModule) Show the design container
+---@field Hide fun(self: GroupDesignModule) Hide the design container
+---@field Release fun(self: GroupDesignModule) Release pooled resources (called when hiding)
+---Optional methods:
+---@field RenderPreview fun(self: GroupDesignModule, members: GroupMemberEntry[], ctx: GroupRenderContext)|nil Render with sample data
+---@field OnSettingChanged fun(self: GroupDesignModule, settingId: string, value: string|number)|nil Called when setting changes
+
+---@class PersonalRenderContext
+---@field durationStr string Formatted fight duration "[M:SS]"
+---@field showHealing boolean Whether to show healing mode
+---@field isBossFight boolean Whether current fight has bosses
+---@field dpsMeter DPSMeter Reference to main DPS meter
+---Pre-computed values (no calc method calls needed in designs):
+---@field personalDPS number Personal DPS (all targets)
+---@field personalShare number Personal damage share % (all targets)
+---@field personalRawHPS number Personal raw HPS
+---@field personalTotalRawHealingOut number Personal total raw healing
+---@field personalTotalEffectiveHealingOut number Personal total effective healing
+---@field bossPersonalDPS number|nil Personal DPS (boss only, nil if not boss fight)
+---@field bossPersonalShare number|nil Personal damage share % (boss only, nil if not boss fight)
+
+---@class GroupRenderContext
+---@field isBossFight boolean Whether current fight has bosses
+---@field growUpward boolean If true, rows should grow upward from anchor
+---@field playerDisplayName string|nil Current player's display name (for highlighting)
+---@field groupDPS number|nil Total group DPS (all targets)
+---@field bossGroupDPS number|nil Total group DPS (boss only, nil if not boss fight)
+---@field dpsMeter DPSMeter Reference to main DPS meter
+
+---@class GroupMemberEntry
+---@field name string Player display name
+---@field allDPS number DPS against all targets
+---@field bossDPS number|nil DPS against bosses only
+---@field rawHPS number Raw healing per second
+---@field effectiveHPS number Effective (non-overheal) HPS
+---@field showHealing boolean Whether this member should be in HPS section
+---@field sortValue number Value used for sorting (highest first)
+---@field role number LFG_ROLE_* constant (DPS, HEAL, TANK)
+
+---@alias DPSMeterState
+---| "HIDDEN"
+---| "ACTIVE"
+---| "LINGERING"
+
+-- This file has no runtime code, it's purely for type definitions

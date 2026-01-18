@@ -1,0 +1,95 @@
+<GuiXml>
+    <Controls>
+        <!-- Onboarding option template with label + inline description -->
+        <Control name="BattleScrolls_OnboardingOption_Gamepad" virtual="true">
+            <Dimensions x="590"/>
+            <Controls>
+                <Label name="$(parent)Text" font="ZoFontGamepad42">
+                    <Anchor point="TOPLEFT"/>
+                    <Anchor point="TOPRIGHT"/>
+                </Label>
+                <Label name="$(parent)Description" font="ZoFontGamepad27"
+                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL"
+                       wrapMode="ELLIPSIS" hidden="true">
+                    <Anchor point="TOPLEFT" relativeTo="$(parent)Text" relativePoint="BOTTOMLEFT" offsetY="4"/>
+                    <Anchor point="TOPRIGHT" relativeTo="$(parent)Text" relativePoint="BOTTOMRIGHT" offsetY="4"/>
+                </Label>
+            </Controls>
+        </Control>
+
+        <!-- Quest-dialogue style onboarding screen -->
+        <TopLevelControl name="BattleScrolls_Onboarding_Gamepad_TopLevel" inherits="ZO_GamepadGrid_NavQuadrant_4Wide_Anchors" hidden="true" tier="MEDIUM">
+            <OnInitialized>
+                BattleScrolls_Onboarding_Gamepad_OnInitialized(self)
+            </OnInitialized>
+
+            <Controls>
+                <!-- Background with left arrow divider (same as interact window) -->
+                <Control name="$(parent)BG" inherits="ZO_LeftArrowGamepadNavQuadrant_4Wide_Background_Template"/>
+
+                <!-- "Battle Scrolls" title positioned to the left of the background -->
+                <Label name="$(parent)Title" font="ZoFontGamepad42"
+                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_CHATTER_NPC"
+                       horizontalAlignment="RIGHT" verticalAlignment="CENTER">
+                    <Anchor point="RIGHT" relativeTo="$(parent)BG" relativePoint="LEFT" offsetY="BS_ONBOARDING_CENTER_OFFSET" offsetX="-25"/>
+                </Label>
+
+                <!-- Step indicator subtitle below title -->
+                <Label name="$(parent)Subtitle" font="ZoFontGamepad27"
+                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL"
+                       horizontalAlignment="RIGHT" verticalAlignment="CENTER">
+                    <Anchor point="TOPRIGHT" relativeTo="$(parent)Title" relativePoint="BOTTOMRIGHT" offsetY="5"/>
+                </Label>
+
+                <!-- Content container (mirrors ZO_InteractWindow_Gamepad structure) -->
+                <Control name="$(parent)Container" inherits="ZO_GamepadGrid_NavQuadrant_ContainerAnchors">
+                    <Controls>
+                        <!-- Horizontal divider separating question from options -->
+                        <Control name="$(parent)Divider" inherits="ZO_GamepadHeaderHorizontalDividerSimple">
+                            <Anchor point="LEFT" relativeTo="$(grandparent)BG" relativePoint="LEFT" offsetX="ZO_GAMEPAD_CONTENT_INSET_X" offsetY="-110"/>
+                            <Anchor point="RIGHT" relativeTo="$(grandparent)BG" relativePoint="RIGHT" offsetX="-ZO_GAMEPAD_CONTENT_INSET_X" offsetY="-110"/>
+                        </Control>
+
+                        <!-- Question text with adaptive font sizing (above divider) -->
+                        <Label name="$(parent)Text"
+                               color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL"
+                               horizontalAlignment="LEFT" verticalAlignment="BOTTOM">
+                            <OnInitialized>
+                                local fonts = {
+                                    { font = "ZoFontGamepad42", lineLimit = 5 },
+                                    { font = "ZoFontGamepad36", lineLimit = 6 },
+                                    { font = "ZoFontGamepad34", lineLimit = 7 },
+                                    { font = "ZoFontGamepad27", lineLimit = 9 }
+                                }
+                                ZO_FontAdjustingWrapLabel_OnInitialized(self, fonts, TEXT_WRAP_MODE_ELLIPSIS)
+                            </OnInitialized>
+                            <Anchor point="BOTTOMLEFT" relativeTo="$(parent)Divider" relativePoint="TOPLEFT" offsetY="-ZO_GAMEPAD_CONTENT_TITLE_DIVIDER_PADDING_Y"/>
+                            <Anchor point="BOTTOMRIGHT" relativeTo="$(parent)Divider" relativePoint="TOPRIGHT" offsetY="-ZO_GAMEPAD_CONTENT_TITLE_DIVIDER_PADDING_Y"/>
+                        </Label>
+
+                        <!-- Options scroll container (below divider) -->
+                        <Scroll name="$(parent)Options">
+                            <AnchorFill/>
+                            <Controls>
+                                <Control name="$(parent)List" inherits="ZO_VerticalParametricScrollListTemplate">
+                                    <Anchor point="TOPLEFT" relativeTo="$(grandparent)Divider" relativePoint="BOTTOMLEFT"/>
+                                    <Anchor point="BOTTOMRIGHT"/>
+                                    <Controls>
+                                        <Texture name="$(parent)ScrollUp" textureFile="EsoUI/Art/Miscellaneous/gamepad/gp_scrollArrow_up.dds" hidden="true">
+                                            <Dimensions x="32" y="32"/>
+                                            <Anchor point="LEFT" relativePoint="TOPLEFT"/>
+                                        </Texture>
+                                        <Texture name="$(parent)ScrollDown" textureFile="EsoUI/Art/Miscellaneous/gamepad/gp_scrollArrow.dds" hidden="true">
+                                            <Dimensions x="32" y="32"/>
+                                            <Anchor point="LEFT" relativePoint="BOTTOMLEFT" offsetY="-15"/>
+                                        </Texture>
+                                    </Controls>
+                                </Control>
+                            </Controls>
+                        </Scroll>
+                    </Controls>
+                </Control>
+            </Controls>
+        </TopLevelControl>
+    </Controls>
+</GuiXml>

@@ -1,0 +1,376 @@
+<GuiXml xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sir.insidi.at/or/schema/esoui.xsd">
+	<Controls>
+		<!-- Virtual template for Hodor-style rows (simple dark background) -->
+		<Control name="BattleScrolls_DPSMeter_HodorRow" virtual="true">
+			<Dimensions x="200" y="22"/>
+			<Controls>
+				<!-- Dark semi-transparent background (color set in Lua) -->
+				<Texture name="$(parent)Background" textureFile="EsoUI/Art/Miscellaneous/centerscreen_left.dds" alpha="0.8">
+					<Anchor point="TOPLEFT"/>
+					<Anchor point="BOTTOMRIGHT"/>
+					<TextureCoords left="0" right="0.1" top="0" bottom="1"/>
+				</Texture>
+				<!-- Player name (left-aligned) -->
+				<Label name="$(parent)Name" font="ZoFontGamepad22"
+					color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" horizontalAlignment="LEFT">
+					<Anchor point="TOPLEFT" offsetX="4" offsetY="1"/>
+					<Anchor point="BOTTOMLEFT" offsetX="4" offsetY="-1"/>
+				</Label>
+				<!-- DPS value (right-aligned) -->
+				<Label name="$(parent)Value" font="ZoFontGamepad22"
+					color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_SELECTED" horizontalAlignment="RIGHT">
+					<Anchor point="TOPRIGHT" offsetX="-4" offsetY="1"/>
+					<Anchor point="BOTTOMRIGHT" offsetX="-4" offsetY="-1"/>
+				</Label>
+			</Controls>
+		</Control>
+
+		<!-- Virtual template for Bars-style rows (not used - created in Lua for dynamic coloring) -->
+		<Control name="BattleScrolls_DPSMeter_BarsRow" virtual="true">
+			<Dimensions x="200" y="22"/>
+		</Control>
+
+		<!-- Personal DPS Meter (main control) -->
+		<TopLevelControl name="BattleScrolls_DPSMeterPersonal" hidden="true" mouseEnabled="false" movable="false" tier="MEDIUM">
+			<Anchor point="BOTTOMLEFT" relativeTo="GuiRoot" relativePoint="BOTTOMLEFT" offsetX="70" offsetY="-15"/>
+			<Dimensions x="230" y="80"/>
+
+			<Controls>
+				<!-- Default design container -->
+				<Control name="$(parent)Default">
+					<Anchor point="TOPLEFT"/>
+					<Anchor point="BOTTOMRIGHT"/>
+
+					<Controls>
+						<!-- Line 1: DPS + share -->
+						<Label name="$(parent)Line1" font="ZoFontGamepad42"
+							color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_SELECTED" horizontalAlignment="LEFT" text="0 DPS (0%)">
+							<Anchor point="TOPLEFT"/>
+						</Label>
+
+						<!-- Line 2: Duration + breakdown -->
+						<Label name="$(parent)Line2" font="ZoFontGamepad34"
+							color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_CONTRAST" horizontalAlignment="LEFT" text="[0:00] All damage">
+							<Anchor point="BOTTOMLEFT"/>
+						</Label>
+
+						<!-- Background texture -->
+						<Texture name="$(parent)Background" textureFile="EsoUI/Art/HUD/Gamepad/LootHistoryBG.dds">
+							<Dimensions x="400" y="120"/>
+							<Anchor point="BOTTOMLEFT" offsetX="-10"/>
+						</Texture>
+					</Controls>
+				</Control>
+
+				<!-- Minimal design container -->
+				<Control name="$(parent)Minimal" hidden="true">
+					<Anchor point="TOPLEFT"/>
+					<Anchor point="BOTTOMRIGHT"/>
+
+					<Controls>
+						<!-- Single line: [Time] DPS (share%) or Boss: [Time] DPS (share%) -->
+						<Label name="$(parent)Line" font="ZoMarketGamepadCalloutFont"
+							color="FFFFFF" horizontalAlignment="LEFT" text="[0:00] 0 DPS">
+							<Anchor point="BOTTOMLEFT"/>
+						</Label>
+					</Controls>
+				</Control>
+
+				<!-- Bar design container (Tribute progress bar style) -->
+				<Control name="$(parent)Bar" hidden="true">
+					<Anchor point="BOTTOMLEFT"/>
+					<Dimensions x="400" y="56"/>
+
+					<Controls>
+						<!-- Primary StatusBar (for right/left/center-right modes) -->
+						<StatusBar name="$(parent)ProgressBar" inherits="ZO_GamepadArrowStatusBarWithBGMedium"
+							textureFile="EsoUI/Art/Miscellaneous/Gamepad/gp_dynamicBar_extraLarge_genericFill.dds"
+							tier="LOW" layer="CONTROLS">
+							<AnchorFill/>
+							<Dimensions x="400" y="56"/>
+							<LeadingEdge textureFile="EsoUI/Art/Miscellaneous/Gamepad/gp_dynamicBar_extraLarge_genericFill_leadingEdge.dds" width="23" height="50"/>
+							<LeadingEdgeTextureCoords left="0" right="0.71875" top="0" bottom="0.859375"/>
+							<TextureCoords left="0" right="1" top="0" bottom="0.859375"/>
+
+							<Controls>
+								<!-- Override Gloss to use extraLarge textures -->
+								<StatusBar name="$(parent)Gloss" override="true"
+									textureFile="EsoUI/Art/Miscellaneous/Gamepad/gp_dynamicBar_extraLarge_genericFill_gloss.dds">
+									<LeadingEdge textureFile="EsoUI/Art/Miscellaneous/Gamepad/gp_dynamicBar_extraLarge_genericFill_leadingEdge_gloss.dds" width="23" height="50"/>
+									<LeadingEdgeTextureCoords left="0" right="0.71875" top="0" bottom="0.859375"/>
+									<TextureCoords left="0" right="1" top="0" bottom="0.859375"/>
+								</StatusBar>
+
+								<!-- Override BG with simpler approach: solid fill + arrow-shaped right -->
+								<Control name="$(parent)BG" override="true">
+									<AnchorFill/>
+									<Controls>
+										<!-- Hide original Left and Middle -->
+										<Texture name="$(parent)Left" override="true" hidden="true"/>
+										<Texture name="$(parent)Middle" override="true" hidden="true"/>
+										<!-- Arrow-shaped right edge -->
+										<Texture name="$(parent)Right" override="true"
+											textureFile="EsoUI/Art/Miscellaneous/Gamepad/gp_dynamicBar_extraLarge_frame_bg.dds">
+											<Anchor point="TOPRIGHT"/>
+											<Anchor point="BOTTOMRIGHT"/>
+											<Dimensions x="25"/>
+											<TextureCoords left="0.296875" right="0.6875" top="0" bottom="0.828125"/>
+										</Texture>
+										<!-- Solid fill for left and middle (stops before right edge) -->
+										<Texture name="$(parent)Fill" textureFile="EsoUI/Art/Miscellaneous/Gamepad/gp_dynamicBar_extraLarge_frame_bg.dds">
+											<Anchor point="TOPLEFT"/>
+											<Anchor point="BOTTOMRIGHT" relativeTo="$(parent)Right" relativePoint="BOTTOMLEFT"/>
+											<TextureCoords left="0.1" right="0.2" top="0.1" bottom="0.7"/>
+										</Texture>
+									</Controls>
+								</Control>
+
+								<!-- Override Overlay to use extraLarge textures -->
+								<Control name="$(parent)Overlay" override="true" tier="LOW" layer="CONTROLS">
+									<Controls>
+										<Texture name="$(parent)Left" override="true" tier="LOW"
+											textureFile="EsoUI/Art/Miscellaneous/Gamepad/gp_dynamicBar_extraLarge_frame.dds">
+											<TextureCoords left="0" right="0.109375" top="0" bottom="0.859375"/>
+										</Texture>
+										<Texture name="$(parent)Right" override="true" tier="LOW"
+											textureFile="EsoUI/Art/Miscellaneous/Gamepad/gp_dynamicBar_extraLarge_frame.dds">
+											<Dimensions x="30" y="55"/>
+											<TextureCoords left="0.28125" right="0.75" top="0" bottom="0.859375"/>
+										</Texture>
+										<Texture name="$(parent)Middle" override="true" tier="LOW"
+											textureFile="EsoUI/Art/Miscellaneous/Gamepad/gp_dynamicBar_extraLarge_frame.dds">
+											<TextureCoords left="0.109375" right="0.28125" top="0" bottom="0.859375"/>
+										</Texture>
+									</Controls>
+								</Control>
+							</Controls>
+						</StatusBar>
+
+						<!-- Left-facing StatusBar (mirrored frame/BG for left mode and center-left) -->
+						<StatusBar name="$(parent)ProgressBarLeft" inherits="ZO_GamepadArrowStatusBarWithBGMedium"
+							textureFile="EsoUI/Art/Miscellaneous/Gamepad/gp_dynamicBar_extraLarge_genericFill.dds"
+							tier="LOW" layer="CONTROLS" hidden="true">
+							<!-- Fill textures NOT mirrored - SetBarAlignment handles fill direction -->
+							<LeadingEdge textureFile="EsoUI/Art/Miscellaneous/Gamepad/gp_dynamicBar_extraLarge_genericFill_leadingEdge.dds" width="23" height="50"/>
+							<LeadingEdgeTextureCoords left="0" right="0.71875" top="0" bottom="0.859375"/>
+							<TextureCoords left="0" right="1" top="0" bottom="0.859375"/>
+
+							<Controls>
+								<!-- Override Gloss - NOT mirrored, alignment handles direction -->
+								<StatusBar name="$(parent)Gloss" override="true"
+									textureFile="EsoUI/Art/Miscellaneous/Gamepad/gp_dynamicBar_extraLarge_genericFill_gloss.dds">
+									<LeadingEdge textureFile="EsoUI/Art/Miscellaneous/Gamepad/gp_dynamicBar_extraLarge_genericFill_leadingEdge_gloss.dds" width="23" height="50"/>
+									<LeadingEdgeTextureCoords left="0" right="0.71875" top="0" bottom="0.859375"/>
+									<TextureCoords left="0" right="1" top="0" bottom="0.859375"/>
+								</StatusBar>
+
+								<!-- Override BG: arrow on left, solid fill, flat cap on right -->
+								<Control name="$(parent)BG" override="true">
+									<AnchorFill/>
+									<Controls>
+										<!-- Hide original Middle -->
+										<Texture name="$(parent)Middle" override="true" hidden="true"/>
+										<!-- Arrow-shaped left edge (mirrored coords) -->
+										<Texture name="$(parent)Left" override="true"
+											textureFile="EsoUI/Art/Miscellaneous/Gamepad/gp_dynamicBar_extraLarge_frame_bg.dds">
+											<Anchor point="TOPLEFT"/>
+											<Anchor point="BOTTOMLEFT"/>
+											<Dimensions x="25"/>
+											<TextureCoords left="0.6875" right="0.296875" top="0" bottom="0.828125"/>
+										</Texture>
+										<!-- Flat right cap (mirrored from left flat coords) -->
+										<Texture name="$(parent)Right" override="true"
+											textureFile="EsoUI/Art/Miscellaneous/Gamepad/gp_dynamicBar_extraLarge_frame_bg.dds">
+											<Anchor point="TOPRIGHT"/>
+											<Anchor point="BOTTOMRIGHT"/>
+											<Dimensions x="7"/>
+											<TextureCoords left="0.00977" right="0" top="0" bottom="0.828125"/>
+										</Texture>
+										<!-- Solid fill from arrow to flat cap -->
+										<Texture name="$(parent)Fill" textureFile="EsoUI/Art/Miscellaneous/Gamepad/gp_dynamicBar_extraLarge_frame_bg.dds">
+											<Anchor point="TOPLEFT" relativeTo="$(parent)Left" relativePoint="TOPRIGHT"/>
+											<Anchor point="BOTTOMRIGHT" relativeTo="$(parent)Right" relativePoint="BOTTOMLEFT"/>
+											<TextureCoords left="0.1" right="0.2" top="0.1" bottom="0.7"/>
+										</Texture>
+									</Controls>
+								</Control>
+
+								<!-- Override Overlay with mirrored frame (arrow on left, flat on right) -->
+								<Control name="$(parent)Overlay" override="true" tier="LOW" layer="CONTROLS">
+									<Controls>
+										<!-- Left becomes arrow - explicit anchors to override inherited offset -->
+										<Texture name="$(parent)Left" override="true" tier="LOW"
+											textureFile="EsoUI/Art/Miscellaneous/Gamepad/gp_dynamicBar_extraLarge_frame.dds">
+											<Anchor point="TOPLEFT"/>
+											<Anchor point="BOTTOMLEFT"/>
+											<Dimensions x="30" y="55"/>
+											<TextureCoords left="0.75" right="0.28125" top="0" bottom="0.859375"/>
+										</Texture>
+										<!-- Right becomes flat cap (mirrored coords) - explicit anchors and dimensions -->
+										<Texture name="$(parent)Right" override="true" tier="LOW"
+											textureFile="EsoUI/Art/Miscellaneous/Gamepad/gp_dynamicBar_extraLarge_frame.dds">
+											<Anchor point="TOPRIGHT"/>
+											<Anchor point="BOTTOMRIGHT"/>
+											<Dimensions x="7"/>
+											<TextureCoords left="0.109375" right="0" top="0" bottom="0.859375"/>
+										</Texture>
+										<!-- Middle fills between Left and Right (anchors work now with explicit Left/Right anchors) -->
+										<Texture name="$(parent)Middle" override="true" tier="LOW"
+											textureFile="EsoUI/Art/Miscellaneous/Gamepad/gp_dynamicBar_extraLarge_frame.dds">
+											<TextureCoords left="0.109375" right="0.28125" top="0" bottom="0.859375"/>
+										</Texture>
+									</Controls>
+								</Control>
+							</Controls>
+						</StatusBar>
+
+						<!-- Text overlay on top of bar -->
+						<Control name="$(parent)TextOverlay" tier="HIGH" layer="OVERLAY">
+							<AnchorFill/>
+							<Controls>
+								<Label name="$(parent)Value" font="ZoFontGamepadBold27"
+									color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_SELECTED"
+									horizontalAlignment="LEFT" verticalAlignment="CENTER" text="0 DPS">
+									<Anchor point="TOPLEFT" offsetX="14"/>
+									<Anchor point="BOTTOMLEFT" offsetX="14"/>
+								</Label>
+								<Label name="$(parent)Duration" font="ZoFontGamepadBold27"
+									color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_SELECTED"
+									horizontalAlignment="RIGHT" verticalAlignment="CENTER" text="[0:00]">
+									<Anchor point="TOPRIGHT" offsetX="-34"/>
+									<Anchor point="BOTTOMRIGHT" offsetX="-34"/>
+								</Label>
+							</Controls>
+						</Control>
+					</Controls>
+				</Control>
+			</Controls>
+		</TopLevelControl>
+
+		<!-- Group DPS Meter -->
+		<TopLevelControl name="BattleScrolls_DPSMeterGroup" hidden="true" mouseEnabled="false" movable="false" tier="MEDIUM">
+			<!-- Default anchor: below personal meter Line2 -->
+			<Anchor point="TOPLEFT" relativeTo="BattleScrolls_DPSMeterPersonalDefaultLine2" relativePoint="BOTTOMLEFT" offsetY="4"/>
+			<Dimensions x="400" y="200"/>
+
+			<Controls>
+				<!-- Default design: simple column layout -->
+				<Control name="$(parent)Default">
+					<Anchor point="TOPLEFT"/>
+					<Anchor point="BOTTOMRIGHT"/>
+
+					<Controls>
+						<!-- Row 1: width set dynamically in Lua -->
+						<Label name="$(parent)Group1" font="ZoFontGamepad27" hidden="true"
+							color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" horizontalAlignment="LEFT">
+							<Anchor point="TOPLEFT"/>
+						</Label>
+						<Label name="$(parent)Group2" font="ZoFontGamepad27" hidden="true"
+							color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" horizontalAlignment="LEFT">
+							<Anchor point="TOPLEFT" relativeTo="$(parent)Group1" relativePoint="TOPRIGHT" offsetX="10"/>
+						</Label>
+						<!-- Row 2 -->
+						<Label name="$(parent)Group3" font="ZoFontGamepad27" hidden="true"
+							color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" horizontalAlignment="LEFT">
+							<Anchor point="TOPLEFT" relativeTo="$(parent)Group1" relativePoint="BOTTOMLEFT" offsetY="2"/>
+							<Anchor point="TOPRIGHT" relativeTo="$(parent)Group1" relativePoint="BOTTOMRIGHT" offsetY="2"/>
+						</Label>
+						<Label name="$(parent)Group4" font="ZoFontGamepad27" hidden="true"
+							color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" horizontalAlignment="LEFT">
+							<Anchor point="TOPLEFT" relativeTo="$(parent)Group2" relativePoint="BOTTOMLEFT" offsetY="2"/>
+							<Anchor point="TOPRIGHT" relativeTo="$(parent)Group2" relativePoint="BOTTOMRIGHT" offsetY="2"/>
+						</Label>
+						<!-- Row 3 -->
+						<Label name="$(parent)Group5" font="ZoFontGamepad27" hidden="true"
+							color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" horizontalAlignment="LEFT">
+							<Anchor point="TOPLEFT" relativeTo="$(parent)Group3" relativePoint="BOTTOMLEFT" offsetY="2"/>
+							<Anchor point="TOPRIGHT" relativeTo="$(parent)Group3" relativePoint="BOTTOMRIGHT" offsetY="2"/>
+						</Label>
+						<Label name="$(parent)Group6" font="ZoFontGamepad27" hidden="true"
+							color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" horizontalAlignment="LEFT">
+							<Anchor point="TOPLEFT" relativeTo="$(parent)Group4" relativePoint="BOTTOMLEFT" offsetY="2"/>
+							<Anchor point="TOPRIGHT" relativeTo="$(parent)Group4" relativePoint="BOTTOMRIGHT" offsetY="2"/>
+						</Label>
+						<!-- Row 4 -->
+						<Label name="$(parent)Group7" font="ZoFontGamepad27" hidden="true"
+							color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" horizontalAlignment="LEFT">
+							<Anchor point="TOPLEFT" relativeTo="$(parent)Group5" relativePoint="BOTTOMLEFT" offsetY="2"/>
+							<Anchor point="TOPRIGHT" relativeTo="$(parent)Group5" relativePoint="BOTTOMRIGHT" offsetY="2"/>
+						</Label>
+						<Label name="$(parent)Group8" font="ZoFontGamepad27" hidden="true"
+							color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" horizontalAlignment="LEFT">
+							<Anchor point="TOPLEFT" relativeTo="$(parent)Group6" relativePoint="BOTTOMLEFT" offsetY="2"/>
+							<Anchor point="TOPRIGHT" relativeTo="$(parent)Group6" relativePoint="BOTTOMRIGHT" offsetY="2"/>
+						</Label>
+						<!-- Row 5 -->
+						<Label name="$(parent)Group9" font="ZoFontGamepad27" hidden="true"
+							color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" horizontalAlignment="LEFT">
+							<Anchor point="TOPLEFT" relativeTo="$(parent)Group7" relativePoint="BOTTOMLEFT" offsetY="2"/>
+							<Anchor point="TOPRIGHT" relativeTo="$(parent)Group7" relativePoint="BOTTOMRIGHT" offsetY="2"/>
+						</Label>
+						<Label name="$(parent)Group10" font="ZoFontGamepad27" hidden="true"
+							color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" horizontalAlignment="LEFT">
+							<Anchor point="TOPLEFT" relativeTo="$(parent)Group8" relativePoint="BOTTOMLEFT" offsetY="2"/>
+							<Anchor point="TOPRIGHT" relativeTo="$(parent)Group8" relativePoint="BOTTOMRIGHT" offsetY="2"/>
+						</Label>
+						<!-- Row 6 -->
+						<Label name="$(parent)Group11" font="ZoFontGamepad27" hidden="true"
+							color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" horizontalAlignment="LEFT">
+							<Anchor point="TOPLEFT" relativeTo="$(parent)Group9" relativePoint="BOTTOMLEFT" offsetY="2"/>
+							<Anchor point="TOPRIGHT" relativeTo="$(parent)Group9" relativePoint="BOTTOMRIGHT" offsetY="2"/>
+						</Label>
+						<Label name="$(parent)Group12" font="ZoFontGamepad27" hidden="true"
+							color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" horizontalAlignment="LEFT">
+							<Anchor point="TOPLEFT" relativeTo="$(parent)Group10" relativePoint="BOTTOMLEFT" offsetY="2"/>
+							<Anchor point="TOPRIGHT" relativeTo="$(parent)Group10" relativePoint="BOTTOMRIGHT" offsetY="2"/>
+						</Label>
+					</Controls>
+				</Control>
+
+				<!-- Hodor design: row-based list (rows instantiated in Lua from virtual template) -->
+				<Control name="$(parent)Hodor" hidden="true">
+					<Anchor point="TOPLEFT"/>
+					<Anchor point="BOTTOMRIGHT"/>
+
+					<Controls>
+						<!-- Header row -->
+						<Control name="$(parent)Header" inherits="BattleScrolls_DPSMeter_HodorRow">
+							<Anchor point="TOPLEFT"/>
+						</Control>
+						<!-- Rows container (rows added dynamically in Lua) -->
+						<Control name="$(parent)Rows">
+							<Anchor point="TOPLEFT" relativeTo="$(parent)Header" relativePoint="BOTTOMLEFT"/>
+							<Anchor point="BOTTOMRIGHT"/>
+						</Control>
+						<!-- Summary row -->
+						<Control name="$(parent)Summary" inherits="BattleScrolls_DPSMeter_HodorRow" hidden="true">
+							<!-- Anchored dynamically after last row -->
+						</Control>
+					</Controls>
+				</Control>
+
+				<!-- Bars design: row-based list with bars (rows created entirely in Lua) -->
+				<Control name="$(parent)Bars" hidden="true">
+					<Anchor point="TOPLEFT"/>
+					<Anchor point="BOTTOMRIGHT"/>
+
+					<Controls>
+						<!-- Header row (created in Lua) -->
+						<Control name="$(parent)Header" hidden="true">
+							<Anchor point="TOPLEFT"/>
+						</Control>
+						<!-- Rows container (rows added dynamically in Lua) -->
+						<Control name="$(parent)Rows">
+							<Anchor point="TOPLEFT" relativeTo="$(parent)Header" relativePoint="BOTTOMLEFT"/>
+							<Anchor point="BOTTOMRIGHT"/>
+						</Control>
+						<!-- Summary row (created in Lua) -->
+						<Control name="$(parent)Summary" hidden="true">
+							<!-- Anchored dynamically after last row -->
+						</Control>
+					</Controls>
+				</Control>
+			</Controls>
+		</TopLevelControl>
+	</Controls>
+</GuiXml>

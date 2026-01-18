@@ -1,0 +1,325 @@
+<GuiXml>
+    <Controls>
+        <!-- Ability entry template with icon frames (active=square, passive=circle) -->
+        <Control name="BattleScrolls_AbilityEntryTemplate" inherits="ZO_GamepadItemSubEntryTemplate" virtual="true">
+            <Controls>
+                <!-- Square edge frame for active abilities (Backdrop) -->
+                <Backdrop name="$(parent)EdgeFrame" tier="HIGH"
+                          edgeColor="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL"
+                          centerColor="00000000" pixelRoundingEnabled="false" hidden="true">
+                    <Anchor point="TOPLEFT" relativeTo="$(parent)Icon" offsetX="-5" offsetY="-5"/>
+                    <Anchor point="BOTTOMRIGHT" relativeTo="$(parent)Icon" offsetX="5" offsetY="5"/>
+                    <Edge file="EsoUI/Art/Miscellaneous/Gamepad/edgeframeGamepadBorder.dds" edgeFileWidth="128" edgeFileHeight="16"/>
+                </Backdrop>
+                <!-- Circle frame for passive abilities (Texture) -->
+                <Texture name="$(parent)CircleFrame" tier="HIGH" pixelRoundingEnabled="false"
+                         textureFile="EsoUI/Art/Miscellaneous/Gamepad/gp_passiveFrame_64.dds"
+                         color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" hidden="true">
+                    <Anchor point="TOPLEFT" relativeTo="$(parent)Icon" offsetX="-5" offsetY="-5"/>
+                    <Anchor point="BOTTOMRIGHT" relativeTo="$(parent)Icon" offsetX="5" offsetY="5"/>
+                </Texture>
+            </Controls>
+        </Control>
+
+        <!-- Stat row template for overview panel - header/value pair -->
+        <Control name="BattleScrolls_OverviewStatRow" virtual="true">
+            <Dimensions y="36"/>
+            <Controls>
+                <Label name="$(parent)Header" font="ZoFontGamepad27" modifyTextType="UPPERCASE"
+                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL"
+                       verticalAlignment="CENTER">
+                    <Anchor point="LEFT"/>
+                    <Dimensions x="280"/>
+                </Label>
+                <Label name="$(parent)Value" font="ZoFontGamepad34" horizontalAlignment="RIGHT"
+                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_SELECTED"
+                       verticalAlignment="CENTER">
+                    <Anchor point="RIGHT"/>
+                    <Dimensions x="200"/>
+                </Label>
+            </Controls>
+        </Control>
+
+        <!-- Section header template for overview panel -->
+        <Control name="BattleScrolls_OverviewSectionHeader" virtual="true">
+            <Dimensions y="50"/>
+            <Controls>
+                <Label name="$(parent)Title" font="ZoFontGamepadBold34" modifyTextType="UPPERCASE"
+                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_SELECTED"
+                       verticalAlignment="BOTTOM">
+                    <Anchor point="BOTTOMLEFT" offsetY="-5"/>
+                </Label>
+            </Controls>
+        </Control>
+
+        <!-- Progress bar template for uptime display -->
+        <Control name="BattleScrolls_OverviewUptimeBar" virtual="true">
+            <Dimensions y="32"/>
+            <Controls>
+                <Label name="$(parent)Label" font="ZoFontGamepad22"
+                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL"
+                       verticalAlignment="CENTER">
+                    <Anchor point="LEFT"/>
+                    <Dimensions x="220"/>
+                </Label>
+                <StatusBar name="$(parent)Bar" textureFile="EsoUI/Art/Miscellaneous/Gamepad/steep_progress.dds"
+                           color="D4AF37">
+                    <Anchor point="LEFT" relativeTo="$(parent)Label" relativePoint="RIGHT" offsetX="10"/>
+                    <Anchor point="RIGHT" relativeTo="$(parent)Value" relativePoint="LEFT" offsetX="-10"/>
+                    <Dimensions y="16"/>
+                </StatusBar>
+                <Label name="$(parent)Value" font="ZoFontGamepad22" horizontalAlignment="RIGHT"
+                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_SELECTED"
+                       verticalAlignment="CENTER">
+                    <Anchor point="RIGHT"/>
+                    <Dimensions x="60"/>
+                </Label>
+            </Controls>
+        </Control>
+
+        <!-- Ability row template for Q3 - Two-line layout with detailed stats -->
+        <Control name="BattleScrolls_OverviewAbilityBar" virtual="true">
+            <Dimensions y="54"/>
+            <Controls>
+                <!-- Ability icon (larger) -->
+                <Texture name="$(parent)Icon" pixelRoundingEnabled="false" tier="HIGH">
+                    <Anchor point="TOPLEFT" offsetX="0" offsetY="4"/>
+                    <Dimensions x="46" y="46"/>
+                </Texture>
+                <!-- Square edge frame for active abilities (Backdrop) -->
+                <Backdrop name="$(parent)EdgeFrame" tier="HIGH"
+                          edgeColor="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL"
+                          centerColor="00000000" pixelRoundingEnabled="false" hidden="true">
+                    <Anchor point="TOPLEFT" relativeTo="$(parent)Icon" offsetX="-4" offsetY="-4"/>
+                    <Anchor point="BOTTOMRIGHT" relativeTo="$(parent)Icon" offsetX="4" offsetY="4"/>
+                    <Edge file="EsoUI/Art/Miscellaneous/Gamepad/edgeframeGamepadBorder.dds" edgeFileWidth="128" edgeFileHeight="16"/>
+                </Backdrop>
+                <!-- Circle frame for passive abilities (Texture) -->
+                <Texture name="$(parent)CircleFrame" tier="HIGH" pixelRoundingEnabled="false"
+                         textureFile="EsoUI/Art/Miscellaneous/Gamepad/gp_passiveFrame_64.dds"
+                         color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" hidden="true">
+                    <Anchor point="TOPLEFT" relativeTo="$(parent)Icon" offsetX="-4" offsetY="-4"/>
+                    <Anchor point="BOTTOMRIGHT" relativeTo="$(parent)Icon" offsetX="4" offsetY="4"/>
+                </Texture>
+
+                <!-- Row 1: Name + Progress Bar + Share % -->
+                <Label name="$(parent)Name" font="ZoFontGamepad22"
+                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_SELECTED"
+                       verticalAlignment="CENTER">
+                    <Anchor point="TOPLEFT" offsetX="56" offsetY="0"/>
+                    <Dimensions x="200" y="26"/>
+                </Label>
+
+                <!-- Share percentage (default position, overridden in Lua to track parent width) -->
+                <Label name="$(parent)Share" font="ZoFontGamepad27" horizontalAlignment="RIGHT"
+                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_SELECTED"
+                       verticalAlignment="CENTER">
+                    <Anchor point="TOPLEFT" offsetX="410" offsetY="0"/>
+                    <Dimensions x="70" y="26"/>
+                </Label>
+
+                <!-- Progress bar (gamepad style with background) -->
+                <StatusBar name="$(parent)Bar" inherits="ZO_GamepadArrowStatusBarWithBGMedium">
+                    <Anchor point="TOPLEFT" relativeTo="$(parent)Name" relativePoint="TOPRIGHT" offsetX="10" offsetY="2"/>
+                    <Anchor point="RIGHT" relativeTo="$(parent)Share" relativePoint="LEFT" offsetX="-10"/>
+                    <Dimensions y="22"/>
+                </StatusBar>
+
+                <!-- Row 2: Stats line (DPS | Crit% | Max Hit) -->
+                <Label name="$(parent)DPS" font="ZoFontGamepad18"
+                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL">
+                    <Anchor point="TOPLEFT" offsetX="56" offsetY="28"/>
+                    <Dimensions x="90" y="24"/>
+                </Label>
+                <Label name="$(parent)Crit" font="ZoFontGamepad18"
+                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL">
+                    <Anchor point="TOPLEFT" offsetX="149" offsetY="28"/>
+                    <Dimensions x="90" y="24"/>
+                </Label>
+                <Label name="$(parent)MaxHit" font="ZoFontGamepad18"
+                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL">
+                    <Anchor point="TOPLEFT" offsetX="242" offsetY="28"/>
+                    <Dimensions x="120" y="24"/>
+                </Label>
+            </Controls>
+        </Control>
+
+        <!-- Target row template for Q4 - Name + value -->
+        <Control name="BattleScrolls_OverviewTargetRow" virtual="true">
+            <Dimensions y="32"/>
+            <Controls>
+                <Label name="$(parent)Name" font="ZoFontGamepad22"
+                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL"
+                       verticalAlignment="CENTER">
+                    <Anchor point="TOPLEFT" offsetX="0" offsetY="0"/>
+                    <Dimensions x="160" y="32"/>
+                </Label>
+                <Label name="$(parent)Value" font="ZoFontGamepad22" horizontalAlignment="RIGHT"
+                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_SELECTED"
+                       verticalAlignment="CENTER">
+                    <Anchor point="TOPRIGHT" offsetX="0" offsetY="0"/>
+                    <Dimensions x="90" y="32"/>
+                </Label>
+            </Controls>
+        </Control>
+
+        <!-- Effect bar template for effects tab (with icon) - matches ability bar style -->
+        <Control name="BattleScrolls_OverviewEffectBar" virtual="true">
+            <Dimensions y="54"/>
+            <Controls>
+                <!-- Effect icon (larger, matching ability bar) -->
+                <Texture name="$(parent)Icon" pixelRoundingEnabled="false" tier="HIGH">
+                    <Anchor point="TOPLEFT" offsetX="0" offsetY="4"/>
+                    <Dimensions x="46" y="46"/>
+                </Texture>
+                <!-- Square edge frame for active abilities (Backdrop) -->
+                <Backdrop name="$(parent)EdgeFrame" tier="HIGH"
+                          edgeColor="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL"
+                          centerColor="00000000" pixelRoundingEnabled="false" hidden="true">
+                    <Anchor point="TOPLEFT" relativeTo="$(parent)Icon" offsetX="-4" offsetY="-4"/>
+                    <Anchor point="BOTTOMRIGHT" relativeTo="$(parent)Icon" offsetX="4" offsetY="4"/>
+                    <Edge file="EsoUI/Art/Miscellaneous/Gamepad/edgeframeGamepadBorder.dds" edgeFileWidth="128" edgeFileHeight="16"/>
+                </Backdrop>
+                <!-- Circle frame for passive abilities (Texture) -->
+                <Texture name="$(parent)CircleFrame" tier="HIGH" pixelRoundingEnabled="false"
+                         textureFile="EsoUI/Art/Miscellaneous/Gamepad/gp_passiveFrame_64.dds"
+                         color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" hidden="true">
+                    <Anchor point="TOPLEFT" relativeTo="$(parent)Icon" offsetX="-4" offsetY="-4"/>
+                    <Anchor point="BOTTOMRIGHT" relativeTo="$(parent)Icon" offsetX="4" offsetY="4"/>
+                </Texture>
+
+                <!-- Row 1: Name + Progress Bar + Uptime % -->
+                <Label name="$(parent)Name" font="ZoFontGamepad22"
+                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_SELECTED"
+                       verticalAlignment="CENTER">
+                    <Anchor point="TOPLEFT" offsetX="56" offsetY="0"/>
+                    <Dimensions x="200" y="26"/>
+                </Label>
+
+                <!-- Uptime percentage (prominent position, right side) -->
+                <Label name="$(parent)Value" font="ZoFontGamepad27" horizontalAlignment="RIGHT"
+                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_SELECTED"
+                       verticalAlignment="CENTER">
+                    <Anchor point="TOPLEFT" offsetX="410" offsetY="0"/>
+                    <Dimensions x="70" y="26"/>
+                </Label>
+
+                <!-- Progress bar (gamepad style with background) -->
+                <StatusBar name="$(parent)Bar" inherits="ZO_GamepadArrowStatusBarWithBGMedium">
+                    <Anchor point="TOPLEFT" relativeTo="$(parent)Name" relativePoint="TOPRIGHT" offsetX="10" offsetY="2"/>
+                    <Anchor point="RIGHT" relativeTo="$(parent)Value" relativePoint="LEFT" offsetX="-10"/>
+                    <Dimensions y="22"/>
+                </StatusBar>
+
+                <!-- Row 2: Stats line (Applications | Player Contribution | Max Stacks) -->
+                <Label name="$(parent)Apps" font="ZoFontGamepad18"
+                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL">
+                    <Anchor point="TOPLEFT" offsetX="56" offsetY="28"/>
+                    <Dimensions x="110" y="24"/>
+                </Label>
+                <Label name="$(parent)Player" font="ZoFontGamepad18"
+                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL">
+                    <Anchor point="TOPLEFT" offsetX="170" offsetY="28"/>
+                    <Dimensions x="110" y="24"/>
+                </Label>
+                <Label name="$(parent)Stacks" font="ZoFontGamepad18"
+                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL">
+                    <Anchor point="TOPLEFT" offsetX="284" offsetY="28"/>
+                    <Dimensions x="100" y="24"/>
+                </Label>
+            </Controls>
+        </Control>
+
+        <!-- Compact effect row template for narrow spaces (Q2/Q4) - no progress bar -->
+        <Control name="BattleScrolls_OverviewEffectRow" virtual="true">
+            <Dimensions y="54"/>
+            <Controls>
+                <!-- Effect icon (same size as ability bars) -->
+                <Texture name="$(parent)Icon" pixelRoundingEnabled="false" tier="HIGH">
+                    <Anchor point="TOPLEFT" offsetX="0" offsetY="4"/>
+                    <Dimensions x="46" y="46"/>
+                </Texture>
+                <!-- Square edge frame for active abilities -->
+                <Backdrop name="$(parent)EdgeFrame" tier="HIGH"
+                          edgeColor="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL"
+                          centerColor="00000000" pixelRoundingEnabled="false" hidden="true">
+                    <Anchor point="TOPLEFT" relativeTo="$(parent)Icon" offsetX="-4" offsetY="-4"/>
+                    <Anchor point="BOTTOMRIGHT" relativeTo="$(parent)Icon" offsetX="4" offsetY="4"/>
+                    <Edge file="EsoUI/Art/Miscellaneous/Gamepad/edgeframeGamepadBorder.dds" edgeFileWidth="128" edgeFileHeight="16"/>
+                </Backdrop>
+                <!-- Circle frame for passive abilities -->
+                <Texture name="$(parent)CircleFrame" tier="HIGH" pixelRoundingEnabled="false"
+                         textureFile="EsoUI/Art/Miscellaneous/Gamepad/gp_passiveFrame_64.dds"
+                         color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" hidden="true">
+                    <Anchor point="TOPLEFT" relativeTo="$(parent)Icon" offsetX="-4" offsetY="-4"/>
+                    <Anchor point="BOTTOMRIGHT" relativeTo="$(parent)Icon" offsetX="4" offsetY="4"/>
+                </Texture>
+
+                <!-- Row 1: Name + Uptime % -->
+                <Label name="$(parent)Name" font="ZoFontGamepad22"
+                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_SELECTED"
+                       verticalAlignment="CENTER">
+                    <Anchor point="TOPLEFT" offsetX="56" offsetY="0"/>
+                    <Anchor point="TOPRIGHT" offsetX="-70" offsetY="0"/>
+                    <Dimensions y="26"/>
+                </Label>
+                <Label name="$(parent)Value" font="ZoFontGamepad27" horizontalAlignment="RIGHT"
+                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_SELECTED"
+                       verticalAlignment="CENTER">
+                    <Anchor point="TOPRIGHT" offsetX="0" offsetY="0"/>
+                    <Dimensions x="65" y="26"/>
+                </Label>
+
+                <!-- Row 2: Stats line (compact) -->
+                <Label name="$(parent)Stats" font="ZoFontGamepad18"
+                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL">
+                    <Anchor point="TOPLEFT" offsetX="56" offsetY="28"/>
+                    <Anchor point="TOPRIGHT" offsetX="0" offsetY="28"/>
+                    <Dimensions y="24"/>
+                </Label>
+            </Controls>
+        </Control>
+
+        <TopLevelControl name="BattleScrolls_Journal_Gamepad_TopLevel" inherits="ZO_Gamepad_ParametricList_Screen" hidden="true">
+            <OnInitialized>
+                BattleScrolls_Journal_Gamepad_OnInitialized(self)
+            </OnInitialized>
+            <Controls>
+                <!-- Overview Panel - spans quadrants 2-3-4, right side of screen -->
+                <Control name="$(parent)OverviewPane" inherits="ZO_GamepadGrid_NavQuadrant_2_3_4_Anchors" hidden="true">
+                    <Controls>
+                        <!-- Background with left arrow pointing from Q1 list -->
+                        <Control name="$(parent)NestedBg" inherits="ZO_SharedGamepadNavQuadrant_2_3_4_Background_Template"/>
+                        <!-- Q2 Container - Summary stats (left column, wider) -->
+                        <Control name="$(parent)Q2Container">
+                            <Dimensions x="290"/>
+                            <Anchor point="TOPLEFT" offsetX="50" offsetY="90"/>
+                            <Anchor point="BOTTOMLEFT" offsetX="50" offsetY="-10"/>
+                        </Control>
+                        <!-- Q4 Container - Targets/sources (right column, wider) -->
+                        <!-- NOTE: Must be defined before Q3 so Q3's anchor to Q4 resolves correctly -->
+                        <Control name="$(parent)Q4Container">
+                            <Dimensions x="300"/>
+                            <Anchor point="TOPRIGHT" offsetX="-40" offsetY="90"/>
+                            <Anchor point="BOTTOMRIGHT" offsetX="-40" offsetY="-10"/>
+                        </Control>
+                        <!-- Q3 Container - Top abilities (middle, fills available space) -->
+                        <Control name="$(parent)Q3Container">
+                            <Anchor point="TOPLEFT" relativeTo="$(parent)Q2Container" relativePoint="TOPRIGHT" offsetX="50" offsetY="0"/>
+                            <Anchor point="BOTTOMRIGHT" relativeTo="$(parent)Q4Container" relativePoint="BOTTOMLEFT" offsetX="-50" offsetY="0"/>
+                        </Control>
+                        <!-- Legacy Container for compatibility (points to Q2) -->
+                        <Control name="$(parent)Container">
+                            <Anchor point="TOPLEFT" relativeTo="$(parent)Q2Container" relativePoint="TOPLEFT"/>
+                            <Anchor point="BOTTOMRIGHT" relativeTo="$(parent)Q2Container" relativePoint="BOTTOMRIGHT"/>
+                        </Control>
+                        <!-- Loading Label - centered in overview pane, shown during async loading -->
+                        <Label name="$(parent)LoadingLabel" font="ZoFontGamepadBold34" color="GAMEPAD_NAV_QUADRANT_TEXT_DISABLED" horizontalAlignment="CENTER" verticalAlignment="CENTER" hidden="true">
+                            <Anchor point="CENTER"/>
+                        </Label>
+                    </Controls>
+                </Control>
+            </Controls>
+        </TopLevelControl>
+    </Controls>
+</GuiXml>

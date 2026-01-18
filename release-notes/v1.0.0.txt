@@ -1,0 +1,34 @@
+Initial public release
+
+DPS Meter
+- Real-time combat damage display
+- Personal mode with multiple designs (default, minimal, bar)
+- Group mode with multiple designs (text, Hodor-style, bars)
+- Configurable position, scale, and linger time
+
+Combat Journal
+- Browse past encounters with three-level navigation
+- Instance > Encounter > Metrics breakdown
+- Filter by zone type and fight type
+- Memory management with configurable storage limits
+
+Damage Tracking
+- Per-target and per-ability breakdown
+- Direct vs DoT damage separation
+- Critical hit tracking
+- Single-target vs AoE categorization
+
+Healing Tracking
+- Healing done and received
+- Source and target breakdown
+
+Effect Tracking
+- Buff/debuff uptimes on player
+- Group member buff tracking
+- Boss debuff tracking
+- Proc monitoring
+
+Group DPS Sharing
+- Share data with group via LibGroupBroadcast
+
+Supported Languages: English, German, French, Spanish, Russian, Japanese, Chinese

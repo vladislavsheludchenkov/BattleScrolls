@@ -1,0 +1,88 @@
+## Title: Battle Scrolls
+## Author: Semigroup1329
+## Description: Combat metrics tracking on consoles with native gamepad UI.
+## APIVersion: 101048
+## AddOnVersion: 1
+## Version: 1.0.0
+## IsLibrary: False
+## DependsOn: LibGroupBroadcast>=91 LibAsync>=30100
+## OptionalDependsOn: LibHarvensAddonSettings
+## SavedVariables: BattleScrollsSavedVariables
+; Localization - default (English) must load first
+lang/default.lua
+; Client language override ($(language) = de, fr, es, ru, jp, zh, or en)
+lang/$(language).lua
+
+; Access control
+accesscheck.lua
+
+; Havok structures (must load before modules that use them)
+havok/structures.lua
+
+; Constants
+constants.lua
+
+; Core infrastructure
+core/utils.lua
+core/effect.lua
+core/gc.lua
+core/log.lua
+
+; Combat domain
+combat/arithmancer.lua
+combat/accumulators.lua
+combat/effects.lua
+combat/effects_events.lua
+combat/effects_reconcile.lua
+combat/state.lua
+combat/scribe.lua
+
+; Storage domain
+storage/binary.lua
+storage/storage.lua
+
+; Network domain
+network/dpsshare.lua
+network/dpssender.lua
+
+; Entry point
+main.lua
+
+; UI - DPS Meter
+ui/meter/types.lua
+ui/meter/utils.lua
+ui/meter/designs/core.lua
+ui/meter/row_factories.lua
+ui/meter/designs/personal/default.lua
+ui/meter/designs/personal/minimal.lua
+ui/meter/designs/personal/bar.lua
+ui/meter/designs/group/text.lua
+ui/meter/designs/group/hodor.lua
+ui/meter/designs/group/bars.lua
+ui/meter/meter.lua
+ui/meter/meter.xml
+
+; UI - Journal (types and utils load first, then renderers, then controllers)
+ui/journal/types.lua
+ui/journal/utils.lua
+ui/journal/renderers/damage.lua
+ui/journal/renderers/healing.lua
+ui/journal/renderers/effects.lua
+ui/journal/renderers/overview.lua
+ui/journal/renderers/settings.lua
+ui/journal/controllers/stats_list.lua
+ui/journal/controllers/instance_list.lua
+ui/journal/controllers/encounter_list.lua
+ui/journal/journal.lua
+ui/journal/filters.lua
+ui/journal/overview_panel.lua
+ui/journal/chronicler.lua
+ui/journal/journal.xml
+
+; UI - Onboarding
+ui/onboarding/onboarding.lua
+ui/onboarding/onboarding.xml
+
+# This Add-on is not created by, affiliated with, or sponsored by, ZeniMax Media Inc. or its affiliates.
+# The Elder Scrolls® and related logos are registered trademarks or trademarks of ZeniMax Media Inc. in the United States
+# and/or other countries. All rights reserved.

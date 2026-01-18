@@ -1,0 +1,554 @@
+-- Battle Scrolls Localization - Chinese Simplified (简体中文)
+-- Translations use ESO's official Chinese terminology
+
+local strings = {
+    -------------------------
+    -- Core UI Labels
+    -------------------------
+    [BATTLESCROLLS_UI_NAME] = "Battle Scrolls",
+    [BATTLESCROLLS_UI_SETTINGS] = "设置",
+    [BATTLESCROLLS_UI_FILTER] = "筛选",
+    [BATTLESCROLLS_UI_FILTER_ACTIVE] = "筛选（已启用）",
+    [BATTLESCROLLS_STAT_HPS] = "HPS",
+
+    -------------------------
+    -- Zone/Instance Tabs
+    -------------------------
+    [BATTLESCROLLS_TAB_ALL_ZONES] = "全部区域",
+    [BATTLESCROLLS_TAB_INSTANCED] = "副本",
+    [BATTLESCROLLS_TAB_OVERLAND] = "野外",
+    [BATTLESCROLLS_TAB_HOUSES] = "住宅",
+    [BATTLESCROLLS_TAB_PVP] = "PvP",
+
+    -------------------------
+    -- Encounter Tabs
+    -------------------------
+    [BATTLESCROLLS_TAB_ALL_ENCOUNTERS] = "全部战斗",
+    [BATTLESCROLLS_TAB_BOSS_ENCOUNTERS] = "Boss战",
+    [BATTLESCROLLS_TAB_OTHER_ENCOUNTERS] = "其他战斗",
+    [BATTLESCROLLS_TAB_PLAYER_ENCOUNTERS] = "PvP战斗",
+    [BATTLESCROLLS_TAB_TARGET_DUMMY] = "目标假人",
+
+    -------------------------
+    -- Stats Tabs
+    -------------------------
+    [BATTLESCROLLS_TAB_OVERVIEW] = "概览",
+    [BATTLESCROLLS_TAB_BOSS_DAMAGE_DONE] = "Boss伤害",
+    [BATTLESCROLLS_TAB_DAMAGE_DONE] = "造成伤害",
+    [BATTLESCROLLS_TAB_DAMAGE_TAKEN] = "受到伤害",
+    [BATTLESCROLLS_TAB_HEALING_OUT] = "治疗输出",
+    [BATTLESCROLLS_TAB_SELF_HEALING] = "自我治疗",
+    [BATTLESCROLLS_TAB_HEALING_IN] = "受到治疗",
+    [BATTLESCROLLS_TAB_EFFECTS] = "效果",
+
+    -------------------------
+    -- Time Headers
+    -------------------------
+    [BATTLESCROLLS_TIME_TODAY] = "今天",
+    [BATTLESCROLLS_TIME_YESTERDAY] = "昨天",
+
+    -------------------------
+    -- DPS Meter Settings
+    -------------------------
+    [BATTLESCROLLS_SETTINGS_DPS_METER] = "DPS计量器",
+    [BATTLESCROLLS_SETTINGS_KEEP_AFTER_COMBAT] = "战斗后保持显示",
+    [BATTLESCROLLS_SETTINGS_HIDE_IMMEDIATELY] = "立即隐藏",
+    [BATTLESCROLLS_SETTINGS_10_SECONDS] = "10秒",
+    [BATTLESCROLLS_SETTINGS_30_SECONDS] = "30秒",
+    [BATTLESCROLLS_SETTINGS_2_MINUTES] = "2分钟",
+    [BATTLESCROLLS_SETTINGS_5_MINUTES] = "5分钟",
+    [BATTLESCROLLS_SETTINGS_UNTIL_RELOAD] = "直到重载",
+
+    [BATTLESCROLLS_SETTINGS_PERSONAL_METER] = "个人计量器",
+    [BATTLESCROLLS_SETTINGS_GROUP_METER] = "团队计量器",
+    [BATTLESCROLLS_SETTINGS_GROUP_METER_TEXT] = "如果团队成员安装了此插件，他们仍然可以看到你的DPS。",
+    [BATTLESCROLLS_SETTINGS_ENABLED] = "启用",
+    [BATTLESCROLLS_SETTINGS_MODE] = "模式",
+    [BATTLESCROLLS_SETTINGS_DESIGN] = "设计",
+    [BATTLESCROLLS_SETTINGS_OFFSET_FROM_LEFT] = "左侧距离",
+    [BATTLESCROLLS_SETTINGS_OFFSET_FROM_TOP] = "顶部距离",
+    [BATTLESCROLLS_SETTINGS_SIZE] = "大小",
+    [BATTLESCROLLS_SETTINGS_RESET_POSITION] = "重置位置",
+    [BATTLESCROLLS_SETTINGS_POSITION] = "位置",
+
+    -- Meter modes
+    [BATTLESCROLLS_SETTINGS_MODE_AUTO] = "自动",
+    [BATTLESCROLLS_SETTINGS_MODE_DAMAGE] = "伤害",
+    [BATTLESCROLLS_SETTINGS_MODE_HEALING] = "治疗",
+
+    -- Meter size options
+    [BATTLESCROLLS_SETTINGS_SIZE_EXTRA_SMALL] = "极小",
+    [BATTLESCROLLS_SETTINGS_SIZE_SMALL] = "小",
+    [BATTLESCROLLS_SETTINGS_SIZE_MEDIUM] = "中",
+    [BATTLESCROLLS_SETTINGS_SIZE_LARGE] = "大",
+    [BATTLESCROLLS_SETTINGS_SIZE_EXTRA_LARGE] = "极大",
+
+    -- Meter position options
+    [BATTLESCROLLS_SETTINGS_POSITION_BELOW] = "在个人下方",
+    [BATTLESCROLLS_SETTINGS_POSITION_ABOVE] = "在个人上方",
+    [BATTLESCROLLS_SETTINGS_POSITION_SEPARATE] = "独立",
+
+    -- Auto mode tooltip
+    [BATTLESCROLLS_SETTINGS_AUTO_MODE_TITLE] = "自动模式",
+    [BATTLESCROLLS_SETTINGS_AUTO_MODE_TEXT] = "显示较高的数值 - DPS或HPS。",
+
+    -- Group tracker tooltips
+    [BATTLESCROLLS_SETTINGS_SHOW_WITHOUT_GROUP_DATA] = "无团队数据时显示",
+    [BATTLESCROLLS_SETTINGS_SHOW_WITHOUT_GROUP_DATA_TEXT] = "启用后，即使没有其他团队成员共享DPS数据，团队计量器也会显示。您只会看到自己的数据。",
+    [BATTLESCROLLS_SETTINGS_GROUP_TRACKER_DESIGN] = "团队计量器设计",
+    [BATTLESCROLLS_SETTINGS_GROUP_TRACKER_POSITION] = "团队计量器位置",
+    [BATTLESCROLLS_SETTINGS_GROUP_TRACKER_POSITION_TEXT] = "下方/上方：将团队计量器附加到个人计量器。\n独立：独立放置团队计量器，可自定义位置。",
+
+    -------------------------
+    -- Recording Settings
+    -------------------------
+    [BATTLESCROLLS_SETTINGS_RECORDING] = "记录",
+    [BATTLESCROLLS_SETTINGS_RECORD_IN_INSTANCED] = "在副本中记录",
+    [BATTLESCROLLS_SETTINGS_RECORD_IN_INSTANCED_TEXT] = "副本区域包括地下城、试炼、竞技场和无尽档案馆。",
+    [BATTLESCROLLS_SETTINGS_RECORD_IN_OVERLAND] = "在野外记录",
+    [BATTLESCROLLS_SETTINGS_RECORD_IN_HOUSES] = "在住宅中记录",
+    [BATTLESCROLLS_SETTINGS_RECORD_IN_PVP] = "在PvP中记录",
+    [BATTLESCROLLS_SETTINGS_RECORD_BOSS_FIGHTS] = "记录Boss战",
+    [BATTLESCROLLS_SETTINGS_RECORD_TRASH_FIGHTS] = "记录小怪战",
+    [BATTLESCROLLS_SETTINGS_RECORD_TRASH_FIGHTS_TEXT] = "与普通敌人的战斗（非Boss、非玩家）。",
+    [BATTLESCROLLS_SETTINGS_RECORD_PLAYER_FIGHTS] = "记录PvP战斗",
+    [BATTLESCROLLS_SETTINGS_RECORD_PLAYER_FIGHTS_TEXT] = "与其他玩家的PvP战斗。",
+    [BATTLESCROLLS_SETTINGS_RECORD_DUMMY_FIGHTS] = "记录目标假人战",
+    [BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TITLE] = "记录筛选器",
+    [BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT] = "区域和战斗类型筛选器是组合的：战斗必须匹配至少一个区域和一个类型才能被记录。",
+
+    -- Storage/History settings
+    [BATTLESCROLLS_SETTINGS_HISTORY_SIZE_LIMIT] = "历史记录限制",
+    [BATTLESCROLLS_SETTINGS_HISTORY_SIZE_LIMIT_TITLE] = "历史记录限制",
+    -- Storage size preset labels (dropdown options)
+    [BATTLESCROLLS_SETTINGS_STORAGE_SIZE_XS] = "极小",
+    [BATTLESCROLLS_SETTINGS_STORAGE_SIZE_SMALL] = "小",
+    [BATTLESCROLLS_SETTINGS_STORAGE_SIZE_MEDIUM] = "中",
+    [BATTLESCROLLS_SETTINGS_STORAGE_SIZE_LARGE] = "大",
+    [BATTLESCROLLS_SETTINGS_STORAGE_SIZE_XL] = "极大",
+    [BATTLESCROLLS_SETTINGS_STORAGE_SIZE_CAUTION] = "小心",
+    [BATTLESCROLLS_SETTINGS_STORAGE_SIZE_YOLO] = "能出什么问题呢？",
+    -- Storage tooltip
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_DESC] = "保留多少战斗历史。超过限制时，最旧的副本会被自动删除。",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_NOTE] = "此限制仅适用于保存的历史记录。插件还会使用内存来追踪当前战斗和渲染界面，因此总使用量会更高。",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_CURRENT] = "历史: <<1>> MB / <<2>> MB (<<3>>%)",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_PRESETS] = "预设 (试炼 ~0.5-1 MB，地下城 ~0.25-0.5 MB):",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_XS] = "  极小: 5 MB - 最近几次",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_SMALL] = "  小: 8 MB - 一晚的开荒",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_MEDIUM] = "  中: 12 MB - 一周的休闲游戏",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_LARGE] = "  大: 18 MB - 几周的记录",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_XL] = "  极大: 25 MB - 一个月的回忆",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_CAUTION] = "  小心: 40 MB - 你真的很喜欢数据",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_YOLO] = "  能出什么问题呢？: 60 MB - 危险地活着",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_WARNING] = "关于ESO内存限制：所有插件共享100 MB内存池。达到70 MB时，ESO会显示警告。达到100 MB时，界面会重新加载并禁用所有插件。如果你使用很多插件，请选择较小的预设。提示：在聊天中输入 /addonmemdisplay 可以查看实时内存监控。",
+
+    -------------------------
+    -- Effect Tracking Settings
+    -------------------------
+    [BATTLESCROLLS_SETTINGS_EFFECT_TRACKING] = "效果追踪",
+    [BATTLESCROLLS_SETTINGS_PLAYER_BUFFS] = "自身增益",
+    [BATTLESCROLLS_SETTINGS_PLAYER_DEBUFFS] = "自身减益",
+    [BATTLESCROLLS_SETTINGS_GROUP_BUFFS] = "团队增益",
+    [BATTLESCROLLS_SETTINGS_BOSS_DEBUFFS] = "Boss减益",
+    [BATTLESCROLLS_SETTINGS_RECON_PRECISION] = "校验精度",
+    [BATTLESCROLLS_SETTINGS_RECON_PRECISION_TOOLTIP] = "效果追踪与游戏状态校验的频率。更高精度能捕获更多遗漏事件，但会消耗更多内存。内存仅在重载UI时释放。",
+    [BATTLESCROLLS_SETTINGS_RECON_MAX] = "最高",
+    [BATTLESCROLLS_SETTINGS_RECON_HIGH] = "高",
+    [BATTLESCROLLS_SETTINGS_RECON_NORMAL] = "正常",
+    [BATTLESCROLLS_SETTINGS_RECON_LOW] = "低",
+    [BATTLESCROLLS_SETTINGS_RECON_OFF] = "关闭",
+
+    -------------------------
+    -- Slider keybinds
+    -------------------------
+    [BATTLESCROLLS_SETTINGS_SLIDER_HOLD_FAST] = "按住快速移动",
+    [BATTLESCROLLS_SETTINGS_SLIDER_RELEASE_PRECISION] = "松开精确调整",
+
+    -------------------------
+    -- Overview Stats
+    -------------------------
+    [BATTLESCROLLS_STAT_DURATION] = "持续时间",
+    [BATTLESCROLLS_STAT_SUMMARY] = "摘要",
+
+    -- Boss Damage
+    [BATTLESCROLLS_STAT_PERSONAL_BOSS_DAMAGE] = "个人Boss伤害",
+    [BATTLESCROLLS_STAT_PERSONAL_BOSS_DPS] = "个人Boss DPS",
+    [BATTLESCROLLS_STAT_PERSONAL_BOSS_DAMAGE_SHARE] = "个人Boss伤害占比",
+    [BATTLESCROLLS_HEADER_BOSS_DAMAGE_DONE] = "Boss伤害",
+
+    -- Total Damage
+    [BATTLESCROLLS_STAT_PERSONAL_DAMAGE] = "个人伤害",
+    [BATTLESCROLLS_STAT_PERSONAL_DPS] = "个人DPS",
+    [BATTLESCROLLS_STAT_PERSONAL_SHARE] = "个人占比",
+    [BATTLESCROLLS_HEADER_TOTAL_DAMAGE_DONE] = "总伤害",
+
+    -- Damage Taken
+    [BATTLESCROLLS_STAT_TOTAL_DAMAGE_TAKEN] = "总受到伤害",
+    [BATTLESCROLLS_STAT_DTPS] = "DTPS",
+    [BATTLESCROLLS_HEADER_DAMAGE_TAKEN] = "受到伤害",
+
+    -- Healing Overview
+    [BATTLESCROLLS_STAT_RAW_SELF_HEALING] = "总自我治疗",
+    [BATTLESCROLLS_STAT_RAW_SELF_HPS] = "总自我治疗HPS",
+    [BATTLESCROLLS_STAT_EFFECTIVE_SELF_HEALING] = "有效自我治疗",
+    [BATTLESCROLLS_STAT_EFFECTIVE_SELF_HPS] = "有效自我治疗HPS",
+    [BATTLESCROLLS_STAT_RAW_HEALING_OUT] = "总治疗输出",
+    [BATTLESCROLLS_STAT_RAW_HEALING_OUT_HPS] = "总输出HPS",
+    [BATTLESCROLLS_STAT_EFFECTIVE_HEALING_OUT] = "有效治疗输出",
+    [BATTLESCROLLS_STAT_EFFECTIVE_HEALING_OUT_HPS] = "有效输出HPS",
+    [BATTLESCROLLS_STAT_RAW_HEALING_IN] = "总受到治疗",
+    [BATTLESCROLLS_STAT_RAW_HEALING_IN_HPS] = "总受到HPS",
+    [BATTLESCROLLS_STAT_EFFECTIVE_HEALING_IN] = "有效受到治疗",
+    [BATTLESCROLLS_STAT_EFFECTIVE_HEALING_IN_HPS] = "有效受到HPS",
+    [BATTLESCROLLS_HEADER_HEALING] = "治疗",
+
+    -- Proc Tracking
+    [BATTLESCROLLS_HEADER_PROC_TRACKING] = "触发追踪",
+    [BATTLESCROLLS_STAT_TOTAL_PROCS] = "次",
+    [BATTLESCROLLS_STAT_MEDIAN_INTERVAL] = "中位数",
+
+    -------------------------
+    -- Damage Stats Details
+    -------------------------
+    [BATTLESCROLLS_STAT_TOTAL_BOSS_DAMAGE] = "总Boss伤害",
+    [BATTLESCROLLS_STAT_BOSS_DPS] = "Boss DPS",
+    [BATTLESCROLLS_STAT_GROUP_SHARE] = "团队占比",
+    [BATTLESCROLLS_STAT_TOTAL_DAMAGE] = "总伤害",
+    [BATTLESCROLLS_STAT_DPS] = "DPS",
+
+    [BATTLESCROLLS_HEADER_BY_ABILITY] = "按技能",
+    [BATTLESCROLLS_HEADER_BY_DAMAGE_TYPE] = "按伤害类型",
+    [BATTLESCROLLS_HEADER_DIRECT_VS_DOT] = "直接 vs DoT",
+    [BATTLESCROLLS_HEADER_AOE_VS_SINGLE] = "范围 vs 单体",
+    [BATTLESCROLLS_HEADER_BY_TARGET] = "按目标",
+    [BATTLESCROLLS_HEADER_BY_SOURCE] = "按来源",
+
+    [BATTLESCROLLS_STAT_DIRECT_DAMAGE] = "直接伤害",
+    [BATTLESCROLLS_STAT_DAMAGE_OVER_TIME] = "持续伤害",
+    [BATTLESCROLLS_STAT_AOE_DAMAGE] = "范围伤害",
+    [BATTLESCROLLS_STAT_SINGLE_TARGET_DAMAGE] = "单体伤害",
+
+    -------------------------
+    -- Healing Stats Details
+    -------------------------
+    [BATTLESCROLLS_STAT_RAW_HEALING] = "总治疗",
+    [BATTLESCROLLS_STAT_RAW_HPS] = "总HPS",
+    [BATTLESCROLLS_STAT_EFFECTIVE_HEALING] = "有效治疗",
+    [BATTLESCROLLS_STAT_EFFECTIVE_HPS] = "有效HPS",
+    [BATTLESCROLLS_STAT_OVERHEAL] = "过量治疗",
+
+    [BATTLESCROLLS_HEADER_RAW_HOT_VS_DIRECT] = "总：HoT vs 直接",
+    [BATTLESCROLLS_HEADER_EFFECTIVE_HOT_VS_DIRECT] = "有效：HoT vs 直接",
+    [BATTLESCROLLS_HEADER_RAW_BY_TARGET] = "总治疗（按目标）",
+    [BATTLESCROLLS_HEADER_RAW_BY_ABILITY] = "总治疗（按技能）",
+    [BATTLESCROLLS_HEADER_EFFECTIVE_BY_TARGET] = "有效治疗（按目标）",
+    [BATTLESCROLLS_HEADER_EFFECTIVE_BY_ABILITY] = "有效治疗（按技能）",
+    [BATTLESCROLLS_HEADER_RAW_BY_SOURCE] = "总治疗（按来源）",
+    [BATTLESCROLLS_HEADER_EFFECTIVE_BY_SOURCE] = "有效治疗（按来源）",
+    [BATTLESCROLLS_HEADER_RAW_HEALING_BY_TARGET] = "总治疗（按目标）",
+    [BATTLESCROLLS_HEADER_RAW_HEALING_BY_ABILITY] = "总治疗（按技能）",
+    [BATTLESCROLLS_HEADER_EFFECTIVE_HEALING_BY_TARGET] = "有效治疗（按目标）",
+    [BATTLESCROLLS_HEADER_EFFECTIVE_HEALING_BY_ABILITY] = "有效治疗（按技能）",
+    [BATTLESCROLLS_HEADER_RAW_HEALING_BY_SOURCE] = "总治疗（按来源）",
+    [BATTLESCROLLS_HEADER_EFFECTIVE_HEALING_BY_SOURCE] = "有效治疗（按来源）",
+
+    [BATTLESCROLLS_STAT_DIRECT_HEALING] = "直接治疗",
+    [BATTLESCROLLS_STAT_HEALING_OVER_TIME] = "持续治疗",
+
+    -------------------------
+    -- Effects Stats
+    -------------------------
+    [BATTLESCROLLS_HEADER_YOUR_BUFFS] = "你的增益",
+    [BATTLESCROLLS_HEADER_DEBUFFS_ON_YOU] = "你身上的减益",
+    [BATTLESCROLLS_HEADER_BUFFS_ON_GROUP] = "团队增益",
+    [BATTLESCROLLS_HEADER_DEBUFFS_ON] = "<<1>>身上的减益",
+
+    [BATTLESCROLLS_EFFECT_UPTIME] = "覆盖率",
+    [BATTLESCROLLS_EFFECT_YOURS] = "你的",
+    [BATTLESCROLLS_EFFECT_AVG] = "平均",
+    [BATTLESCROLLS_EFFECT_MEMBERS] = "成员",
+
+    -------------------------
+    -- Effect Tooltips
+    -------------------------
+    [BATTLESCROLLS_TOOLTIP_TOTAL_UPTIME] = "总覆盖率",
+    [BATTLESCROLLS_TOOLTIP_TOTAL_APPLICATIONS] = "总应用次数",
+    [BATTLESCROLLS_TOOLTIP_YOUR_CONTRIBUTION] = "你的贡献",
+    [BATTLESCROLLS_TOOLTIP_YOUR_UPTIME] = "覆盖率",
+    [BATTLESCROLLS_TOOLTIP_YOUR_APPLICATIONS] = "应用次数",
+    [BATTLESCROLLS_TOOLTIP_MAX_STACKS] = "最大层数",
+    [BATTLESCROLLS_TOOLTIP_TIME_AT_MAX_STACKS] = "最大层数时间",
+    [BATTLESCROLLS_TOOLTIP_YOUR_TIME_AT_MAX] = "你的最大层时间",
+    [BATTLESCROLLS_TOOLTIP_AVG_UPTIME_PER_MEMBER] = "每成员平均覆盖率",
+    [BATTLESCROLLS_TOOLTIP_MEMBERS_AFFECTED] = "影响成员数",
+    [BATTLESCROLLS_TOOLTIP_AVG_UPTIME] = "平均覆盖率",
+    [BATTLESCROLLS_TOOLTIP_MAX_STACKS_OBSERVED] = "观察到的最大层数",
+    [BATTLESCROLLS_TOOLTIP_AVG_TIME_AT_MAX] = "平均最大层时间",
+    [BATTLESCROLLS_TOOLTIP_YOUR_AVG_TIME_AT_MAX] = "你的平均最大层时间",
+    [BATTLESCROLLS_TOOLTIP_PEAK_INSTANCES] = "最大同时来源数",
+    [BATTLESCROLLS_TOOLTIP_AVG_UPTIME_PER_INSTANCE] = "每来源平均覆盖率",
+    [BATTLESCROLLS_TOOLTIP_PER_MEMBER] = "按成员",
+    [BATTLESCROLLS_TOOLTIP_YOU] = "你",
+
+    -------------------------
+    -- Ability Tooltips
+    -------------------------
+    [BATTLESCROLLS_TOOLTIP_TOTAL] = "总计",
+    [BATTLESCROLLS_TOOLTIP_TYPE] = "类型",
+    [BATTLESCROLLS_TOOLTIP_DELIVERY] = "方式",
+    [BATTLESCROLLS_TOOLTIP_CRIT] = "暴击",
+    [BATTLESCROLLS_TOOLTIP_AVG_TICK] = "平均跳",
+    [BATTLESCROLLS_TOOLTIP_MIN_TICK] = "最小跳",
+    [BATTLESCROLLS_TOOLTIP_MAX_TICK] = "最大跳",
+
+    [BATTLESCROLLS_TOOLTIP_BY_TARGET] = "按目标",
+    [BATTLESCROLLS_TOOLTIP_MEAN_INTERVAL] = "平均间隔",
+    [BATTLESCROLLS_TOOLTIP_MEDIAN_INTERVAL] = "中位数间隔",
+
+    [BATTLESCROLLS_TOOLTIP_ABILITY] = "技能",
+
+    -------------------------
+    -- Damage Types
+    -------------------------
+    [BATTLESCROLLS_DAMAGE_TYPE_NONE] = "无",
+    [BATTLESCROLLS_DAMAGE_TYPE_GENERIC] = "通用",
+    [BATTLESCROLLS_DAMAGE_TYPE_PHYSICAL] = "物理",
+    [BATTLESCROLLS_DAMAGE_TYPE_FIRE] = "火焰",
+    [BATTLESCROLLS_DAMAGE_TYPE_SHOCK] = "电击",
+    [BATTLESCROLLS_DAMAGE_TYPE_OBLIVION] = "湮灭",
+    [BATTLESCROLLS_DAMAGE_TYPE_FROST] = "寒霜",
+    [BATTLESCROLLS_DAMAGE_TYPE_EARTH] = "大地",
+    [BATTLESCROLLS_DAMAGE_TYPE_MAGIC] = "魔法",
+    [BATTLESCROLLS_DAMAGE_TYPE_DROWN] = "溺水",
+    [BATTLESCROLLS_DAMAGE_TYPE_DISEASE] = "疾病",
+    [BATTLESCROLLS_DAMAGE_TYPE_POISON] = "毒素",
+    [BATTLESCROLLS_DAMAGE_TYPE_BLEED] = "流血",
+
+    -------------------------
+    -- Over Time/Direct Descriptions
+    -------------------------
+    [BATTLESCROLLS_DELIVERY_MIXED] = "混合",
+    [BATTLESCROLLS_DELIVERY_DOT] = "DoT",
+    [BATTLESCROLLS_DELIVERY_DIRECT] = "直接",
+    [BATTLESCROLLS_DELIVERY_HOT] = "HoT",
+
+    -------------------------
+    -- Filter Dialog
+    -------------------------
+    [BATTLESCROLLS_FILTER_DAMAGE_DONE] = "筛选伤害",
+    [BATTLESCROLLS_FILTER_BOSS_DAMAGE] = "筛选Boss伤害",
+    [BATTLESCROLLS_FILTER_BY_SOURCE] = "按来源筛选",
+    [BATTLESCROLLS_FILTER_BY_TARGET] = "按目标筛选",
+    [BATTLESCROLLS_FILTER_BY_GROUP_MEMBER] = "按成员筛选",
+    [BATTLESCROLLS_FILTER] = "筛选",
+    [BATTLESCROLLS_FILTER_ACTIVE] = "筛选（已启用）",
+    [BATTLESCROLLS_FILTER_RESET] = "重置",
+    [BATTLESCROLLS_FILTER_DAMAGE_DONE_BY] = "伤害来源",
+    [BATTLESCROLLS_FILTER_DAMAGE_DONE_TO] = "伤害目标",
+    [BATTLESCROLLS_FILTER_BOSS_TARGET] = "Boss目标",
+
+    -------------------------
+    -- Encounter Display
+    -------------------------
+    [BATTLESCROLLS_ENCOUNTER_FIGHT_IN_WITH] = "<<l:1>>与<<2>>的战斗",
+    [BATTLESCROLLS_ENCOUNTER_FIGHT_WITH] = "与<<1>>的战斗",
+    [BATTLESCROLLS_ENCOUNTER_FIGHT_IN] = "<<l:1>>的战斗",
+    [BATTLESCROLLS_ENCOUNTER_COMBAT] = "战斗",
+    [BATTLESCROLLS_ENCOUNTER_INTO_INSTANCE] = "开始后",
+    [BATTLESCROLLS_ENCOUNTER_SELF_SUFFIX] = "（自己）",
+
+    -------------------------
+    -- List States
+    -------------------------
+    [BATTLESCROLLS_LIST_LOADING] = "加载中",
+    [BATTLESCROLLS_LIST_NO_DATA] = "没有战斗记录",
+    [BATTLESCROLLS_LIST_NO_ENCOUNTERS] = "没有战斗",
+    [BATTLESCROLLS_LIST_NO_STATS] = "没有可用的统计数据",
+    [BATTLESCROLLS_LIST_NO_SETTINGS] = "没有可用的设置",
+
+    -------------------------
+    -- LibHarvensAddonSettings Integration
+    -------------------------
+    [BATTLESCROLLS_LIBHARVENS_OPEN_BUTTON] = "打开战斗卷轴",
+    [BATTLESCROLLS_LIBHARVENS_TOOLTIP] = "战斗卷轴也可以从<<1>>菜单访问。",
+
+    -------------------------
+    -- Misc
+    -------------------------
+    [BATTLESCROLLS_UNKNOWN] = "未知",
+    [BATTLESCROLLS_UNKNOWN_BOSS] = "未知Boss",
+
+    -------------------------
+    -- Personal Meter Designs
+    -------------------------
+    [BATTLESCROLLS_DESIGN_PERSONAL_DEFAULT] = "默认",
+    [BATTLESCROLLS_DESIGN_PERSONAL_MINIMAL] = "简约",
+    [BATTLESCROLLS_DESIGN_PERSONAL_BAR] = "进度条",
+
+    -- Bar design settings
+    [BATTLESCROLLS_DESIGN_BAR_DIRECTION] = "进度条方向",
+    [BATTLESCROLLS_DESIGN_BAR_DIRECTION_RIGHT] = "向右",
+    [BATTLESCROLLS_DESIGN_BAR_DIRECTION_LEFT] = "向左",
+    [BATTLESCROLLS_DESIGN_BAR_DIRECTION_CENTER] = "双向",
+
+    -------------------------
+    -- Group Meter Designs
+    -------------------------
+    [BATTLESCROLLS_DESIGN_GROUP_TEXT] = "文本",
+    [BATTLESCROLLS_DESIGN_GROUP_HODOR] = "Hodor",
+    [BATTLESCROLLS_DESIGN_GROUP_HODOR_DESC] = "非常接近Hodor Reflexes (@andy.s、@m00nyONE)。",
+    [BATTLESCROLLS_DESIGN_GROUP_BARS] = "进度条",
+    [BATTLESCROLLS_DESIGN_GROUP_BARS_DESC] = "参考了Hodor Restyle (Hyperioxes)。",
+
+    -- Text design settings
+    [BATTLESCROLLS_DESIGN_TEXT_COLUMNS] = "列数",
+    [BATTLESCROLLS_DESIGN_TEXT_COLUMNS_TITLE] = "列布局",
+    [BATTLESCROLLS_DESIGN_TEXT_COLUMNS_TEXT] = "4人或更少的队伍始终使用1列。",
+
+    -------------------------
+    -- DPS Meter Display Strings
+    -- Note: DPS/HPS are universal gaming terms, hardcoded in code
+    -------------------------
+    [BATTLESCROLLS_METER_EFFECTIVE] = "有效",
+    [BATTLESCROLLS_METER_EFF] = "有效",
+    [BATTLESCROLLS_METER_BOSS] = "Boss",
+    [BATTLESCROLLS_METER_ALL] = "全部",
+    [BATTLESCROLLS_METER_ALL_DAMAGE] = "总伤害",
+    [BATTLESCROLLS_METER_TOTAL] = "合计",
+    [BATTLESCROLLS_METER_BOSS_ALL_DAMAGE] = "Boss伤害 / 总伤害",
+    [BATTLESCROLLS_METER_EFFECTIVE_RAW_HEALING] = "有效 / 总治疗",
+
+    -- Overview Panel Q3/Q4 Headers
+    [BATTLESCROLLS_OVERVIEW_TOP_ABILITIES] = "主要技能",
+    [BATTLESCROLLS_OVERVIEW_BOSSES] = "Boss",
+    [BATTLESCROLLS_OVERVIEW_TARGETS] = "目标",
+    [BATTLESCROLLS_OVERVIEW_SOURCES] = "来源",
+    [BATTLESCROLLS_OVERVIEW_TARGETS_HEALED] = "治疗目标",
+    [BATTLESCROLLS_OVERVIEW_HEALERS] = "治疗者",
+    [BATTLESCROLLS_OVERVIEW_GROUP_BUFFS] = "团队增益",
+    [BATTLESCROLLS_OVERVIEW_BOSS_DEBUFFS] = "Boss减益",
+
+    -- Group Stats
+    [BATTLESCROLLS_GROUP_DAMAGE] = "团队伤害",
+    [BATTLESCROLLS_GROUP_BOSS_DAMAGE] = "团队Boss伤害",
+    [BATTLESCROLLS_GROUP_DPS] = "团队DPS",
+    [BATTLESCROLLS_GROUP_BOSS_DPS] = "团队Boss DPS",
+    [BATTLESCROLLS_STAT_GROUP_DAMAGE] = "团队伤害",
+    [BATTLESCROLLS_STAT_GROUP_DPS] = "团队DPS",
+    [BATTLESCROLLS_STAT_GROUP_BOSS_DAMAGE] = "团队Boss伤害",
+    [BATTLESCROLLS_STAT_GROUP_BOSS_DPS] = "团队Boss DPS",
+
+    -- Overview Panel - Ability Stats
+    [BATTLESCROLLS_STAT_MAX_PREFIX] = "最高: <<1>>",
+    [BATTLESCROLLS_STAT_CRIT_PERCENT] = "<<1>>%暴击",
+    [BATTLESCROLLS_STAT_PER_SECOND] = "<<1>>/秒",
+
+    -- Overview Panel - Effect Stats
+    [BATTLESCROLLS_EFFECT_APPS_COUNT] = "<<1>>次应用",
+    [BATTLESCROLLS_EFFECT_YOURS_PERCENT] = "<<1>>%自己",
+    [BATTLESCROLLS_EFFECT_STACKS_COUNT] = "×<<1>>层",
+
+    -- Overview Panel Summary
+    [BATTLESCROLLS_OVERVIEW_ENCOUNTER] = "战斗",
+    [BATTLESCROLLS_OVERVIEW_DAMAGE_OUTPUT] = "伤害输出",
+    [BATTLESCROLLS_OVERVIEW_SUMMARY] = "摘要",
+    [BATTLESCROLLS_OVERVIEW_TOTAL] = "总计",
+    [BATTLESCROLLS_OVERVIEW_SHARE] = "占比",
+    [BATTLESCROLLS_OVERVIEW_COMPOSITION] = "构成",
+    [BATTLESCROLLS_OVERVIEW_QUALITY] = "质量",
+    [BATTLESCROLLS_OVERVIEW_CRIT_RATE] = "暴击率",
+    [BATTLESCROLLS_OVERVIEW_MAX_HIT] = "最高伤害",
+    [BATTLESCROLLS_OVERVIEW_MAX_HEAL] = "最高治疗",
+    [BATTLESCROLLS_OVERVIEW_EFFICIENCY] = "效率",
+    [BATTLESCROLLS_OVERVIEW_KEY_BUFFS] = "你的增益",
+    [BATTLESCROLLS_OVERVIEW_KEY_DEBUFFS] = "关键减益",
+    [BATTLESCROLLS_OVERVIEW_UPTIMES] = "覆盖时间",
+    [BATTLESCROLLS_OVERVIEW_NO_EFFECTS] = "无效果记录",
+
+    -- Overview Panel Short Labels
+    [BATTLESCROLLS_BOSS_DAMAGE] = "Boss伤害",
+    [BATTLESCROLLS_DAMAGE_DONE] = "造成伤害",
+    [BATTLESCROLLS_HEALING_OUT] = "治疗输出",
+    [BATTLESCROLLS_SELF_HEALING] = "自我治疗",
+    [BATTLESCROLLS_HEALING_IN] = "受到治疗",
+    [BATTLESCROLLS_AOE] = "范围",
+    [BATTLESCROLLS_SINGLE_TARGET] = "单体",
+    [BATTLESCROLLS_HEALING_RAW_HPS] = "总HPS",
+    [BATTLESCROLLS_HEALING_EFFECTIVE_HPS] = "有效HPS",
+    [BATTLESCROLLS_HEALING_OVERHEAL] = "过量治疗",
+    [BATTLESCROLLS_TOOLTIP_DURATION] = "持续时间",
+
+    -------------------------
+    -- LibAsync Settings
+    -------------------------
+    [BATTLESCROLLS_SETTINGS_PERFORMANCE] = "性能",
+    [BATTLESCROLLS_SETTINGS_ASYNC_SPEED] = "处理速度",
+    [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_PERFORMANCE] = "高性能",
+    [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_BALANCED] = "平衡",
+    [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_SMOOTH] = "流畅",
+    [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_CUSTOM] = "自定义 (<<1>> FPS)",
+    [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_TITLE] = "处理速度",
+    [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_TEXT] = "控制后台任务的处理速度。主要影响日志界面以及战斗结束后记录出现在列表中的时间。\n\n高性能：处理最快。可能导致短暂卡顿。\n平衡：速度和流畅度的良好平衡。\n流畅：最流畅的游戏体验，处理较慢。\n\n此设置影响所有使用LibAsync的插件。",
+
+    -------------------------
+    -- Onboarding
+    -------------------------
+    [BATTLESCROLLS_ONBOARDING_WELCOME_TITLE] = "欢迎使用战斗卷轴",
+    [BATTLESCROLLS_ONBOARDING_WELCOME_TEXT] = "战斗卷轴记录您的战斗遭遇，让您稍后在日志中查看。\n\n功能：\n- 实时DPS/HPS计量器\n- 详细的伤害和治疗分解\n- 增益/减益覆盖率追踪\n- Boss减益监控\n\n让我们配置一些设置。",
+    [BATTLESCROLLS_ONBOARDING_GET_STARTED] = "开始",
+    [BATTLESCROLLS_ONBOARDING_GET_STARTED_DESC] = "引导我完成设置选项",
+    [BATTLESCROLLS_ONBOARDING_SKIP] = "跳过",
+    [BATTLESCROLLS_ONBOARDING_SKIP_DESC] = "我自己研究。使用推荐设置。",
+    [BATTLESCROLLS_ONBOARDING_METER_QUESTION] = "选择DPS计量器样式：",
+    -- Meter presets
+    [BATTLESCROLLS_PRESET_PERSONAL_MINIMAL] = "简约",
+    [BATTLESCROLLS_PRESET_PERSONAL_MINIMAL_DESC] = "屏幕角落的紧凑个人计量器",
+    [BATTLESCROLLS_PRESET_FULL_STACKED] = "个人 + 团队",
+    [BATTLESCROLLS_PRESET_FULL_STACKED_DESC] = "个人计量器与下方的团队排名",
+    [BATTLESCROLLS_PRESET_HODOR] = "Hodor风格",
+    [BATTLESCROLLS_PRESET_HODOR_DESC] = "仅团队，非常接近Hodor Reflexes (@andy.s, @m00nyONE)",
+    [BATTLESCROLLS_PRESET_BAR] = "进度条",
+    [BATTLESCROLLS_PRESET_BAR_DESC] = "个人DPS进度条",
+    [BATTLESCROLLS_PRESET_COLORFUL] = "彩色条",
+    [BATTLESCROLLS_PRESET_COLORFUL_DESC] = "个人和团队DPS彩色条，团队参考了Hodor Restyle (Hyperioxes)",
+    [BATTLESCROLLS_PRESET_DISABLED] = "禁用",
+    [BATTLESCROLLS_PRESET_DISABLED_DESC] = "无计量器，仅录制",
+    -- Storage options
+    [BATTLESCROLLS_ONBOARDING_STORAGE_QUESTION] = "保留多少历史记录？",
+    [BATTLESCROLLS_ONBOARDING_STORAGE_MINIMAL] = "最少 (5 MB)",
+    [BATTLESCROLLS_ONBOARDING_STORAGE_MINIMAL_DESC] = "约6次试炼",
+    [BATTLESCROLLS_ONBOARDING_STORAGE_MODERATE] = "适中 (12 MB)",
+    [BATTLESCROLLS_ONBOARDING_STORAGE_MODERATE_DESC] = "约16次试炼",
+    [BATTLESCROLLS_ONBOARDING_STORAGE_GENEROUS] = "较多 (25 MB)",
+    [BATTLESCROLLS_ONBOARDING_STORAGE_GENEROUS_DESC] = "约36次试炼",
+    -- Effects tracking
+    [BATTLESCROLLS_ONBOARDING_EFFECTS_QUESTION] = "需要多少增益/减益追踪？",
+    [BATTLESCROLLS_ONBOARDING_EFFECTS_FULL] = "完整追踪",
+    [BATTLESCROLLS_ONBOARDING_EFFECTS_FULL_DESC] = "您的增益、Boss减益以及团队增益覆盖率（如所有团队成员的主要勇气覆盖率）",
+    [BATTLESCROLLS_ONBOARDING_EFFECTS_ESSENTIAL] = "仅基本",
+    [BATTLESCROLLS_ONBOARDING_EFFECTS_ESSENTIAL_DESC] = "仅您的增益和Boss减益。跳过团队追踪以减少内存使用。",
+    [BATTLESCROLLS_ONBOARDING_EFFECTS_DISABLED] = "禁用",
+    [BATTLESCROLLS_ONBOARDING_EFFECTS_DISABLED_DESC] = "不追踪增益/减益。内存使用最少，但报告中无覆盖率数据。",
+    -- Completion
+    [BATTLESCROLLS_ONBOARDING_COMPLETE_TITLE] = "一切就绪！",
+    [BATTLESCROLLS_ONBOARDING_COMPLETE_TEXT] = "战斗卷轴已准备好追踪您的战斗。\n\n现在去战斗吧！\n\n您的战斗记录将显示在日志中。您可以随时在设置选项卡中调整这些设置。",
+    [BATTLESCROLLS_ONBOARDING_CHAT_MESSAGE] = "[战斗卷轴] 感谢安装！打开日志 > 战斗卷轴进行设置和激活。",
+    [BATTLESCROLLS_ONBOARDING_CONTINUE] = "继续",
+    [BATTLESCROLLS_ONBOARDING_FINISH] = "完成设置",
+    [BATTLESCROLLS_ONBOARDING_LETS_GO] = "出发！",
+    [BATTLESCROLLS_ONBOARDING_STEP_FORMAT] = "第 <<1>> 步，共 <<2>> 步",
+
+    -------------------------
+    -- Dynamic Overview Panel
+    -------------------------
+    [BATTLESCROLLS_OVERVIEW_DAMAGE_TAKEN] = "受到伤害",
+    [BATTLESCROLLS_OVERVIEW_TOP_HEALING] = "最高治疗",
+    [BATTLESCROLLS_OVERVIEW_TOP_INCOMING] = "最高受到伤害",
+    [BATTLESCROLLS_OVERVIEW_HEALING_TARGETS] = "治疗目标",
+    [BATTLESCROLLS_OVERVIEW_DAMAGE_SOURCES] = "伤害来源",
+}
+
+-- Register translations
+for stringId, stringValue in pairs(strings) do
+    SafeAddString(stringId, stringValue, 1)
+end
