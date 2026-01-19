@@ -67,6 +67,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 - **Hodor Reflexes** by @andy.s and @m00nyONE - the "Hodor" group meter design is closely based on their work
 - **Hodor Restyle** by Hyperioxes - the "Bars" group meter design is loosely inspired by this
 - **LibCombat** by Solinur - ideas for solving some combat tracking edge cases (vSS/vCR portal handling)
+- **Area Damage** [ability list](https://github.com/Shienar/AreaDamage) by Shienar - used for AoE vs ST breakdown
 
 ---
 

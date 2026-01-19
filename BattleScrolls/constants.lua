@@ -97,6 +97,7 @@ constants.allowBossUnitIdOverrideZoneIds = {
     [1121] = true
 }
 
+-- Copied from https://github.com/Shienar/AreaDamage/blob/main/table.lua
 constants.aoeAbilityIds = {
     -- CATEGORY: Item Set>Arena>Maelstrom Arena
     [71646] = true, -- Winterborn | Last Checked: U47
