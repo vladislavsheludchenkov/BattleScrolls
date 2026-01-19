@@ -496,10 +496,7 @@ local function estimateValueSize(value, visited)
 end
 
 -- Correction factor for memory estimates.
--- Our Lua 5.1 memory model underestimates actual ESO memory usage by ~50% due to:
--- - ZO_SavedVars wrapper overhead (nested account/world tables)
--- - Memory allocator bookkeeping per allocation
--- - Possible differences in Havok Lua vs standard Lua 5.1
+-- Our Lua 5.1 memory model underestimates actual ESO memory usage by ~50% god knows why
 local MEMORY_ESTIMATE_CORRECTION_FACTOR = 1.5
 
 ---Gets the estimated size of an instance in bytes, using cached value if available

@@ -598,22 +598,14 @@ local function InitializeFilterDialog()
 end
 
 -------------------------
--- Initialize on Load
+-- Initialize (called from main.lua)
 -------------------------
 
-local function OnAddOnLoaded(_event, name)
-    if name ~= "BattleScrolls" then
-        return
-    end
-
-    EVENT_MANAGER:UnregisterForEvent("BattleScrolls_JournalFilters", EVENT_ADD_ON_LOADED)
-
+function filters.Initialize()
     zo_callLater(function()
         InitializeFilterDialog()
     end, 100)
 end
-
-EVENT_MANAGER:RegisterForEvent("BattleScrolls_JournalFilters", EVENT_ADD_ON_LOADED, OnAddOnLoaded)
 
 -- Export to namespace
 journal.filters = filters

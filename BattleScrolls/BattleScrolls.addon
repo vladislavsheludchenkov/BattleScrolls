@@ -2,8 +2,8 @@
 ## Author: Semigroup1329
 ## Description: Combat metrics tracking on consoles with native gamepad UI.
 ## APIVersion: 101048
-## AddOnVersion: 1
-## Version: 1.0.0
+## AddOnVersion: {{addon_version}}
+## Version: {{version}}
 ## IsLibrary: False
 ## DependsOn: LibGroupBroadcast>=91 LibAsync>=30100
 ## OptionalDependsOn: LibHarvensAddonSettings

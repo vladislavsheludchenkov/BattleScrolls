@@ -34,6 +34,7 @@ function BattleScrolls.OnAddOnLoaded(_, addonName)
         BattleScrolls.dpsSender:Initialize()
         BattleScrolls.dpsMeter:Initialize()
         BattleScrolls.onboarding:Initialize()
+        BattleScrolls.journal.filters.Initialize()
         EVENT_MANAGER:UnregisterForEvent("BattleScrolls_Main", EVENT_ADD_ON_LOADED)
     end
 end
