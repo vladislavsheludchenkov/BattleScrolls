@@ -254,7 +254,7 @@ function scribe:ResetForNewInstance()
         left = false,
         timestampS = GetTimeStamp(),
         encounters = {},
-        -- _instanceData and _instanceBits will be set after first encounter
+        -- _instanceData will be set after first encounter
     }
     self.location = BattleScrolls.utils.MaybeLocationName()
     -- GC after replacing instance (old instance/caches discarded, nothing important happening)
@@ -471,12 +471,11 @@ function scribe:ImportEncounterFromStateAsync()
 
         -- Re-encode instance fields (abilityInfo only, unitNames now per-encounter)
         -- This ensures SavedVariables always has consistent compressed data
-        local encodedFields = BattleScrolls.binaryStorage.EncodeInstanceFieldsAsync(
+        local encodedFields = BattleScrolls.binaryStorage.encodeInstanceFieldsAsync(
             decodedAbilityInfo):Await()
         -- No yield between setting fields and inserting encounter to make
         -- sure it's atomic
         instance._instanceData = encodedFields._instanceData
-        instance._instanceBits = encodedFields._instanceBits
         table.insert(instance.encounters, compactEncounter)
         -- Invalidate cached size since instance data changed
         instance._estimatedSize = nil

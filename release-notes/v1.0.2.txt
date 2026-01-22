@@ -1,0 +1,9 @@
+Storage and effect tracking improvements
+
+Storage
+- Optimized encoding/decoding for faster Journal loading
+- Reduced memory usage during encounter processing
+
+Effect Tracking
+- Fixed buff/debuff uptimes when group members go offline during combat
+- Improved handling of group members reconnecting mid-fight

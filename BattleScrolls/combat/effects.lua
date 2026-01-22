@@ -955,12 +955,27 @@ local function reconcilePlayerAliveState(ctx)
 end
 
 ---Reconciles unit alive state before effect reconciliation (for bosses and group members)
+---Uses different logic per unit type:
+---  - Bosses: dead if IsUnitDead or doesn't exist (despawn = death)
+---  - Group: dead if IsUnitDead or offline (portal = alive, continue reconciliation)
 ---@param ctx EffectContext
 ---@param storageKey string The storage key (unitTag for bosses, displayName for group)
 ---@param unitTag string The unit tag to check
 ---@return boolean shouldContinue Whether to continue with effect reconciliation (false if dead)
 local function reconcileUnitAliveState(ctx, storageKey, unitTag)
-    local isActuallyDead = IsUnitDead(unitTag)
+    local isBoss = unitTag:find(PATTERN_BOSS)
+    local isActuallyDead
+
+    if isBoss then
+        -- Boss: dead if doesn't exist OR IsUnitDead
+        isActuallyDead = not DoesUnitExist(unitTag) or IsUnitDead(unitTag)
+    else
+        -- Group member: dead if IsUnitDead OR offline
+        -- Note: DoesUnitExist is intentionally NOT checked here
+        -- Portal entry = unit doesn't exist but IsUnitOnline returns true = still alive
+        isActuallyDead = IsUnitDead(unitTag) or not IsUnitOnline(unitTag)
+    end
+
     local aliveState = ctx.unitAliveState[storageKey]
 
     if not aliveState then
@@ -982,7 +997,6 @@ local function reconcileUnitAliveState(ctx, storageKey, unitTag)
         else
             effects.handleUnitAlive(ctx, unitTag)
         end
-        return not isActuallyDead
     end
 
     return not isActuallyDead

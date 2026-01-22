@@ -53,7 +53,6 @@ BattleScrolls = BattleScrolls or {}
 ---Binary-encoded encounter (v3+)
 ---@class CompactEncounter
 ---@field _v number Schema version (3+)
----@field _bits number Bit length of encoded data
 ---@field _data string[] Array of base64-encoded data chunks
 ---@field displayName string|nil Pre-computed display name for encounter list UI
 ---@field location string|nil Location within the zone
@@ -84,7 +83,7 @@ BattleScrolls = BattleScrolls or {}
 
 -- Instance types distinguish between live state (during combat) and storage format.
 -- InstanceState: Live instance with uncompressed abilityInfo and unitNames
--- InstanceStorage: Persisted instance with potentially compressed data (_instanceData/_instanceBits)
+-- InstanceStorage: Persisted instance with potentially compressed data (_instanceData)
 -- Instance: Union type for code that handles both formats
 
 ---@class InstanceState
@@ -102,8 +101,7 @@ BattleScrolls = BattleScrolls or {}
 ---@field timestampS number Absolute timestamp when this instance visit started
 ---@field abilityInfo table<number, AbilityInfoStorage>|nil Uncompressed ability info (nil if compressed)
 ---@field unitNames table<number, string>|nil Uncompressed unit names (nil if compressed)
----@field _instanceData string[]|nil Compressed abilityInfo and unitNames (base64 chunks)
----@field _instanceBits number|nil Bit length of compressed data
+---@field _instanceData string[]|nil Compressed abilityInfo (base64 chunks)
 ---@field encounters Encounter[] Array of encounters in this instance
 
 ---@alias Instance InstanceState|InstanceStorage
@@ -625,7 +623,7 @@ end
 ---@param encounter Encounter
 ---@return Effect
 function storage.EncodeEncounterAsync(encounter)
-    return BattleScrolls.binaryStorage.EncodeEncounterAsync(encounter)
+    return BattleScrolls.binaryStorage.encodeEncounterAsync(encounter)
 end
 
 ---Tab visibility flags computed from encounter data
@@ -697,7 +695,7 @@ end
 ---@return Effect Effect that resolves to Encounter
 function storage.DecodeEncounterAsync(encounter)
     return LibEffect.Async(function()
-        local decoded = BattleScrolls.binaryStorage.DecodeEncounterAsync(encounter):Await()
+        local decoded = BattleScrolls.binaryStorage.decodeEncounterAsync(encounter):Await()
         return computeTabVisibility(decoded)
     end)
 end
@@ -715,6 +713,6 @@ end
 ---@param instance Instance
 ---@return Effect Effect that resolves to DecodedInstanceFields
 function storage.DecodeInstanceFieldsAsync(instance)
-    return BattleScrolls.binaryStorage.DecodeInstanceFieldsAsync(instance)
+    return BattleScrolls.binaryStorage.decodeInstanceFieldsAsync(instance)
 end
 

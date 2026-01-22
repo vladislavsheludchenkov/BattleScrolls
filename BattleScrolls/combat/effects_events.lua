@@ -16,6 +16,9 @@ local effects = BattleScrolls.effects
 local effectsEvents = {}
 BattleScrolls.effectsEvents = effectsEvents
 
+---@type string
+local PATTERN_GROUP = "^group"
+
 -- =============================================================================
 -- EVENT HANDLERS
 -- =============================================================================
@@ -88,13 +91,18 @@ local function onGroupDestroyed(_eventCode, unitTag)
     if IsGroupCompanionUnitTag(unitTag) then return end
     local s = BattleScrolls.state
     if not s or not s.inCombat then return end
-    effects.handleUnitDeath(s, unitTag)
+    -- Treat as death if offline OR actually dead
+    -- Portal entry = online and not dead = still alive
+    if not IsUnitOnline(unitTag) or IsUnitDead(unitTag) then
+        effects.handleUnitDeath(s, unitTag)
+    end
 end
 
 local function onBossCreated(_eventCode, unitTag)
     local s = BattleScrolls.state
     if not s or not s.inCombat then return end
-    effects.handleUnitAlive(s, unitTag)
+    -- Do full refresh which reconciles both alive state and effects
+    effects.handleBossFullRefresh(s, unitTag)
 end
 
 local function onGroupCreated(_eventCode, unitTag)
@@ -102,7 +110,23 @@ local function onGroupCreated(_eventCode, unitTag)
     if IsGroupCompanionUnitTag(unitTag) then return end
     local s = BattleScrolls.state
     if not s or not s.inCombat then return end
-    effects.handleUnitAlive(s, unitTag)
+    -- Do full refresh which reconciles both alive state and effects
+    effects.handleGroupFullRefresh(s, unitTag)
+end
+
+local function onGroupConnectedStatus(_eventCode, unitTag, isOnline)
+    if AreUnitsEqual("player", unitTag) then return end
+    if IsGroupCompanionUnitTag(unitTag) then return end
+    if not unitTag:find(PATTERN_GROUP) then return end
+    local s = BattleScrolls.state
+    if not s or not s.inCombat then return end
+    if isOnline then
+        -- Do full refresh which reconciles both alive state and effects
+        effects.handleGroupFullRefresh(s, unitTag)
+    else
+        -- Offline = treat as dead for effect tracking purposes
+        effects.handleUnitDeath(s, unitTag)
+    end
 end
 
 local function onEffectsFullUpdate(_eventCode)
@@ -167,6 +191,9 @@ function effectsEvents:Initialize()
     EVENT_MANAGER:AddFilterForEvent("BS_Effects_Created_Group", EVENT_UNIT_CREATED,
         REGISTER_FILTER_UNIT_TAG_PREFIX, "group")
 
+    -- Group connected status (online/offline)
+    EVENT_MANAGER:RegisterForEvent("BS_Effects_Connected_Group", EVENT_GROUP_MEMBER_CONNECTED_STATUS, onGroupConnectedStatus)
+
     -- Full effect refresh
     EVENT_MANAGER:RegisterForEvent("BS_Effects_FullUpdate", EVENT_EFFECTS_FULL_UPDATE, onEffectsFullUpdate)
 end
@@ -182,5 +209,6 @@ function effectsEvents:Cleanup()
     EVENT_MANAGER:UnregisterForEvent("BS_Effects_Destroyed_Group", EVENT_UNIT_DESTROYED)
     EVENT_MANAGER:UnregisterForEvent("BS_Effects_Created_Boss", EVENT_UNIT_CREATED)
     EVENT_MANAGER:UnregisterForEvent("BS_Effects_Created_Group", EVENT_UNIT_CREATED)
+    EVENT_MANAGER:UnregisterForEvent("BS_Effects_Connected_Group", EVENT_GROUP_MEMBER_CONNECTED_STATUS)
     EVENT_MANAGER:UnregisterForEvent("BS_Effects_FullUpdate", EVENT_EFFECTS_FULL_UPDATE)
 end

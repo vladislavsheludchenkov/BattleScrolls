@@ -24,7 +24,6 @@ BattleScrolls.addonName = "BattleScrolls"
 ---@param addonName string Name of the loaded addon
 function BattleScrolls.OnAddOnLoaded(_, addonName)
     if addonName == BattleScrolls.addonName then
-        BattleScrolls.binaryStorage:Initialize()
         BattleScrolls.storage:Initialize()
         BattleScrolls.state:Initialize()
         BattleScrolls.effectsEvents:Initialize()

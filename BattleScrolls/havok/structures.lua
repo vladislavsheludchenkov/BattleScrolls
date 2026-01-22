@@ -272,6 +272,33 @@ function structures.newEffectStatsWithAttribution(abilityId, effectType)
     }
 end
 
+---Creates an EffectStatsWithAttribution with all fields specified (for decoding)
+---@param abilityId number
+---@param effectType number
+---@param totalActiveTimeMs number
+---@param timeAtMaxStacksMs number
+---@param applications number
+---@param maxStacks number
+---@param playerActiveTimeMs number
+---@param playerTimeAtMaxStacksMs number
+---@param playerApplications number
+---@param peakConcurrentInstances number
+---@return EffectStatsWithAttribution
+function structures.makeEffectStatsWithAttribution(abilityId, effectType, totalActiveTimeMs, timeAtMaxStacksMs, applications, maxStacks, playerActiveTimeMs, playerTimeAtMaxStacksMs, playerApplications, peakConcurrentInstances)
+    return hmake BS_EffectStatsWithAttribution {
+        abilityId = abilityId,
+        effectType = effectType,
+        totalActiveTimeMs = totalActiveTimeMs,
+        timeAtMaxStacksMs = timeAtMaxStacksMs,
+        applications = applications,
+        maxStacks = maxStacks,
+        playerActiveTimeMs = playerActiveTimeMs,
+        playerTimeAtMaxStacksMs = playerTimeAtMaxStacksMs,
+        playerApplications = playerApplications,
+        peakConcurrentInstances = peakConcurrentInstances,
+    }
+end
+
 ---Creates a new EffectInstance
 ---@param abilityId number
 ---@param effectType number
@@ -310,6 +337,25 @@ function structures.newDamageBreakdown(initialRawHit)
     }
 end
 
+---Creates a DamageBreakdown with all fields specified (for decoding)
+---@param total number
+---@param rawTotal number
+---@param ticks number
+---@param critTicks number
+---@param minTick number
+---@param maxTick number
+---@return DamageBreakdown
+function structures.makeDamageBreakdown(total, rawTotal, ticks, critTicks, minTick, maxTick)
+    return hmake BS_DamageBreakdown {
+        total = total,
+        rawTotal = rawTotal,
+        ticks = ticks,
+        critTicks = critTicks,
+        minTick = minTick,
+        maxTick = maxTick,
+    }
+end
+
 ---Creates a new DamageDone
 ---@return DamageDone
 function structures.newDamageDone()
@@ -329,6 +375,19 @@ function structures.newHealingTotals()
     }
 end
 
+---Creates a HealingTotals with all fields specified (for decoding)
+---@param raw number
+---@param real number
+---@param overheal number
+---@return HealingTotals
+function structures.makeHealingTotals(raw, real, overheal)
+    return hmake BS_HealingTotals {
+        raw = raw,
+        real = real,
+        overheal = overheal,
+    }
+end
+
 ---Creates a new HealingBreakdown
 ---@param initialRawHit number|nil
 ---@return HealingBreakdown
@@ -341,6 +400,27 @@ function structures.newHealingBreakdown(initialRawHit)
         critTicks = 0,
         minTick = initialRawHit,
         maxTick = initialRawHit,
+    }
+end
+
+---Creates a HealingBreakdown with all fields specified (for decoding)
+---@param raw number
+---@param real number
+---@param overheal number
+---@param ticks number
+---@param critTicks number
+---@param minTick number
+---@param maxTick number
+---@return HealingBreakdown
+function structures.makeHealingBreakdown(raw, real, overheal, ticks, critTicks, minTick, maxTick)
+    return hmake BS_HealingBreakdown {
+        raw = raw,
+        real = real,
+        overheal = overheal,
+        ticks = ticks,
+        critTicks = critTicks,
+        minTick = minTick,
+        maxTick = maxTick,
     }
 end
 
