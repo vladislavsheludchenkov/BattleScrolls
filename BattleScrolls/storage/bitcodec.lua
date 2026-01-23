@@ -38,8 +38,10 @@ end
 -- ENCODER THRESHOLD
 -- =============================================================================
 
--- Flush to chunk when we have 1497 bytes (-> 1996 chars, must be < 2000)
-local ENCODE_FLUSH_BYTES = 1497
+-- Flush to chunk when we have this many bytes
+-- PS5 investigation: reduced from 1497 (1996 chars) to 180 (240 chars) to test
+-- if string length causes SavedVariables corruption on PS5
+local ENCODE_FLUSH_BYTES = 180
 
 -- =============================================================================
 -- BIT ENCODER - Write-only, streams directly to base64 chunks
