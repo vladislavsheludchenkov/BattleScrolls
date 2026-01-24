@@ -174,3 +174,18 @@ function utils.GetUndecoratedDisplayName(unitTag)
     end
     return UndecorateDisplayName(displayName)
 end
+
+---Checks if the console is running in Fidelity graphics mode
+---Fidelity mode on PS5/Xbox caps framerate at 30fps. If stall threshold is higher than the
+---framerate cap (e.g. 60), LibAsync yields too early, leaving little to no processing time.
+---@return boolean isFidelity True if running in Fidelity mode on a supported console
+function utils.IsFidelityMode()
+    if DoesPlatformSupportGraphicSetting(GRAPHICS_SETTING_GRAPHICS_MODE_PS5) then
+        return tonumber(GetSetting(SETTING_TYPE_GRAPHICS, GRAPHICS_SETTING_GRAPHICS_MODE_PS5)) == GRAPHICS_MODE_FIDELITY
+    elseif DoesPlatformSupportGraphicSetting(GRAPHICS_SETTING_GRAPHICS_MODE_XBSS) then
+        return tonumber(GetSetting(SETTING_TYPE_GRAPHICS, GRAPHICS_SETTING_GRAPHICS_MODE_XBSS)) == GRAPHICS_MODE_FIDELITY
+    elseif DoesPlatformSupportGraphicSetting(GRAPHICS_SETTING_GRAPHICS_MODE_XBSX) then
+        return tonumber(GetSetting(SETTING_TYPE_GRAPHICS, GRAPHICS_SETTING_GRAPHICS_MODE_XBSX)) == GRAPHICS_MODE_FIDELITY
+    end
+    return true -- assuming it is fidelity is safer as the consequences are nothing works vs maybe stutters once in forever
+end

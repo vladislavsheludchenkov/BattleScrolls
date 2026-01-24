@@ -1,0 +1,7 @@
+New features:
+- You can now delete individual instances and encounters from history
+
+Bugfixes:
+- Fixed an infinite load or Battle Scrolls not appearing in the menu at all when having Smooth performance mode and Fidelity graphics mode. You may need to /reloadui one extra time after updating to this version if you're affected before it works again
+- Fixed multiple game dialogs (such as item destruction) failing with UI errors after using filters in Battle Scrolls
+- Fixed animation sometimes playing in the wrong direction when exiting from Battle Scrolls back to Journal

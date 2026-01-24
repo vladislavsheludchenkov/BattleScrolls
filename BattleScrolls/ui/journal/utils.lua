@@ -110,6 +110,19 @@ function utils.formatPercent(num)
     return string.format("%.1f%%", num)
 end
 
+---Formats bytes as human-readable string (KB or MB)
+---@param bytes number
+---@return string
+function utils.formatBytes(bytes)
+    if bytes >= 1000000 then
+        return string.format("%.1f MB", bytes / 1000000)
+    elseif bytes >= 1000 then
+        return string.format("%.1f KB", bytes / 1000)
+    else
+        return string.format("%d bytes", bytes)
+    end
+end
+
 ---Formats DPS value, rounding small values appropriately
 ---@param dps number Raw DPS value
 ---@return string Formatted DPS string

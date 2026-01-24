@@ -547,6 +547,18 @@ ZO_CreateStringId("BATTLESCROLLS_ONBOARDING_LETS_GO", "Let's Go!")
 ZO_CreateStringId("BATTLESCROLLS_ONBOARDING_STEP_FORMAT", "Step <<1>> of <<2>>")
 
 -------------------------
+-- Delete Functionality
+-------------------------
+ZO_CreateStringId("BATTLESCROLLS_DELETE", "Delete")
+ZO_CreateStringId("BATTLESCROLLS_DELETE_INSTANCE_TITLE", "Delete Zone")
+ZO_CreateStringId("BATTLESCROLLS_DELETE_INSTANCE_TEXT", "Delete <<1>> and all its encounters?")
+ZO_CreateStringId("BATTLESCROLLS_DELETE_ENCOUNTER_TITLE", "Delete Encounter")
+ZO_CreateStringId("BATTLESCROLLS_DELETE_ENCOUNTER_TEXT", "Delete <<1>>?")
+ZO_CreateStringId("BATTLESCROLLS_DELETE_WARNING", "This action cannot be undone.")
+ZO_CreateStringId("BATTLESCROLLS_DELETE_MEMORY_FREE", "Frees approximately <<1>>")
+ZO_CreateStringId("BATTLESCROLLS_DELETE_MEMORY_STATUS", "Memory: <<1>> of <<2>> (<<3>>%)")
+
+-------------------------
 -- Dynamic Overview Panel
 -------------------------
 ZO_CreateStringId("BATTLESCROLLS_OVERVIEW_DAMAGE_TAKEN", "Damage Taken")

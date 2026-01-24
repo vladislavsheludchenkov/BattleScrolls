@@ -539,6 +539,18 @@ local strings = {
     [BATTLESCROLLS_ONBOARDING_STEP_FORMAT] = "Paso <<1>> de <<2>>",
 
     -------------------------
+    -- Delete Functionality
+    -------------------------
+    [BATTLESCROLLS_DELETE] = "Eliminar",
+    [BATTLESCROLLS_DELETE_INSTANCE_TITLE] = "Eliminar zona",
+    [BATTLESCROLLS_DELETE_INSTANCE_TEXT] = "¿Eliminar <<1>> y todos sus combates?",
+    [BATTLESCROLLS_DELETE_ENCOUNTER_TITLE] = "Eliminar combate",
+    [BATTLESCROLLS_DELETE_ENCOUNTER_TEXT] = "¿Eliminar <<1>>?",
+    [BATTLESCROLLS_DELETE_WARNING] = "Esta acción no se puede deshacer.",
+    [BATTLESCROLLS_DELETE_MEMORY_FREE] = "Libera aproximadamente <<1>>",
+    [BATTLESCROLLS_DELETE_MEMORY_STATUS] = "Memoria: <<1>> de <<2>> (<<3>>%)",
+
+    -------------------------
     -- Dynamic Overview Panel
     -------------------------
     [BATTLESCROLLS_OVERVIEW_DAMAGE_TAKEN] = "Daño recibido",

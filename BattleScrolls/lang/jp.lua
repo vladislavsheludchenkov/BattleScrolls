@@ -539,6 +539,18 @@ local strings = {
     [BATTLESCROLLS_ONBOARDING_STEP_FORMAT] = "ステップ <<1>>/<<2>>",
 
     -------------------------
+    -- Delete Functionality
+    -------------------------
+    [BATTLESCROLLS_DELETE] = "削除",
+    [BATTLESCROLLS_DELETE_INSTANCE_TITLE] = "ゾーンを削除",
+    [BATTLESCROLLS_DELETE_INSTANCE_TEXT] = "<<1>>とすべての戦闘を削除しますか？",
+    [BATTLESCROLLS_DELETE_ENCOUNTER_TITLE] = "戦闘を削除",
+    [BATTLESCROLLS_DELETE_ENCOUNTER_TEXT] = "<<1>>を削除しますか？",
+    [BATTLESCROLLS_DELETE_WARNING] = "この操作は取り消せません。",
+    [BATTLESCROLLS_DELETE_MEMORY_FREE] = "約<<1>>を解放",
+    [BATTLESCROLLS_DELETE_MEMORY_STATUS] = "メモリ: <<1>> / <<2>> (<<3>>%)",
+
+    -------------------------
     -- Dynamic Overview Panel
     -------------------------
     [BATTLESCROLLS_OVERVIEW_DAMAGE_TAKEN] = "被ダメージ",

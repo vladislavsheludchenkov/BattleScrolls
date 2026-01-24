@@ -235,7 +235,7 @@ end
 
 ---Resets the scribe for a new instance
 function scribe:ResetForNewInstance()
-    self.left = true
+    self.instance.left = true
     self.pushedToStorage = false
     -- Reset decoded cache
     self.decodedAbilityInfo = {}
@@ -259,6 +259,15 @@ function scribe:ResetForNewInstance()
     self.location = BattleScrolls.utils.MaybeLocationName()
     -- GC after replacing instance (old instance/caches discarded, nothing important happening)
     BattleScrolls.gc:RequestGC(2)
+end
+
+---Called by storage when an instance is removed from history
+---Resets scribe if the removed instance is the active one to prevent orphaned encounters
+---@param instance Instance The instance that was removed
+function scribe:OnInstanceRemoved(instance)
+    if self.instance == instance then
+        self:ResetForNewInstance()
+    end
 end
 
 function scribe:OnPlayerActivated()

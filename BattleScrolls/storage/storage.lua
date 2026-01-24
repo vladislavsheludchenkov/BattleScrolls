@@ -102,7 +102,7 @@ BattleScrolls = BattleScrolls or {}
 ---@field abilityInfo table<number, AbilityInfoStorage>|nil Uncompressed ability info (nil if compressed)
 ---@field unitNames table<number, string>|nil Uncompressed unit names (nil if compressed)
 ---@field _instanceData string[]|nil Compressed abilityInfo (base64 chunks)
----@field encounters Encounter[] Array of encounters in this instance
+---@field encounters CompactEncounter[] Array of encounters in this instance
 
 ---@alias Instance InstanceState|InstanceStorage
 
@@ -612,6 +612,71 @@ function storage:EstimateHistorySize()
     end
 
     return totalBytes, encounterCount, #history
+end
+
+---Estimates the size of an encounter in bytes
+---@param encounter CompactEncounter|Encounter
+---@return number bytes Estimated memory in bytes
+function storage:EstimateEncounterSize(encounter)
+    return estimateValueSize(encounter) * MEMORY_ESTIMATE_CORRECTION_FACTOR
+end
+
+---Gets the estimated size of an instance in bytes
+---@param instance Instance
+---@return number bytes Estimated memory in bytes
+function storage:EstimateInstanceSize(instance)
+    return getInstanceSize(instance)
+end
+
+---Deletes an instance from history by its unique index
+---@param instanceIndex number The unique index of the instance
+---@return boolean success True if instance was found and deleted
+function storage:DeleteInstance(instanceIndex)
+    local history = self.savedVariables.history
+    for i, instance in ipairs(history) do
+        if instance.index == instanceIndex then
+            -- Notify scribe in case this is the active instance
+            if BattleScrolls.scribe then
+                BattleScrolls.scribe:OnInstanceRemoved(instance)
+            end
+            table.remove(history, i)
+            BattleScrolls.gc:RequestGC(2)
+            return true
+        end
+    end
+    return false
+end
+
+---Deletes an encounter from an instance by reference
+---@param instance Instance The instance containing the encounter
+---@param encounter CompactEncounter The encounter object to delete (compared by reference)
+---@return boolean success True if encounter was found and deleted
+---@return boolean instanceDeleted True if instance was also deleted (was last encounter)
+function storage:DeleteEncounter(instance, encounter)
+    instance._estimatedSize = nil  -- Invalidate cached size
+    for i, enc in ipairs(instance.encounters) do
+        if enc == encounter then  -- Direct reference comparison
+            table.remove(instance.encounters, i)
+            BattleScrolls.gc:RequestGC(2)
+            if #instance.encounters == 0 then
+                -- Notify scribe in case this is the active instance
+                if BattleScrolls.scribe then
+                    BattleScrolls.scribe:OnInstanceRemoved(instance)
+                end
+                -- Delete the now-empty instance
+                local history = self.savedVariables.history
+                for j, inst in ipairs(history) do
+                    if inst == instance then
+                        table.remove(history, j)
+                        break
+                    end
+                end
+                return true, true
+            end
+            return true, false
+        end
+    end
+    return false, false
 end
 
 -- =============================================================================

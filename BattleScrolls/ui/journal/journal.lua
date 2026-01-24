@@ -220,7 +220,6 @@ function BattleScrolls_Journal_Gamepad:OnDeferredInitialize()
     if overviewPane and BattleScrolls_Journal_OverviewPanel then
         self.overviewPanel = BattleScrolls_Journal_OverviewPanel:New(overviewPane)
     end
-
 end
 
 function BattleScrolls_Journal_Gamepad:PerformUpdate()
@@ -308,9 +307,22 @@ function BattleScrolls_Journal_Gamepad:InitializeKeybindStripDescriptors()
             keybind = "UI_SHORTCUT_NEGATIVE",
             name = GetString(SI_GAMEPAD_BACK_OPTION),
             callback = function()
+                ZO_ConveyorSceneFragment_SetMovingForward()
                 SCENE_MANAGER:HideCurrentScene()
             end,
             sound = SOUNDS.GAMEPAD_MENU_BACK,
+        },
+        {
+            keybind = "UI_SHORTCUT_RIGHT_STICK",
+            name = GetString(BATTLESCROLLS_DELETE),
+            callback = function()
+                self:ShowDeleteInstanceDialog()
+            end,
+            visible = function()
+                local targetData = self.instanceList:GetTargetData()
+                return targetData ~= nil and targetData.data ~= nil and not targetData.isSettings
+            end,
+            sound = SOUNDS.DIALOG_ACCEPT,
         },
     }
 
@@ -350,14 +362,21 @@ function BattleScrolls_Journal_Gamepad:InitializeKeybindStripDescriptors()
             keybind = "UI_SHORTCUT_NEGATIVE",
             name = GetString(SI_GAMEPAD_BACK_OPTION),
             callback = function()
-                self.mode = NAVIGATION_MODE.INSTANCES
-                self.pendingTabIndex = self.selectedInstanceTab or INSTANCE_TAB.ALL
-                ZO_ConveyorSceneFragment_SetMovingBackward()
-                self:SetCurrentList(self.instanceList)
-                self:RefreshList()
-                self:SetActiveKeybinds(self.instanceKeybindStripDescriptor)
+                self:NavigateToInstanceList()
             end,
             sound = SOUNDS.GAMEPAD_MENU_BACK,
+        },
+        {
+            keybind = "UI_SHORTCUT_RIGHT_STICK",
+            name = GetString(BATTLESCROLLS_DELETE),
+            callback = function()
+                self:ShowDeleteEncounterDialog()
+            end,
+            visible = function()
+                local targetData = self.encounterList:GetTargetData()
+                return targetData ~= nil and targetData.data ~= nil
+            end,
+            sound = SOUNDS.DIALOG_ACCEPT,
         },
     }
 
@@ -819,6 +838,106 @@ function BattleScrolls_Journal_Gamepad:SetActiveKeybinds(keybindDescriptor)
     if self.keybindStripDescriptor then
         KEYBIND_STRIP:AddKeybindButtonGroup(self.keybindStripDescriptor)
     end
+end
+
+-------------------------
+-- Navigation Helpers
+-------------------------
+
+---Navigates back to the instance list
+function BattleScrolls_Journal_Gamepad:NavigateToInstanceList()
+    self.mode = NAVIGATION_MODE.INSTANCES
+    self.selectedInstance = nil
+    self.selectedEncounter = nil
+    self.decodedEncounter = nil
+    self.arithmancer = nil
+    self.pendingTabIndex = self.selectedInstanceTab or INSTANCE_TAB.ALL
+    ZO_ConveyorSceneFragment_SetMovingBackward()
+    self:SetCurrentList(self.instanceList)
+    self:RefreshList()
+    self:SetActiveKeybinds(self.instanceKeybindStripDescriptor)
+end
+
+-------------------------
+-- Delete Dialogs
+-------------------------
+
+---Shows delete instance confirmation dialog
+function BattleScrolls_Journal_Gamepad:ShowDeleteInstanceDialog()
+    local targetData = self.instanceList:GetTargetData()
+    if not targetData or not targetData.data then return end
+
+    local instance = targetData.data
+    local storage = BattleScrolls.storage
+    local utils = BattleScrolls.journal.utils
+
+    local instanceSize = storage:EstimateInstanceSize(instance)
+    local totalBytes, _, _ = storage:EstimateHistorySize()
+    local preset = storage:GetCurrentSizePreset()
+    local limitBytes = preset.memoryMB * 1000000
+    local usagePercent = limitBytes > 0 and (totalBytes / limitBytes * 100) or 0
+
+    local encounterCount = #instance.encounters
+    local instanceName = string.format("%s (%d)", instance.zone, encounterCount)
+
+    local mainText = table.concat({
+        zo_strformat(GetString(BATTLESCROLLS_DELETE_INSTANCE_TEXT), instanceName),
+        zo_strformat(GetString(BATTLESCROLLS_DELETE_MEMORY_FREE), utils.formatBytes(instanceSize)),
+        zo_strformat(GetString(BATTLESCROLLS_DELETE_MEMORY_STATUS),
+            utils.formatBytes(totalBytes), utils.formatBytes(limitBytes), string.format("%.0f", usagePercent)),
+    }, "\n\n")
+
+    BattleScrolls.journal.dialogs.showBasicDialog({
+        title = GetString(BATTLESCROLLS_DELETE_INSTANCE_TITLE),
+        mainText = mainText,
+        warning = GetString(BATTLESCROLLS_DELETE_WARNING),
+        confirmSound = SOUNDS.INVENTORY_DESTROY_JUNK,
+        onConfirm = function()
+            storage:DeleteInstance(instance.index)
+            self:RefreshList()
+        end,
+    })
+end
+
+---Shows delete encounter confirmation dialog
+function BattleScrolls_Journal_Gamepad:ShowDeleteEncounterDialog()
+    local targetData = self.encounterList:GetTargetData()
+    if not targetData or not targetData.data then return end
+
+    local encounter = targetData.data
+    local instance = self.selectedInstance
+    local storage = BattleScrolls.storage
+    local utils = BattleScrolls.journal.utils
+
+    local encounterSize = storage:EstimateEncounterSize(encounter)
+    local totalBytes, _, _ = storage:EstimateHistorySize()
+    local preset = storage:GetCurrentSizePreset()
+    local limitBytes = preset.memoryMB * 1000000
+    local usagePercent = limitBytes > 0 and (totalBytes / limitBytes * 100) or 0
+
+    local encounterName = encounter.displayName
+
+    local mainText = table.concat({
+        zo_strformat(GetString(BATTLESCROLLS_DELETE_ENCOUNTER_TEXT), encounterName),
+        zo_strformat(GetString(BATTLESCROLLS_DELETE_MEMORY_FREE), utils.formatBytes(encounterSize)),
+        zo_strformat(GetString(BATTLESCROLLS_DELETE_MEMORY_STATUS),
+            utils.formatBytes(totalBytes), utils.formatBytes(limitBytes), string.format("%.0f", usagePercent)),
+    }, "\n\n")
+
+    BattleScrolls.journal.dialogs.showBasicDialog({
+        title = GetString(BATTLESCROLLS_DELETE_ENCOUNTER_TITLE),
+        mainText = mainText,
+        warning = GetString(BATTLESCROLLS_DELETE_WARNING),
+        confirmSound = SOUNDS.INVENTORY_DESTROY_JUNK,
+        onConfirm = function()
+            local _, instanceDeleted = storage:DeleteEncounter(instance, encounter)
+            if instanceDeleted or #instance.encounters == 0 then
+                self:NavigateToInstanceList()
+            else
+                self:RefreshList()
+            end
+        end,
+    })
 end
 
 -------------------------

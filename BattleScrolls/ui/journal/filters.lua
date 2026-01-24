@@ -102,7 +102,7 @@ function filters.initializePending(journalUI)
             end
         end
     end
-    BattleScrolls.gc:RequestGC(5)
+    BattleScrolls.gc:RequestGC(2)
 end
 
 ---Resets all pending filters to selected
@@ -170,7 +170,7 @@ function filters.applyPending(journalUI)
 
     local hasFilters = tabFilters.targetFilter or tabFilters.sourceFilter or tabFilters.groupFilter
     journalUI:SetFiltersForTab(journalUI.selectedTab, hasFilters and tabFilters or nil)
-    BattleScrolls.gc:RequestGC(5)
+    BattleScrolls.gc:RequestGC(2)
 end
 
 function filters.togglePending(id)
@@ -501,6 +501,14 @@ end
 -- Show Dialog
 -------------------------
 
+---Cleans up dialog state
+local function CleanupDialogState()
+    pendingFilterState = {}
+    pendingSourceFilterState = {}
+    cachedParametricList = {}
+    BattleScrolls.gc:RequestGC(2)
+end
+
 ---Shows the filter dialog
 ---@param journalUI BattleScrolls_Journal_Gamepad
 function filters.showDialog(journalUI)
@@ -515,96 +523,23 @@ function filters.showDialog(journalUI)
         return
     end
 
-    ZO_Dialogs_ShowGamepadDialog("BATTLESCROLLS_FILTER_DIALOG")
-end
-
--------------------------
--- Dialog Registration
--------------------------
-
-local function InitializeFilterDialog()
-    local function SetupFunction(dialog)
-        local journalUI = BattleScrolls.journalUI
-        ZO_GenericGamepadDialog_RefreshText(dialog, filters.getDialogTitle(journalUI))
-        dialog.info.parametricList = cachedParametricList
-        dialog:setupFunc()
-    end
-
-    local function OnReleaseDialog(_dialog)
-        pendingFilterState = {}
-        pendingSourceFilterState = {}
-        cachedParametricList = {}
-        BattleScrolls.gc:RequestGC(5)
-    end
-
-    ZO_Dialogs_RegisterCustomDialog("BATTLESCROLLS_FILTER_DIALOG",
-    {
-        gamepadInfo = {
-            dialogType = GAMEPAD_DIALOGS.PARAMETRIC,
-        },
-        setup = SetupFunction,
-        parametricList = {},
-        parametricListOnSelectionChangedCallback = function(_dialog, _list, newSelectedData, _oldSelectedData)
-            if newSelectedData then
-                KEYBIND_STRIP:UpdateKeybindButtonGroup(_dialog.keybinds)
-            end
+    journal.dialogs.showParametricDialog({
+        title = filters.getDialogTitle(journalUI),
+        parametricList = cachedParametricList,
+        onConfirm = function()
+            filters.applyPending(journalUI)
+            CleanupDialogState()
+            journal.chronicler.refreshList(journalUI, true)
+            KEYBIND_STRIP:UpdateKeybindButtonGroup(journalUI.statsKeybindStripDescriptor)
         end,
-        blockDialogReleaseOnPress = true,
-        buttons = {
-            {
-                keybind = "DIALOG_PRIMARY",
-                text = SI_GAMEPAD_SELECT_OPTION,
-                callback = function(dialog)
-                    local targetData = dialog.entryList:GetTargetData()
-                    if targetData and targetData.callback then
-                        targetData.callback(dialog)
-                    end
-                end,
-            },
-            {
-                keybind = "DIALOG_NEGATIVE",
-                text = SI_DIALOG_CANCEL,
-                callback = function(_dialog)
-                    pendingFilterState = {}
-                    pendingSourceFilterState = {}
-                    ZO_Dialogs_ReleaseDialogOnButtonPress("BATTLESCROLLS_FILTER_DIALOG")
-                end,
-            },
-            {
-                keybind = "DIALOG_SECONDARY",
-                text = SI_DIALOG_CONFIRM,
-                callback = function(_dialog)
-                    local journalUI = BattleScrolls.journalUI
-                    filters.applyPending(journalUI)
-                    ZO_Dialogs_ReleaseDialogOnButtonPress("BATTLESCROLLS_FILTER_DIALOG")
-                    journal.chronicler.refreshList(journalUI, true)
-                    KEYBIND_STRIP:UpdateKeybindButtonGroup(journalUI.statsKeybindStripDescriptor)
-                end,
-            },
-            {
-                keybind = "DIALOG_RESET",
-                text = GetString(BATTLESCROLLS_FILTER_RESET),
-                callback = function(dialog)
-                    filters.resetPending()
-                    local RESELECT_ENTRY = true
-                    local DONT_LIMIT_NUM_ENTRIES = nil
-                    ZO_GenericParametricListGamepadDialogTemplate_RebuildEntryList(dialog, DONT_LIMIT_NUM_ENTRIES, RESELECT_ENTRY)
-                end,
-            },
-        },
-        onHidingCallback = OnReleaseDialog,
-        noChoiceCallback = OnReleaseDialog,
+        onCancel = function()
+            CleanupDialogState()
+        end,
+        onReset = function()
+            filters.resetPending()
+        end,
+        resetText = GetString(BATTLESCROLLS_FILTER_RESET),
     })
-end
-
--------------------------
--- Initialize (called from main.lua)
--------------------------
-
-function filters.Initialize()
-    zo_callLater(function()
-        InitializeFilterDialog()
-    end, 100)
 end
 
 -- Export to namespace

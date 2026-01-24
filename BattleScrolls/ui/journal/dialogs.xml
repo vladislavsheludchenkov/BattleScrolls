@@ -1,0 +1,17 @@
+<GuiXml>
+    <Controls>
+        <!-- Basic Confirmation Dialog -->
+        <TopLevelControl name="BattleScrolls_BasicDialog" inherits="ZO_GenericGamepadDialogBase" hidden="true" tier="HIGH" level="100">
+            <OnInitialized>
+                BattleScrolls_BasicDialog_OnInitialized(self)
+            </OnInitialized>
+        </TopLevelControl>
+
+        <!-- Parametric List Dialog (for filters) -->
+        <TopLevelControl name="BattleScrolls_ParametricDialog" inherits="ZO_GenericParametricListGamepadDialogTemplate" hidden="true" tier="HIGH" level="100">
+            <OnInitialized>
+                BattleScrolls_ParametricDialog_OnInitialized(self)
+            </OnInitialized>
+        </TopLevelControl>
+    </Controls>
+</GuiXml>

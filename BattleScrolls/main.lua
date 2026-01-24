@@ -25,6 +25,15 @@ BattleScrolls.addonName = "BattleScrolls"
 function BattleScrolls.OnAddOnLoaded(_, addonName)
     if addonName == BattleScrolls.addonName then
         BattleScrolls.storage:Initialize()
+
+        -- In Fidelity mode (30fps cap), threshold > 30 causes LibAsync to yield too early
+        if BattleScrolls.utils.IsFidelityMode() then
+            local currentThreshold = BattleScrolls.storage:GetAsyncStallThreshold()
+            if currentThreshold > 30 then
+                BattleScrolls.storage:SetAsyncStallThreshold(15) -- 15 is LibAsync default, so we're just resetting it here
+            end
+        end
+
         BattleScrolls.state:Initialize()
         BattleScrolls.effectsEvents:Initialize()
         BattleScrolls.effectsReconciler:Initialize()
@@ -33,7 +42,6 @@ function BattleScrolls.OnAddOnLoaded(_, addonName)
         BattleScrolls.dpsSender:Initialize()
         BattleScrolls.dpsMeter:Initialize()
         BattleScrolls.onboarding:Initialize()
-        BattleScrolls.journal.filters.Initialize()
         EVENT_MANAGER:UnregisterForEvent("BattleScrolls_Main", EVENT_ADD_ON_LOADED)
     end
 end

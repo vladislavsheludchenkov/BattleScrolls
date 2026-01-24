@@ -541,6 +541,18 @@ local strings = {
     [BATTLESCROLLS_ONBOARDING_STEP_FORMAT] = "Шаг <<1>> из <<2>>",
 
     -------------------------
+    -- Delete Functionality
+    -------------------------
+    [BATTLESCROLLS_DELETE] = "Удалить",
+    [BATTLESCROLLS_DELETE_INSTANCE_TITLE] = "Удалить зону",
+    [BATTLESCROLLS_DELETE_INSTANCE_TEXT] = "Удалить <<1>> и все её сражения?",
+    [BATTLESCROLLS_DELETE_ENCOUNTER_TITLE] = "Удалить сражение",
+    [BATTLESCROLLS_DELETE_ENCOUNTER_TEXT] = "Удалить <<1>>?",
+    [BATTLESCROLLS_DELETE_WARNING] = "Это действие нельзя отменить.",
+    [BATTLESCROLLS_DELETE_MEMORY_FREE] = "Освободится примерно <<1>>",
+    [BATTLESCROLLS_DELETE_MEMORY_STATUS] = "Память: <<1>> из <<2>> (<<3>>%)",
+
+    -------------------------
     -- Dynamic Overview Panel
     -------------------------
     [BATTLESCROLLS_OVERVIEW_DAMAGE_TAKEN] = "Полученный урон",

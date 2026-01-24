@@ -539,6 +539,18 @@ local strings = {
     [BATTLESCROLLS_ONBOARDING_STEP_FORMAT] = "第 <<1>> 步，共 <<2>> 步",
 
     -------------------------
+    -- Delete Functionality
+    -------------------------
+    [BATTLESCROLLS_DELETE] = "删除",
+    [BATTLESCROLLS_DELETE_INSTANCE_TITLE] = "删除区域",
+    [BATTLESCROLLS_DELETE_INSTANCE_TEXT] = "删除 <<1>> 及其所有战斗？",
+    [BATTLESCROLLS_DELETE_ENCOUNTER_TITLE] = "删除战斗",
+    [BATTLESCROLLS_DELETE_ENCOUNTER_TEXT] = "删除 <<1>>？",
+    [BATTLESCROLLS_DELETE_WARNING] = "此操作无法撤销。",
+    [BATTLESCROLLS_DELETE_MEMORY_FREE] = "将释放约<<1>>",
+    [BATTLESCROLLS_DELETE_MEMORY_STATUS] = "内存：<<1>> / <<2>> (<<3>>%)",
+
+    -------------------------
     -- Dynamic Overview Panel
     -------------------------
     [BATTLESCROLLS_OVERVIEW_DAMAGE_TAKEN] = "受到伤害",
