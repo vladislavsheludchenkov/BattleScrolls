@@ -6,7 +6,7 @@ Thank you for your interest in contributing to Battle Scrolls!
 
 ### Bug Reports
 
-If you find a bug, please [open an issue](https://github.com/YOUR_USERNAME/BattleScrolls/issues/new) with:
+If you find a bug, please [open an issue](https://github.com/vladislavsheludchenkov/BattleScrolls/issues/new) with:
 - ESO client version and console platform (PlayStation/Xbox)
 - Steps to reproduce the issue
 - Expected vs actual behavior
@@ -73,7 +73,7 @@ You don't need to translate to all languages yourself. Once the string exists in
 
 1. Clone the repo and set up type checking libraries inside it:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/BattleScrolls.git
+   git clone https://github.com/vladislavsheludchenkov/BattleScrolls.git
    cd BattleScrolls
 
    # Clone ESO UI source (for type checking)
