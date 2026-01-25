@@ -14,7 +14,7 @@ local strings = {
     -------------------------
     -- Zone/Instance Tabs
     -------------------------
-    [BATTLESCROLLS_TAB_ALL_ZONES] = "Alle Zonen",
+    [BATTLESCROLLS_TAB_ALL_ZONES] = "Alle Gebiete",
     [BATTLESCROLLS_TAB_INSTANCED] = "Instanzen",
     [BATTLESCROLLS_TAB_OVERLAND] = "Oberwelt",
     [BATTLESCROLLS_TAB_HOUSES] = "Häuser",
@@ -107,7 +107,7 @@ local strings = {
     [BATTLESCROLLS_SETTINGS_RECORD_IN_INSTANCED_TEXT] = "Instanzzonen umfassen Verliese, Prüfungen, Arenen und das Endlose Archiv.",
     [BATTLESCROLLS_SETTINGS_RECORD_IN_OVERLAND] = "In Oberwelt aufnehmen",
     [BATTLESCROLLS_SETTINGS_RECORD_IN_HOUSES] = "In Häusern aufnehmen",
-    [BATTLESCROLLS_SETTINGS_RECORD_IN_PVP] = "In PvP-Zonen aufnehmen",
+    [BATTLESCROLLS_SETTINGS_RECORD_IN_PVP] = "In PvP-Gebieten aufnehmen",
     [BATTLESCROLLS_SETTINGS_RECORD_BOSS_FIGHTS] = "Bosskämpfe aufnehmen",
     [BATTLESCROLLS_SETTINGS_RECORD_TRASH_FIGHTS] = "Trash-Kämpfe aufnehmen",
     [BATTLESCROLLS_SETTINGS_RECORD_TRASH_FIGHTS_TEXT] = "Kämpfe gegen normale Gegner (keine Bosse, keine Spieler).",
@@ -115,7 +115,7 @@ local strings = {
     [BATTLESCROLLS_SETTINGS_RECORD_PLAYER_FIGHTS_TEXT] = "PvP-Kämpfe gegen andere Spieler.",
     [BATTLESCROLLS_SETTINGS_RECORD_DUMMY_FIGHTS] = "Übungspuppen-Kämpfe aufnehmen",
     [BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TITLE] = "Aufnahmefilter",
-    [BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT] = "Zonen- und Kampftyp-Filter werden kombiniert: Ein Kampf muss mindestens eine Zone UND einen Kampftyp erfüllen, um aufgenommen zu werden.",
+    [BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT] = "Gebiets- und Kampftyp-Filter werden kombiniert: Ein Kampf muss mindestens ein Gebiet UND einen Kampftyp erfüllen, um aufgenommen zu werden.",
 
     -- Storage/History settings
     [BATTLESCROLLS_SETTINGS_HISTORY_SIZE_LIMIT] = "Verlaufsgrenze",
@@ -129,7 +129,7 @@ local strings = {
     [BATTLESCROLLS_SETTINGS_STORAGE_SIZE_CAUTION] = "Vorsicht",
     [BATTLESCROLLS_SETTINGS_STORAGE_SIZE_YOLO] = "Was kann schon schiefgehen?",
     -- Storage tooltip
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_DESC] = "Wie viel Kampfverlauf gespeichert werden soll. Wenn das Limit erreicht wird, werden die ältesten Instanzen automatisch entfernt.",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_DESC] = "Wie viel Kampfverlauf gespeichert werden soll. Wenn das Limit erreicht wird, werden die ältesten nicht gesperrten Gebiete automatisch entfernt. Du kannst einzelne Gebiete sperren, um sie vor der Bereinigung zu schützen.",
     [BATTLESCROLLS_SETTINGS_STORAGE_TT_NOTE] = "Dieses Limit gilt nur für gespeicherten Verlauf. Das Addon verwendet zusätzlich Speicher für den aktuellen Kampf und die Benutzeroberfläche, daher wird der Gesamtverbrauch höher sein.",
     [BATTLESCROLLS_SETTINGS_STORAGE_TT_CURRENT] = "Verlauf: <<1>> MB von <<2>> MB (<<3>>%)",
     [BATTLESCROLLS_SETTINGS_STORAGE_TT_PRESETS] = "Voreinstellungen (Prüfung ~0,5-1 MB, Verlies ~0,25-0,5 MB):",
@@ -484,11 +484,10 @@ local strings = {
     [BATTLESCROLLS_SETTINGS_PERFORMANCE] = "Leistung",
     [BATTLESCROLLS_SETTINGS_ASYNC_SPEED] = "Verarbeitungsgeschwindigkeit",
     [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_PERFORMANCE] = "Leistung",
-    [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_BALANCED] = "Ausgewogen",
     [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_SMOOTH] = "Flüssig",
     [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_CUSTOM] = "Benutzerdefiniert (<<1>> FPS)",
     [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_TITLE] = "Verarbeitungsgeschwindigkeit",
-    [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_TEXT] = "Steuert, wie schnell Hintergrundaufgaben verarbeitet werden. Betrifft hauptsächlich die Journal-Oberfläche und die Zeit zwischen Kampfende und dem Erscheinen des Eintrags in der Liste.\n\nLeistung: Schnellste Verarbeitung. Kann kurze Ruckler verursachen.\nAusgewogen: Gute Mischung aus Geschwindigkeit und Flüssigkeit.\nFlüssig: Flüssigstes Gameplay, langsamere Verarbeitung.\n\nDiese Einstellung betrifft ALLE Addons, die LibAsync verwenden.",
+    [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_TEXT] = "Steuert, wie schnell Hintergrundaufgaben verarbeitet werden. Betrifft hauptsächlich die Journal-Oberfläche und die Zeit zwischen Kampfende und dem Erscheinen des Eintrags in der Liste.\n\nLeistung: Schnellste Verarbeitung. Kann kurze Ruckler verursachen.\nFlüssig: Flüssigeres Gameplay, langsamere Verarbeitung. Kann dazu führen, dass Einträge beim Laden hängen bleiben oder nicht im Journal erscheinen.\n\nDiese Einstellung betrifft ALLE Addons, die LibAsync verwenden.",
 
     -------------------------
     -- Onboarding
@@ -542,7 +541,7 @@ local strings = {
     -- Delete Functionality
     -------------------------
     [BATTLESCROLLS_DELETE] = "Löschen",
-    [BATTLESCROLLS_DELETE_INSTANCE_TITLE] = "Zone löschen",
+    [BATTLESCROLLS_DELETE_INSTANCE_TITLE] = "Gebiet löschen",
     [BATTLESCROLLS_DELETE_INSTANCE_TEXT] = "<<1>> und alle zugehörigen Kämpfe löschen?",
     [BATTLESCROLLS_DELETE_ENCOUNTER_TITLE] = "Kampf löschen",
     [BATTLESCROLLS_DELETE_ENCOUNTER_TEXT] = "<<1>> löschen?",
@@ -558,6 +557,15 @@ local strings = {
     [BATTLESCROLLS_OVERVIEW_TOP_INCOMING] = "Top eingehender Schaden",
     [BATTLESCROLLS_OVERVIEW_HEALING_TARGETS] = "Heilungsziele",
     [BATTLESCROLLS_OVERVIEW_DAMAGE_SOURCES] = "Schadensquellen",
+
+    -------------------------
+    -- Instance Locking
+    -------------------------
+    [BATTLESCROLLS_LOCK_ERROR_TITLE] = "Sperren nicht möglich",
+    [BATTLESCROLLS_LOCK_ERROR_TEXT] = "Das Sperren dieses Gebiets würde dein Speicherlimit überschreiten. Gesperrte Gebiete und das neueste Gebiet sind vor der Bereinigung geschützt.\n\nUm Speicher freizugeben, entsperre oder lösche einige gesperrte Gebiete, oder erhöhe dein Speicherlimit in den Einstellungen.",
+    [BATTLESCROLLS_LOCK_LOCKED_SIZE] = "Derzeit gesperrt: <<1>>",
+    [BATTLESCROLLS_LOCK_INSTANCE_SIZE] = "Dieses Gebiet: <<1>>",
+    [BATTLESCROLLS_LOCK_LIMIT] = "Speicherlimit: <<1>>",
 }
 
 -- Register translations

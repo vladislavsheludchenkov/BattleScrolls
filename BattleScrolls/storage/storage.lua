@@ -98,6 +98,7 @@ BattleScrolls = BattleScrolls or {}
 ---@field zone string Zone or instance name
 ---@field isOverland boolean True if this is an overland zone
 ---@field left boolean True if player left this zone
+---@field locked boolean|nil True if instance is locked from automatic cleanup
 ---@field timestampS number Absolute timestamp when this instance visit started
 ---@field abilityInfo table<number, AbilityInfoStorage>|nil Uncompressed ability info (nil if compressed)
 ---@field unitNames table<number, string>|nil Uncompressed unit names (nil if compressed)
@@ -247,12 +248,12 @@ storage.sizePresetOrder = { "xs", "small", "medium", "large", "xl", "caution", "
 -- Async speed presets (LibAsync stall threshold in FPS)
 -- Lower FPS = more aggressive processing = faster but may cause stutters
 -- Higher FPS = gentler processing = smoother but slower
+-- Note: "smooth" at 30 FPS may cause encounters to fail loading in Journal
 storage.asyncSpeedPresets = {
     performance = { key = "performance", fps = 15 },
-    balanced = { key = "balanced", fps = 30 },
-    smooth = { key = "smooth", fps = 60 },
+    smooth = { key = "smooth", fps = 30 },
 }
-storage.asyncSpeedPresetOrder = { "performance", "balanced", "smooth" }
+storage.asyncSpeedPresetOrder = { "performance", "smooth" }
 
 -- Effect reconciliation presets
 -- Controls how often we call GetUnitBuffInfo to catch missed effect events
@@ -377,14 +378,16 @@ function storage:GetAsyncStallThreshold()
     return AsyncSavedVars and AsyncSavedVars.ASYNC_STALL_THRESHOLD or 15
 end
 
----Sets the LibAsync stall threshold
+---Sets the LibAsync stall threshold (applied immediately)
 ---@param fps number The FPS threshold value
 function storage:SetAsyncStallThreshold(fps)
-    if AsyncSavedVars then
+    -- Use LibAsync's slash command handler to apply the change immediately
+    -- This updates both the saved var and the internal threshold
+    if LibAsync and LibAsync.Slash then
+        LibAsync:Slash("stall", fps)
+    elseif AsyncSavedVars then
+        -- Fallback: just set the saved var (will apply on next load)
         AsyncSavedVars.ASYNC_STALL_THRESHOLD = fps
-        -- LibAsync reads from ASYNC_STALL_THRESHOLD global, need to update via its API
-        -- The actual global is internal to LibAsync, but we can set the saved var
-        -- which will be picked up on next load
     end
 end
 
@@ -566,25 +569,30 @@ function storage:CleanupIfNecessaryAsync()
             return
         end
 
-        -- Calculate how many instances to remove
-        local removeCount = 0
+        -- Calculate which instances to remove (skip locked instances)
         local excess = currentBytes - byteLimit
         local removed = 0
+        local indicesToRemove = {}
 
         for i = 1, #history - 1 do
-            removed = removed + instanceSizes[i]
-            removeCount = removeCount + 1
-            if removed >= excess then
-                break
+            if not history[i].locked then
+                removed = removed + instanceSizes[i]
+                table.insert(indicesToRemove, i)
+                if removed >= excess then
+                    break
+                end
             end
         end
 
-        if removeCount > 0 then
-            BattleScrolls.utils.removePrefixInPlace(history, removeCount)
+        -- Remove in reverse order to maintain correct indices
+        if #indicesToRemove > 0 then
+            for i = #indicesToRemove, 1, -1 do
+                table.remove(history, indicesToRemove[i])
+            end
             -- GC after removing instances (big cleanup done, nothing important happening)
             BattleScrolls.gc:RequestGC(2)
             -- BattleScrolls.log.Info(string.format("Cleaned up %d old instance(s)",
-            --     removeCount))
+            --     #indicesToRemove))
         end
     end):Ensure(function()
         self.cleanupTask = nil
@@ -626,6 +634,85 @@ end
 ---@return number bytes Estimated memory in bytes
 function storage:EstimateInstanceSize(instance)
     return getInstanceSize(instance)
+end
+
+---Gets the total size of all locked instances
+---@return number bytes Total size of locked instances in bytes
+function storage:GetLockedInstancesSize()
+    local history = self.savedVariables.history
+    local totalSize = 0
+    for _, instance in ipairs(history) do
+        if instance.locked then
+            totalSize = totalSize + getInstanceSize(instance)
+        end
+    end
+    return totalSize
+end
+
+---Checks if an instance can be locked without exceeding storage limit
+---@param instanceIndex number The unique index of the instance to check
+---@return boolean canLock True if the instance can be locked
+function storage:CanLockInstance(instanceIndex)
+    local history = self.savedVariables.history
+    if #history == 0 then
+        return false
+    end
+
+    local preset = self:GetCurrentSizePreset()
+    local byteLimit = preset.memoryMB * 1000000
+
+    -- Find the instance
+    local targetInstance = nil
+    for _, instance in ipairs(history) do
+        if instance.index == instanceIndex then
+            targetInstance = instance
+            break
+        end
+    end
+
+    if not targetInstance then
+        return false
+    end
+
+    -- If already locked, it can stay locked
+    if targetInstance.locked then
+        return true
+    end
+
+    -- Calculate protected size: locked instances + this instance
+    local lockedSize = self:GetLockedInstancesSize()
+    local thisInstanceSize = getInstanceSize(targetInstance)
+
+    local protectedSize = lockedSize + thisInstanceSize
+    return protectedSize <= byteLimit
+end
+
+---Locks an instance to prevent automatic cleanup
+---@param instanceIndex number The unique index of the instance
+---@return boolean success True if instance was locked
+function storage:LockInstance(instanceIndex)
+    if not self:CanLockInstance(instanceIndex) then
+        return false
+    end
+
+    local history = self.savedVariables.history
+    for _, instance in ipairs(history) do
+        if instance.index == instanceIndex then
+            instance.locked = true
+        end
+    end
+    return true
+end
+
+---Unlocks an instance to allow automatic cleanup
+---@param instanceIndex number The unique index of the instance
+function storage:UnlockInstance(instanceIndex)
+    local history = self.savedVariables.history
+    for _, instance in ipairs(history) do
+        if instance.index == instanceIndex then
+            instance.locked = nil  -- Use nil to save storage space
+        end
+    end
 end
 
 ---Deletes an instance from history by its unique index

@@ -324,6 +324,23 @@ function BattleScrolls_Journal_Gamepad:InitializeKeybindStripDescriptors()
             end,
             sound = SOUNDS.DIALOG_ACCEPT,
         },
+        {
+            keybind = "UI_SHORTCUT_SECONDARY",
+            name = function()
+                local targetData = self.instanceList:GetTargetData()
+                if targetData and targetData.data and targetData.data.locked then
+                    return GetString(SI_ITEM_ACTION_UNMARK_AS_LOCKED)
+                end
+                return GetString(SI_ITEM_ACTION_MARK_AS_LOCKED)
+            end,
+            callback = function()
+                self:ToggleInstanceLock()
+            end,
+            visible = function()
+                local targetData = self.instanceList:GetTargetData()
+                return targetData ~= nil and targetData.data ~= nil and not targetData.isSettings
+            end,
+        },
     }
 
     -- Encounter list keybinds
@@ -937,6 +954,63 @@ function BattleScrolls_Journal_Gamepad:ShowDeleteEncounterDialog()
                 self:RefreshList()
             end
         end,
+    })
+end
+
+-------------------------
+-- Instance Lock
+-------------------------
+
+---Toggles the lock state of the selected instance
+function BattleScrolls_Journal_Gamepad:ToggleInstanceLock()
+    local targetData = self.instanceList:GetTargetData()
+    if not targetData or not targetData.data then return end
+
+    local instance = targetData.data
+    local storage = BattleScrolls.storage
+
+    if instance.locked then
+        -- Unlock the instance
+        storage:UnlockInstance(instance.index)
+        PlaySound(SOUNDS.INVENTORY_ITEM_UNLOCKED)
+        self:RefreshList()
+        KEYBIND_STRIP:UpdateKeybindButtonGroup(self.keybindStripDescriptor)
+    else
+        -- Try to lock the instance
+        local success = storage:LockInstance(instance.index)
+        if success then
+            PlaySound(SOUNDS.INVENTORY_ITEM_LOCKED)
+            self:RefreshList()
+            KEYBIND_STRIP:UpdateKeybindButtonGroup(self.keybindStripDescriptor)
+        else
+            self:ShowLockErrorDialog(instance)
+        end
+    end
+end
+
+---Shows error dialog when locking would exceed storage limit
+---@param instance Instance The instance that cannot be locked
+function BattleScrolls_Journal_Gamepad:ShowLockErrorDialog(instance)
+    local storage = BattleScrolls.storage
+    local utils = BattleScrolls.journal.utils
+
+    local instanceSize = storage:EstimateInstanceSize(instance)
+    local lockedSize = storage:GetLockedInstancesSize()
+    local preset = storage:GetCurrentSizePreset()
+    local limitBytes = preset.memoryMB * 1000000
+
+    local mainText = table.concat({
+        GetString(BATTLESCROLLS_LOCK_ERROR_TEXT),
+        "",
+        zo_strformat(GetString(BATTLESCROLLS_LOCK_LOCKED_SIZE), utils.formatBytes(lockedSize)),
+        zo_strformat(GetString(BATTLESCROLLS_LOCK_INSTANCE_SIZE), utils.formatBytes(instanceSize)),
+        zo_strformat(GetString(BATTLESCROLLS_LOCK_LIMIT), utils.formatBytes(limitBytes)),
+    }, "\n")
+
+    BattleScrolls.journal.dialogs.showBasicDialog({
+        title = GetString(BATTLESCROLLS_LOCK_ERROR_TITLE),
+        mainText = mainText,
+        infoOnly = true,
     })
 end
 

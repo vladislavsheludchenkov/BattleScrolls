@@ -129,7 +129,7 @@ local strings = {
     [BATTLESCROLLS_SETTINGS_STORAGE_SIZE_CAUTION] = "小心",
     [BATTLESCROLLS_SETTINGS_STORAGE_SIZE_YOLO] = "能出什么问题呢？",
     -- Storage tooltip
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_DESC] = "保留多少战斗历史。超过限制时，最旧的副本会被自动删除。",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_DESC] = "保留多少战斗历史。超过限制时，最旧的未锁定区域会被自动删除。您可以锁定单个区域以保护它们不被清理。",
     [BATTLESCROLLS_SETTINGS_STORAGE_TT_NOTE] = "此限制仅适用于保存的历史记录。插件还会使用内存来追踪当前战斗和渲染界面，因此总使用量会更高。",
     [BATTLESCROLLS_SETTINGS_STORAGE_TT_CURRENT] = "历史: <<1>> MB / <<2>> MB (<<3>>%)",
     [BATTLESCROLLS_SETTINGS_STORAGE_TT_PRESETS] = "预设 (试炼 ~0.5-1 MB，地下城 ~0.25-0.5 MB):",
@@ -484,11 +484,10 @@ local strings = {
     [BATTLESCROLLS_SETTINGS_PERFORMANCE] = "性能",
     [BATTLESCROLLS_SETTINGS_ASYNC_SPEED] = "处理速度",
     [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_PERFORMANCE] = "高性能",
-    [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_BALANCED] = "平衡",
     [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_SMOOTH] = "流畅",
     [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_CUSTOM] = "自定义 (<<1>> FPS)",
     [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_TITLE] = "处理速度",
-    [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_TEXT] = "控制后台任务的处理速度。主要影响日志界面以及战斗结束后记录出现在列表中的时间。\n\n高性能：处理最快。可能导致短暂卡顿。\n平衡：速度和流畅度的良好平衡。\n流畅：最流畅的游戏体验，处理较慢。\n\n此设置影响所有使用LibAsync的插件。",
+    [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_TEXT] = "控制后台任务的处理速度。主要影响日志界面以及战斗结束后记录出现在列表中的时间。\n\n高性能：处理最快。可能导致短暂卡顿。\n流畅：更流畅的游戏体验，处理较慢。可能导致记录卡在加载状态或无法在日志中显示。\n\n此设置影响所有使用LibAsync的插件。",
 
     -------------------------
     -- Onboarding
@@ -558,6 +557,15 @@ local strings = {
     [BATTLESCROLLS_OVERVIEW_TOP_INCOMING] = "最高受到伤害",
     [BATTLESCROLLS_OVERVIEW_HEALING_TARGETS] = "治疗目标",
     [BATTLESCROLLS_OVERVIEW_DAMAGE_SOURCES] = "伤害来源",
+
+    -------------------------
+    -- Instance Locking
+    -------------------------
+    [BATTLESCROLLS_LOCK_ERROR_TITLE] = "无法锁定",
+    [BATTLESCROLLS_LOCK_ERROR_TEXT] = "锁定此区域将超出您的内存限制。锁定的区域和最新区域受到保护，不会被清理。\n\n要释放空间，请解锁或删除一些锁定的区域，或在设置中增加内存限制。",
+    [BATTLESCROLLS_LOCK_LOCKED_SIZE] = "当前已锁定：<<1>>",
+    [BATTLESCROLLS_LOCK_INSTANCE_SIZE] = "此区域：<<1>>",
+    [BATTLESCROLLS_LOCK_LIMIT] = "内存限制：<<1>>",
 }
 
 -- Register translations

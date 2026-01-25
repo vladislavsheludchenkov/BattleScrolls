@@ -99,37 +99,54 @@ function BasicDialog:OnHidden()
     self.onConfirm = nil
     self.onCancel = nil
     self.confirmSound = nil
+    self.infoOnly = false
 end
 
 function BasicDialog:SetupKeybinds()
-    self.keybindStripDescriptor = {
-        alignment = KEYBIND_STRIP_ALIGN_LEFT,
-        {
-            keybind = "UI_SHORTCUT_PRIMARY",
-            name = GetString(SI_DIALOG_CONFIRM),
-            callback = function()
-                local onConfirm = self.onConfirm
-                local confirmSound = self.confirmSound or SOUNDS.DIALOG_ACCEPT
-                self:Hide()
-                PlaySound(confirmSound)
-                if onConfirm then
-                    onConfirm()
-                end
-            end,
-        },
-        {
-            keybind = "UI_SHORTCUT_NEGATIVE",
-            name = GetString(SI_DIALOG_CANCEL),
-            callback = function()
-                local onCancel = self.onCancel
-                self:Hide()
-                PlaySound(SOUNDS.DIALOG_DECLINE)
-                if onCancel then
-                    onCancel()
-                end
-            end,
-        },
-    }
+    if self.infoOnly then
+        -- Info-only dialog: single dismiss button
+        self.keybindStripDescriptor = {
+            alignment = KEYBIND_STRIP_ALIGN_LEFT,
+            {
+                keybind = "UI_SHORTCUT_NEGATIVE",
+                name = GetString(SI_GAMEPAD_BACK_OPTION),
+                callback = function()
+                    self:Hide()
+                    PlaySound(SOUNDS.GAMEPAD_MENU_BACK)
+                end,
+            },
+        }
+    else
+        -- Confirmation dialog: confirm and cancel buttons
+        self.keybindStripDescriptor = {
+            alignment = KEYBIND_STRIP_ALIGN_LEFT,
+            {
+                keybind = "UI_SHORTCUT_PRIMARY",
+                name = GetString(SI_DIALOG_CONFIRM),
+                callback = function()
+                    local onConfirm = self.onConfirm
+                    local confirmSound = self.confirmSound or SOUNDS.DIALOG_ACCEPT
+                    self:Hide()
+                    PlaySound(confirmSound)
+                    if onConfirm then
+                        onConfirm()
+                    end
+                end,
+            },
+            {
+                keybind = "UI_SHORTCUT_NEGATIVE",
+                name = GetString(SI_DIALOG_CANCEL),
+                callback = function()
+                    local onCancel = self.onCancel
+                    self:Hide()
+                    PlaySound(SOUNDS.DIALOG_DECLINE)
+                    if onCancel then
+                        onCancel()
+                    end
+                end,
+            },
+        }
+    end
 end
 
 function BasicDialog:Show(data)
@@ -141,6 +158,7 @@ function BasicDialog:Show(data)
     self.onConfirm = data.onConfirm
     self.onCancel = data.onCancel
     self.confirmSound = data.confirmSound
+    self.infoOnly = data.infoOnly or false
 
     -- Set header/title with left alignment
     if self.header then
@@ -496,8 +514,8 @@ end
 -- Public API
 -----------------------------------------------------------
 
----Shows a basic confirmation dialog
----@param data {title: string, mainText: string, warning: string|nil, onConfirm: function|nil, onCancel: function|nil, confirmSound: string|nil}
+---Shows a basic confirmation dialog or info dialog
+---@param data {title: string, mainText: string, warning: string|nil, onConfirm: function|nil, onCancel: function|nil, confirmSound: string|nil, infoOnly: boolean|nil}
 function dialogs.showBasicDialog(data)
     if BattleScrolls.dialogs.basic then
         BattleScrolls.dialogs.basic:Show(data)

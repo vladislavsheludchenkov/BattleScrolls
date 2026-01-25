@@ -129,7 +129,7 @@ local strings = {
     [BATTLESCROLLS_SETTINGS_STORAGE_SIZE_CAUTION] = "注意",
     [BATTLESCROLLS_SETTINGS_STORAGE_SIZE_YOLO] = "まあ大丈夫でしょ",
     -- Storage tooltip
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_DESC] = "戦闘履歴の保存量を設定します。制限を超えると、古いインスタンスが自動的に削除されます。",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_DESC] = "戦闘履歴の保存量を設定します。制限を超えると、ロックされていない古いゾーンが自動的に削除されます。個別のゾーンをロックして保護することができます。",
     [BATTLESCROLLS_SETTINGS_STORAGE_TT_NOTE] = "この制限は保存された履歴のみに適用されます。アドオンは現在の戦闘の追跡やUIの描画にもメモリを使用するため、実際の使用量はここに表示されているより高くなります。",
     [BATTLESCROLLS_SETTINGS_STORAGE_TT_CURRENT] = "履歴: <<1>> MB / <<2>> MB (<<3>>%)",
     [BATTLESCROLLS_SETTINGS_STORAGE_TT_PRESETS] = "プリセット (トライアル ~0.5-1 MB、ダンジョン ~0.25-0.5 MB):",
@@ -484,11 +484,10 @@ local strings = {
     [BATTLESCROLLS_SETTINGS_PERFORMANCE] = "パフォーマンス",
     [BATTLESCROLLS_SETTINGS_ASYNC_SPEED] = "処理速度",
     [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_PERFORMANCE] = "パフォーマンス重視",
-    [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_BALANCED] = "バランス",
     [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_SMOOTH] = "滑らか",
     [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_CUSTOM] = "カスタム (<<1>> FPS)",
     [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_TITLE] = "処理速度",
-    [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_TEXT] = "バックグラウンドタスクの処理速度を制御します。主にジャーナルUIと、戦闘終了から記録がリストに表示されるまでの時間に影響します。\n\nパフォーマンス重視: 最速処理。一時的なカクつきの可能性あり。\nバランス: 速度と滑らかさの良いバランス。\n滑らか: 最も滑らかなゲームプレイ、処理は遅め。\n\nこの設定はLibAsyncを使用するすべてのアドオンに影響します。",
+    [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_TEXT] = "バックグラウンドタスクの処理速度を制御します。主にジャーナルUIと、戦闘終了から記録がリストに表示されるまでの時間に影響します。\n\nパフォーマンス重視: 最速処理。一時的なカクつきの可能性あり。\n滑らか: より滑らかなゲームプレイ、処理は遅め。記録がロード中のまま止まったり、ジャーナルに表示されない場合があります。\n\nこの設定はLibAsyncを使用するすべてのアドオンに影響します。",
 
     -------------------------
     -- Onboarding
@@ -558,6 +557,15 @@ local strings = {
     [BATTLESCROLLS_OVERVIEW_TOP_INCOMING] = "トップ被ダメージ",
     [BATTLESCROLLS_OVERVIEW_HEALING_TARGETS] = "回復対象",
     [BATTLESCROLLS_OVERVIEW_DAMAGE_SOURCES] = "ダメージ源",
+
+    -------------------------
+    -- Instance Locking
+    -------------------------
+    [BATTLESCROLLS_LOCK_ERROR_TITLE] = "ロックできません",
+    [BATTLESCROLLS_LOCK_ERROR_TEXT] = "このゾーンをロックするとメモリ制限を超えます。ロックされたゾーンと最新のゾーンはクリーンアップから保護されます。\n\n空き容量を確保するには、ロックされたゾーンのロックを解除または削除するか、設定でメモリ制限を増やしてください。",
+    [BATTLESCROLLS_LOCK_LOCKED_SIZE] = "現在ロック中: <<1>>",
+    [BATTLESCROLLS_LOCK_INSTANCE_SIZE] = "このゾーン: <<1>>",
+    [BATTLESCROLLS_LOCK_LIMIT] = "メモリ制限: <<1>>",
 }
 
 -- Register translations

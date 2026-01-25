@@ -174,6 +174,7 @@ function InstanceListController.refresh(journalUI)
                 entryData.data = instance
                 entryData:SetIconTintOnSelection(true)
                 entryData:SetIconDisabledTintOnSelection(true)
+                entryData:SetLocked(instance.locked or false)
 
                 -- Add time as sublabel
                 entryData:AddSubLabel(BattleScrolls.utils.formatTime(instance.timestampS))

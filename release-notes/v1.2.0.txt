@@ -1,0 +1,9 @@
+New features:
+- Zone locking: Press X/Square on any zone in the instance list to lock it. Locked zones are protected from automatic cleanup when you exceed your storage limit. The most recent zone is also always protected
+
+Localization:
+- German: Improved terminology consistency ("Zonen" → "Gebiete")
+- Russian: Improved terminology consistency ("зоны" → "области")
+
+Bugfixes:
+- Smooth preset no longer gets UI stuck on "Loading" or prevents encounters from appearing in Journal. Due to it being adjusted, you'll be reset to default "Performance" mode upon updating if you had it selected

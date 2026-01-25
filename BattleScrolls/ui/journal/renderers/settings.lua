@@ -838,54 +838,51 @@ function SettingsRenderer.renderSettings(list, onRefresh)
     -- =====================
     -- Performance Section
     -- =====================
-    -- Hidden in Fidelity mode since threshold must be ≤30 to get any processing time
-    if not BattleScrolls.utils.IsFidelityMode() then
-        -- Build valid values and labels for async speed presets
-        local asyncSpeedValues = {}
-        local asyncSpeedLabels = {}
-        local asyncSpeedPresets = BattleScrolls.storage.asyncSpeedPresets
-        local asyncSpeedOrder = BattleScrolls.storage.asyncSpeedPresetOrder
-        local currentPresetKey = BattleScrolls.storage:GetAsyncSpeedPresetKey()
-        local currentFPS = BattleScrolls.storage:GetAsyncStallThreshold()
+    -- Build valid values and labels for async speed presets
+    local asyncSpeedValues = {}
+    local asyncSpeedLabels = {}
+    local asyncSpeedPresets = BattleScrolls.storage.asyncSpeedPresets
+    local asyncSpeedOrder = BattleScrolls.storage.asyncSpeedPresetOrder
+    local currentPresetKey = BattleScrolls.storage:GetAsyncSpeedPresetKey()
+    local currentFPS = BattleScrolls.storage:GetAsyncStallThreshold()
 
-        -- If we have a custom value (not matching any preset), add it as the first option
-        local hasCustomValue = (currentPresetKey == nil)
+    -- If we have a custom value (not matching any preset), add it as the first option
+    local hasCustomValue = (currentPresetKey == nil)
 
-        if hasCustomValue then
-            table.insert(asyncSpeedValues, currentFPS)
-            table.insert(asyncSpeedLabels, zo_strformat(GetString(BATTLESCROLLS_SETTINGS_ASYNC_SPEED_CUSTOM), currentFPS))
+    if hasCustomValue then
+        table.insert(asyncSpeedValues, currentFPS)
+        table.insert(asyncSpeedLabels, zo_strformat(GetString(BATTLESCROLLS_SETTINGS_ASYNC_SPEED_CUSTOM), currentFPS))
+    end
+
+    -- Add standard presets
+    for _, presetKey in ipairs(asyncSpeedOrder) do
+        local preset = asyncSpeedPresets[presetKey]
+        local labelStringId = _G["BATTLESCROLLS_SETTINGS_ASYNC_SPEED_" .. string.upper(presetKey)]
+        table.insert(asyncSpeedValues, preset.fps)
+        table.insert(asyncSpeedLabels, GetString(labelStringId))
+    end
+
+    local asyncSpeedData = {}
+    asyncSpeedData.text = GetString(BATTLESCROLLS_SETTINGS_ASYNC_SPEED)
+    asyncSpeedData.header = GetString(BATTLESCROLLS_SETTINGS_PERFORMANCE)
+    asyncSpeedData.tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_ASYNC_SPEED_TITLE)
+    asyncSpeedData.tooltipText = GetString(BATTLESCROLLS_SETTINGS_ASYNC_SPEED_TEXT)
+    asyncSpeedData.valid = asyncSpeedValues
+    asyncSpeedData.valueStrings = asyncSpeedLabels
+    asyncSpeedData.getFunction = function()
+        return BattleScrolls.storage:GetAsyncStallThreshold()
+    end
+    asyncSpeedData.setFunction = function(fps)
+        BattleScrolls.storage:SetAsyncStallThreshold(fps)
+        -- Check if we need to rebuild the list (when moving from custom to preset)
+        local newPresetKey = BattleScrolls.storage:GetAsyncSpeedPresetKey()
+        if hasCustomValue and newPresetKey ~= nil then
+            -- Switching from custom to a standard preset - rebuild list without custom entry
+            onRefresh()
         end
+    end
 
-        -- Add standard presets
-        for _, presetKey in ipairs(asyncSpeedOrder) do
-            local preset = asyncSpeedPresets[presetKey]
-            local labelStringId = _G["BATTLESCROLLS_SETTINGS_ASYNC_SPEED_" .. string.upper(presetKey)]
-            table.insert(asyncSpeedValues, preset.fps)
-            table.insert(asyncSpeedLabels, GetString(labelStringId))
-        end
-
-        local asyncSpeedData = {}
-        asyncSpeedData.text = GetString(BATTLESCROLLS_SETTINGS_ASYNC_SPEED)
-        asyncSpeedData.header = GetString(BATTLESCROLLS_SETTINGS_PERFORMANCE)
-        asyncSpeedData.tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_ASYNC_SPEED_TITLE)
-        asyncSpeedData.tooltipText = GetString(BATTLESCROLLS_SETTINGS_ASYNC_SPEED_TEXT)
-        asyncSpeedData.valid = asyncSpeedValues
-        asyncSpeedData.valueStrings = asyncSpeedLabels
-        asyncSpeedData.getFunction = function()
-            return BattleScrolls.storage:GetAsyncStallThreshold()
-        end
-        asyncSpeedData.setFunction = function(fps)
-            BattleScrolls.storage:SetAsyncStallThreshold(fps)
-            -- Check if we need to rebuild the list (when moving from custom to preset)
-            local newPresetKey = BattleScrolls.storage:GetAsyncSpeedPresetKey()
-            if hasCustomValue and newPresetKey ~= nil then
-                -- Switching from custom to a standard preset - rebuild list without custom entry
-                onRefresh()
-            end
-        end
-
-        list:AddEntry("ZO_GamepadHorizontalListRowWithHeader", asyncSpeedData)
-    end -- not Fidelity mode
+    list:AddEntry("ZO_GamepadHorizontalListRowWithHeader", asyncSpeedData)
 
     -- Effect reconciliation precision (only shown when effect tracking is enabled)
     if effectTrackingEnabled then

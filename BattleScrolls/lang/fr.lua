@@ -129,7 +129,7 @@ local strings = {
     [BATTLESCROLLS_SETTINGS_STORAGE_SIZE_CAUTION] = "Attention",
     [BATTLESCROLLS_SETTINGS_STORAGE_SIZE_YOLO] = "Qu'est-ce qui pourrait mal tourner?",
     -- Storage tooltip
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_DESC] = "Combien d'historique de combat garder. Quand la limite est atteinte, les instances les plus anciennes sont automatiquement supprimées.",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_DESC] = "Combien d'historique de combat garder. Quand la limite est atteinte, les zones les plus anciennes non verrouillées sont automatiquement supprimées. Vous pouvez verrouiller des zones individuelles pour les protéger du nettoyage.",
     [BATTLESCROLLS_SETTINGS_STORAGE_TT_NOTE] = "Cette limite s'applique uniquement à l'historique sauvegardé. L'addon utilise aussi de la mémoire pour le combat en cours et l'interface, donc l'utilisation totale sera plus élevée.",
     [BATTLESCROLLS_SETTINGS_STORAGE_TT_CURRENT] = "Historique: <<1>> Mo sur <<2>> Mo (<<3>>%)",
     [BATTLESCROLLS_SETTINGS_STORAGE_TT_PRESETS] = "Préréglages (épreuve ~0,5-1 Mo, donjon ~0,25-0,5 Mo):",
@@ -484,11 +484,10 @@ local strings = {
     [BATTLESCROLLS_SETTINGS_PERFORMANCE] = "Performance",
     [BATTLESCROLLS_SETTINGS_ASYNC_SPEED] = "Vitesse de traitement",
     [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_PERFORMANCE] = "Performance",
-    [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_BALANCED] = "Équilibré",
     [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_SMOOTH] = "Fluide",
     [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_CUSTOM] = "Personnalisé (<<1>> FPS)",
     [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_TITLE] = "Vitesse de traitement",
-    [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_TEXT] = "Contrôle la vitesse de traitement des tâches en arrière-plan. Affecte principalement l'interface du Journal et le délai entre la fin du combat et l'apparition de la rencontre dans la liste.\n\nPerformance: Traitement le plus rapide. Peut causer de brèves saccades.\nÉquilibré: Bon mélange de vitesse et de fluidité.\nFluide: Gameplay le plus fluide, traitement plus lent.\n\nCe paramètre affecte TOUS les addons utilisant LibAsync.",
+    [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_TEXT] = "Contrôle la vitesse de traitement des tâches en arrière-plan. Affecte principalement l'interface du Journal et le délai entre la fin du combat et l'apparition de la rencontre dans la liste.\n\nPerformance: Traitement le plus rapide. Peut causer de brèves saccades.\nFluide: Gameplay plus fluide, traitement plus lent. Peut faire que les rencontres restent bloquées en chargement ou n'apparaissent pas dans le Journal.\n\nCe paramètre affecte TOUS les addons utilisant LibAsync.",
 
     -------------------------
     -- Onboarding
@@ -558,6 +557,15 @@ local strings = {
     [BATTLESCROLLS_OVERVIEW_TOP_INCOMING] = "Top dégâts entrants",
     [BATTLESCROLLS_OVERVIEW_HEALING_TARGETS] = "Cibles de soins",
     [BATTLESCROLLS_OVERVIEW_DAMAGE_SOURCES] = "Sources de dégâts",
+
+    -------------------------
+    -- Instance Locking
+    -------------------------
+    [BATTLESCROLLS_LOCK_ERROR_TITLE] = "Impossible de verrouiller",
+    [BATTLESCROLLS_LOCK_ERROR_TEXT] = "Verrouiller cette zone dépasserait votre limite de mémoire. Les zones verrouillées et la plus récente sont protégées du nettoyage.\n\nPour libérer de l'espace, déverrouillez ou supprimez des zones verrouillées, ou augmentez votre limite de mémoire dans les Paramètres.",
+    [BATTLESCROLLS_LOCK_LOCKED_SIZE] = "Actuellement verrouillé: <<1>>",
+    [BATTLESCROLLS_LOCK_INSTANCE_SIZE] = "Cette zone: <<1>>",
+    [BATTLESCROLLS_LOCK_LIMIT] = "Limite de mémoire: <<1>>",
 }
 
 -- Register translations

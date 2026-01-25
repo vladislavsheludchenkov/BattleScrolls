@@ -26,12 +26,10 @@ function BattleScrolls.OnAddOnLoaded(_, addonName)
     if addonName == BattleScrolls.addonName then
         BattleScrolls.storage:Initialize()
 
-        -- In Fidelity mode (30fps cap), threshold > 30 causes LibAsync to yield too early
-        if BattleScrolls.utils.IsFidelityMode() then
-            local currentThreshold = BattleScrolls.storage:GetAsyncStallThreshold()
-            if currentThreshold > 30 then
-                BattleScrolls.storage:SetAsyncStallThreshold(15) -- 15 is LibAsync default, so we're just resetting it here
-            end
+        -- Reset stall threshold to default if it's set too high (can cause issues)
+        local currentThreshold = BattleScrolls.storage:GetAsyncStallThreshold()
+        if currentThreshold > 30 then
+            BattleScrolls.storage:SetAsyncStallThreshold(15) -- 15 is LibAsync default
         end
 
         BattleScrolls.state:Initialize()

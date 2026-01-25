@@ -168,7 +168,7 @@ ZO_CreateStringId("BATTLESCROLLS_SETTINGS_STORAGE_SIZE_XL", "Extra Large")
 ZO_CreateStringId("BATTLESCROLLS_SETTINGS_STORAGE_SIZE_CAUTION", "Be Careful")
 ZO_CreateStringId("BATTLESCROLLS_SETTINGS_STORAGE_SIZE_YOLO", "What Could Go Wrong?")
 -- Storage tooltip
-ZO_CreateStringId("BATTLESCROLLS_SETTINGS_STORAGE_TT_DESC", "How much combat history to keep. When you exceed the limit, the oldest instances are automatically removed.")
+ZO_CreateStringId("BATTLESCROLLS_SETTINGS_STORAGE_TT_DESC", "How much combat history to keep. When you exceed the limit, the oldest unlocked zones are automatically removed. You can lock individual zones to protect them from cleanup.")
 ZO_CreateStringId("BATTLESCROLLS_SETTINGS_STORAGE_TT_NOTE", "This limit applies to saved history only. The addon also uses memory for tracking the current combat and rendering the UI, so total usage will be higher than what's shown here.")
 ZO_CreateStringId("BATTLESCROLLS_SETTINGS_STORAGE_TT_CURRENT", "History: <<1>> MB of <<2>> MB (<<3>>%)")
 ZO_CreateStringId("BATTLESCROLLS_SETTINGS_STORAGE_TT_PRESETS", "Presets (trial ~0.5-1 MB, dungeon ~0.25-0.5 MB):")
@@ -492,11 +492,10 @@ ZO_CreateStringId("BATTLESCROLLS_UNKNOWN_BOSS", "Unknown Boss")
 ZO_CreateStringId("BATTLESCROLLS_SETTINGS_PERFORMANCE", "Performance")
 ZO_CreateStringId("BATTLESCROLLS_SETTINGS_ASYNC_SPEED", "Processing Speed")
 ZO_CreateStringId("BATTLESCROLLS_SETTINGS_ASYNC_SPEED_PERFORMANCE", "Performance")
-ZO_CreateStringId("BATTLESCROLLS_SETTINGS_ASYNC_SPEED_BALANCED", "Balanced")
 ZO_CreateStringId("BATTLESCROLLS_SETTINGS_ASYNC_SPEED_SMOOTH", "Smooth")
 ZO_CreateStringId("BATTLESCROLLS_SETTINGS_ASYNC_SPEED_CUSTOM", "Custom (<<1>> FPS)")
 ZO_CreateStringId("BATTLESCROLLS_SETTINGS_ASYNC_SPEED_TITLE", "Processing Speed")
-ZO_CreateStringId("BATTLESCROLLS_SETTINGS_ASYNC_SPEED_TEXT", "Controls how quickly background tasks are processed. This mostly affects the Journal UI and the time between combat ending and the encounter appearing in the list.\n\nPerformance: Fastest processing. May cause brief stutters in large content.\nBalanced: Good mix of speed and smoothness.\nSmooth: Smoothest gameplay, slower processing.\n\nThis setting affects ALL addons using LibAsync.")
+ZO_CreateStringId("BATTLESCROLLS_SETTINGS_ASYNC_SPEED_TEXT", "Controls how quickly background tasks are processed. This mostly affects the Journal UI and the time between combat ending and the encounter appearing in the list.\n\nPerformance: Fastest processing. May cause brief stutters in large content.\nSmooth: Smoother gameplay, slower processing. May cause encounters to get stuck loading or fail to appear in Journal.\n\nThis setting affects ALL addons using LibAsync.")
 
 -------------------------
 -- Onboarding
@@ -557,6 +556,15 @@ ZO_CreateStringId("BATTLESCROLLS_DELETE_ENCOUNTER_TEXT", "Delete <<1>>?")
 ZO_CreateStringId("BATTLESCROLLS_DELETE_WARNING", "This action cannot be undone.")
 ZO_CreateStringId("BATTLESCROLLS_DELETE_MEMORY_FREE", "Frees approximately <<1>>")
 ZO_CreateStringId("BATTLESCROLLS_DELETE_MEMORY_STATUS", "Memory: <<1>> of <<2>> (<<3>>%)")
+
+-------------------------
+-- Instance Locking
+-------------------------
+ZO_CreateStringId("BATTLESCROLLS_LOCK_ERROR_TITLE", "Cannot Lock")
+ZO_CreateStringId("BATTLESCROLLS_LOCK_ERROR_TEXT", "Locking this zone would exceed your memory limit. Locked zones and the most recent zone are protected from cleanup.\n\nTo free up space, unlock or delete some locked zones, or increase your memory limit in Settings.")
+ZO_CreateStringId("BATTLESCROLLS_LOCK_LOCKED_SIZE", "Currently locked: <<1>>")
+ZO_CreateStringId("BATTLESCROLLS_LOCK_INSTANCE_SIZE", "This zone: <<1>>")
+ZO_CreateStringId("BATTLESCROLLS_LOCK_LIMIT", "Memory limit: <<1>>")
 
 -------------------------
 -- Dynamic Overview Panel

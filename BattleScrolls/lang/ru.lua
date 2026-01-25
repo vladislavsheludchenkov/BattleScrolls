@@ -15,7 +15,7 @@ local strings = {
     -------------------------
     -- Zone/Instance Tabs
     -------------------------
-    [BATTLESCROLLS_TAB_ALL_ZONES] = "Все зоны",
+    [BATTLESCROLLS_TAB_ALL_ZONES] = "Все области",
     [BATTLESCROLLS_TAB_INSTANCED] = "Инстансы",
     [BATTLESCROLLS_TAB_OVERLAND] = "Открытый мир",
     [BATTLESCROLLS_TAB_HOUSES] = "Дома",
@@ -116,7 +116,7 @@ local strings = {
     [BATTLESCROLLS_SETTINGS_RECORD_PLAYER_FIGHTS_TEXT] = "PvP-сражения против других игроков.",
     [BATTLESCROLLS_SETTINGS_RECORD_DUMMY_FIGHTS] = "Записывать сражения с манекеном",
     [BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TITLE] = "Фильтры записи",
-    [BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT] = "Фильтры зон и типов сражений комбинируются: сражение должно соответствовать хотя бы одной зоне И одному типу для записи.",
+    [BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT] = "Фильтры областей и типов сражений комбинируются: сражение должно соответствовать хотя бы одной области И одному типу для записи.",
 
     -- Storage/History settings
     [BATTLESCROLLS_SETTINGS_HISTORY_SIZE_LIMIT] = "Лимит истории",
@@ -130,7 +130,7 @@ local strings = {
     [BATTLESCROLLS_SETTINGS_STORAGE_SIZE_CAUTION] = "Осторожно",
     [BATTLESCROLLS_SETTINGS_STORAGE_SIZE_YOLO] = "Что может пойти не так?",
     -- Storage tooltip
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_DESC] = "Сколько истории боёв хранить. При превышении лимита старые инстансы удаляются автоматически.",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_DESC] = "Сколько истории боёв хранить. При превышении лимита старые незаблокированные области удаляются автоматически. Вы можете заблокировать отдельные области, чтобы защитить их от очистки.",
     [BATTLESCROLLS_SETTINGS_STORAGE_TT_NOTE] = "Этот лимит относится только к сохранённой истории. Аддон также использует память для отслеживания текущего боя и отрисовки интерфейса, поэтому общее потребление будет выше.",
     [BATTLESCROLLS_SETTINGS_STORAGE_TT_CURRENT] = "История: <<1>> МБ из <<2>> МБ (<<3>>%)",
     [BATTLESCROLLS_SETTINGS_STORAGE_TT_PRESETS] = "Пресеты (испытание ~0.5-1 МБ, подземелье ~0.25-0.5 МБ):",
@@ -486,11 +486,10 @@ local strings = {
     [BATTLESCROLLS_SETTINGS_PERFORMANCE] = "Производительность",
     [BATTLESCROLLS_SETTINGS_ASYNC_SPEED] = "Скорость обработки",
     [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_PERFORMANCE] = "Производительность",
-    [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_BALANCED] = "Сбалансировано",
     [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_SMOOTH] = "Плавность",
     [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_CUSTOM] = "Другое (<<1>> FPS)",
     [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_TITLE] = "Скорость обработки",
-    [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_TEXT] = "Настройка скорости обработки фоновых задач. Влияет в основном на интерфейс Журнала и время между окончанием боя и появлением записи в списке.\n\nПроизводительность: Быстрая обработка. Возможны кратковременные подлагивания.\nСбалансировано: Хороший баланс скорости и плавности.\nПлавность: Плавный геймплей, медленная обработка.\n\nВлияет на ВСЕ аддоны, использующие LibAsync.",
+    [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_TEXT] = "Настройка скорости обработки фоновых задач. Влияет в основном на интерфейс Журнала и время между окончанием боя и появлением записи в списке.\n\nПроизводительность: Быстрая обработка. Возможны кратковременные подлагивания.\nПлавность: Более плавный геймплей, медленная обработка. Записи могут зависать при загрузке или не появляться в Журнале.\n\nВлияет на ВСЕ аддоны, использующие LibAsync.",
 
     -------------------------
     -- Onboarding
@@ -544,7 +543,7 @@ local strings = {
     -- Delete Functionality
     -------------------------
     [BATTLESCROLLS_DELETE] = "Удалить",
-    [BATTLESCROLLS_DELETE_INSTANCE_TITLE] = "Удалить зону",
+    [BATTLESCROLLS_DELETE_INSTANCE_TITLE] = "Удалить область",
     [BATTLESCROLLS_DELETE_INSTANCE_TEXT] = "Удалить <<1>> и все её сражения?",
     [BATTLESCROLLS_DELETE_ENCOUNTER_TITLE] = "Удалить сражение",
     [BATTLESCROLLS_DELETE_ENCOUNTER_TEXT] = "Удалить <<1>>?",
@@ -560,6 +559,15 @@ local strings = {
     [BATTLESCROLLS_OVERVIEW_TOP_INCOMING] = "Топ входящий урон",
     [BATTLESCROLLS_OVERVIEW_HEALING_TARGETS] = "Цели исцеления",
     [BATTLESCROLLS_OVERVIEW_DAMAGE_SOURCES] = "Источники урона",
+
+    -------------------------
+    -- Instance Locking
+    -------------------------
+    [BATTLESCROLLS_LOCK_ERROR_TITLE] = "Невозможно заблокировать",
+    [BATTLESCROLLS_LOCK_ERROR_TEXT] = "Блокировка этой области превысит лимит памяти. Заблокированные области и последняя область защищены от очистки.\n\nЧтобы освободить место, разблокируйте или удалите некоторые заблокированные области, или увеличьте лимит памяти в настройках.",
+    [BATTLESCROLLS_LOCK_LOCKED_SIZE] = "Заблокировано: <<1>>",
+    [BATTLESCROLLS_LOCK_INSTANCE_SIZE] = "Эта область: <<1>>",
+    [BATTLESCROLLS_LOCK_LIMIT] = "Лимит памяти: <<1>>",
 }
 
 BS_STRINGS = strings
