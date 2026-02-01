@@ -82,14 +82,15 @@ function StatsListController.refresh(journalUI)
         BattleScrolls.gc:RequestGC(5)
     end
 
-    -- Show loading state
-    list:SetNoItemText(GetString(BATTLESCROLLS_LIST_LOADING))
-    list:Commit()
-
     -- Check what needs to be decoded/computed
     local needsEncounterDecode = journalUI.decodedEncounter == nil
     local needsAbilityInfo = journalUI.abilityInfo == nil
     local needsArithmancer = journalUI.arithmancer == nil
+
+    -- Show loading state
+    list:SetNoItemText(GetString(BATTLESCROLLS_LIST_LOADING))
+    list:Commit()
+
 
     -- Async refresh
     journalUI.taskInProgress = LibEffect.Async(function()
@@ -146,12 +147,18 @@ function StatsListController.refresh(journalUI)
         StatsListController.renderTab(ctx, journalUI.selectedTab):Await()
 
         LibEffect.Yield():Await()
+        journalUI.statsRefreshPending = false
         list:Commit()
 
-        -- For non-overview tabs, scroll to index 2 (just below the overview entry)
+        -- Restore saved index (e.g. after favorite toggle) or default to index 2
         local numItems = list:GetNumItems()
+        local restoreIndex = journalUI.restoreSelectedIndex
+        journalUI.restoreSelectedIndex = nil
+
         local targetIndex = 1
-        if journalUI.selectedTab ~= StatsTab.OVERVIEW and numItems >= 2 then
+        if restoreIndex and restoreIndex >= 1 and restoreIndex <= numItems then
+            targetIndex = restoreIndex
+        elseif journalUI.selectedTab ~= StatsTab.OVERVIEW and numItems >= 2 then
             targetIndex = 2
         end
         if list:GetSelectedIndex() ~= targetIndex then

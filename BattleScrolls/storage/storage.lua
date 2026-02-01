@@ -143,6 +143,7 @@ BattleScrolls = BattleScrolls or {}
 ---@field trackBossDebuffs boolean
 ---@field effectReconciliationPreset "max"|"high"|"normal"|"low"|"off"
 ---@field storageSizePreset "xs"|"small"|"medium"|"large"|"xl"|"caution"|"yolo"
+---@field favoriteEffects table<number, boolean>
 ---@field hasCompletedOnboarding boolean
 
 ---@class StorageData
@@ -225,6 +226,7 @@ storage.defaults = {
         trackBossDebuffs = true, -- track debuffs on bosses
         effectReconciliationPreset = "normal", -- Effect reconciliation precision preset
         storageSizePreset = "medium", -- Storage size preset key
+        favoriteEffects = {}, -- Favorite effects keyed by abilityId (account-wide)
         hasCompletedOnboarding = false, -- whether user has completed initial setup
     }
 }

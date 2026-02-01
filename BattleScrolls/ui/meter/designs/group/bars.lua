@@ -5,6 +5,7 @@ end
 local utils = BattleScrolls.dpsMeterUtils
 local registry = BattleScrolls.dpsMeterDesigns
 local factories = BattleScrolls.dpsMeterRowFactories
+local constants = BattleScrolls.constants
 
 ---@class BarsGroupDesign : GroupDesignModule
 local design = {
@@ -156,10 +157,14 @@ function design:Render(members, ctx)
         if value and value > maxDPS then maxDPS = value end
     end
 
+    maxDPS = math.min(maxDPS, constants.huge)
+
     local maxHPS = 0
     for _, member in ipairs(hpsMembers) do
         if member.rawHPS and member.rawHPS > maxHPS then maxHPS = member.rawHPS end
     end
+
+    maxHPS = math.min(maxHPS, constants.huge)
 
     -- Collect all rows for positioning
     local allRows = {}
@@ -184,6 +189,7 @@ function design:Render(members, ctx)
             local icon = row:GetNamedChild("Icon")
 
             local barValue = ctx.isBossFight and member.bossDPS or member.allDPS
+            barValue = math.min(barValue, constants.huge)
 
             if nameLabel then nameLabel:SetText(member.name) end
             if valueLabel then
@@ -213,8 +219,8 @@ function design:Render(members, ctx)
             table.insert(allRows, { control = row, isHeader = false, isNewSection = false })
         end
 
-        -- Add Total row if 2+ DPS members
-        if #dpsMembers >= 2 and ctx.groupDPS then
+        -- Add Total row
+        if ctx.groupDPS then
             rowIndex = rowIndex + 1
             if rowIndex <= MAX_ROWS then
                 local totalRow = rows[rowIndex]
@@ -267,6 +273,7 @@ function design:Render(members, ctx)
             local icon = row:GetNamedChild("Icon")
 
             local barValue = member.rawHPS
+            barValue = math.min(barValue, constants.huge)
 
             if nameLabel then nameLabel:SetText(member.name) end
             if valueLabel then

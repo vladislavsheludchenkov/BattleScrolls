@@ -634,7 +634,7 @@ function BattleScrolls.state:UpdateUnitFriendliness(unitId, unitType)
                 local function addToTable(targetTable)
                     targetTable[sourceUnitId] = targetTable[sourceUnitId] or {}
                     if not targetTable[sourceUnitId][unitId] then
-                        targetTable[sourceUnitId][unitId] = BattleScrolls.accumulators.newDamageDone()
+                        targetTable[sourceUnitId][unitId] = BattleScrolls.structures.newDamageDone()
                     end
                     local unknownDamage = i[unitId]
                     local targetDamage = targetTable[sourceUnitId][unitId]
@@ -934,7 +934,7 @@ function BattleScrolls.state:OnHealingOut(_, result, _isError, _abilityName, _ab
     self:UpdateAbilityInfo(abilityID, isHot, damageType)
 
     if not self.healingStats.healingOutToGroup[targetUnitID] then
-        self.healingStats.healingOutToGroup[targetUnitID] = BattleScrolls.accumulators.newHealingDoneDiffSource()
+        self.healingStats.healingOutToGroup[targetUnitID] = BattleScrolls.structures.newHealingDoneDiffSource()
     end
 
     BattleScrolls.accumulators.healingDiffSource(self.healingStats.healingOutToGroup[targetUnitID], sourceUnitID, abilityID, hitValue, overflow, isCrit)
@@ -978,7 +978,7 @@ function BattleScrolls.state:OnHealingIn(_, result, _isError, _abilityName, _abi
     self:UpdateAbilityInfo(abilityID, isHot, damageType)
 
     if not self.healingStats.healingInFromGroup[sourceUnitID] then
-        self.healingStats.healingInFromGroup[sourceUnitID] = BattleScrolls.accumulators.newHealingDone()
+        self.healingStats.healingInFromGroup[sourceUnitID] = BattleScrolls.structures.newHealingDone()
     end
 
     BattleScrolls.accumulators.healingDone(self.healingStats.healingInFromGroup[sourceUnitID], abilityID, hitValue, overflow, isCrit)

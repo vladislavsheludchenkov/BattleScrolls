@@ -50,12 +50,6 @@ end
 -- Damage Accumulation
 -- ============================================================================
 
----Creates a new empty DamageDone structure (uses hstructure)
----@return DamageDone
-function accumulators.newDamageDone()
-    return BattleScrolls.structures.newDamageDone()
-end
-
 ---Accumulates damage into the given damage table (nested: sourceUnitId -> targetUnitId -> DamageDone)
 ---@param damageTable table<number, table<number, DamageDone>>
 ---@param sourceUnitID number
@@ -71,7 +65,7 @@ function accumulators.damage(damageTable, sourceUnitID, targetUnitID, abilityID,
 
     local damageDone = damageTable[sourceUnitID][targetUnitID]
     if not damageDone then
-        damageDone = accumulators.newDamageDone()
+        damageDone = BattleScrolls.structures.newDamageDone()
         damageTable[sourceUnitID][targetUnitID] = damageDone
     end
 
@@ -101,12 +95,6 @@ end
 -- Healing Accumulation
 -- ============================================================================
 
----Creates a new empty HealingTotals (lean, uses hstructure)
----@return HealingTotals
-function accumulators.newHealingTotals()
-    return BattleScrolls.structures.newHealingTotals()
-end
-
 ---Adds healing values to a lean HealingTotals (no crit stats)
 ---@param totals HealingTotals
 ---@param hitValue number The actual healing done (real)
@@ -115,13 +103,6 @@ function accumulators.addToHealingTotals(totals, hitValue, overflow)
     totals.real = totals.real + hitValue
     totals.overheal = totals.overheal + overflow
     totals.raw = totals.raw + hitValue + overflow
-end
-
----Creates a new empty HealingBreakdown (full with crit stats, uses hstructure)
----@param initialRawHit number|nil Optional initial raw hit value for minTick/maxTick
----@return HealingBreakdown
-function accumulators.newHealingBreakdown(initialRawHit)
-    return BattleScrolls.structures.newHealingBreakdown(initialRawHit)
 end
 
 ---Adds healing values to a full HealingBreakdown (with crit stats)
@@ -142,12 +123,6 @@ function accumulators.addToHealingBreakdown(breakdown, hitValue, overflow, isCri
     breakdown.maxTick = breakdown.maxTick and math.max(breakdown.maxTick, rawHit) or rawHit
 end
 
----Creates a new empty HealingDone (with lean totals, uses hstructure)
----@return HealingDone
-function accumulators.newHealingDone()
-    return BattleScrolls.structures.newHealingDone()
-end
-
 ---Accumulates healing into a HealingDone structure (tracks by abilityId only)
 ---@param healingDone HealingDone
 ---@param abilityID number
@@ -163,15 +138,9 @@ function accumulators.healingDone(healingDone, abilityID, hitValue, overflow, is
 
     -- Full breakdown with crit stats per ability
     if not healingDone.byAbilityId[abilityID] then
-        healingDone.byAbilityId[abilityID] = accumulators.newHealingBreakdown(rawHit)
+        healingDone.byAbilityId[abilityID] = BattleScrolls.structures.newHealingBreakdown(rawHit)
     end
     accumulators.addToHealingBreakdown(healingDone.byAbilityId[abilityID], hitValue, overflow, isCrit)
-end
-
----Creates a new empty HealingDoneDiffSource (with lean totals, uses hstructure)
----@return HealingDoneDiffSource
-function accumulators.newHealingDoneDiffSource()
-    return BattleScrolls.structures.newHealingDoneDiffSource()
 end
 
 ---Accumulates healing into a HealingDoneDiffSource structure (tracks by sourceUnitId -> abilityId)
@@ -193,7 +162,7 @@ function accumulators.healingDiffSource(healingDone, sourceUnitID, abilityID, hi
         healingDone.bySourceUnitIdByAbilityId[sourceUnitID] = {}
     end
     if not healingDone.bySourceUnitIdByAbilityId[sourceUnitID][abilityID] then
-        healingDone.bySourceUnitIdByAbilityId[sourceUnitID][abilityID] = accumulators.newHealingBreakdown(rawHit)
+        healingDone.bySourceUnitIdByAbilityId[sourceUnitID][abilityID] = BattleScrolls.structures.newHealingBreakdown(rawHit)
     end
     accumulators.addToHealingBreakdown(healingDone.bySourceUnitIdByAbilityId[sourceUnitID][abilityID], hitValue, overflow, isCrit)
 end
@@ -202,12 +171,6 @@ end
 -- HealingStats Factory and Clear
 -- ============================================================================
 
----Creates a new empty HealingStats structure (uses hstructure)
----@return HealingStats
-function accumulators.newHealingStats()
-    return BattleScrolls.structures.newHealingStats()
-end
-
 ---Clears combat tracking state (damage, healing, procs, ability info)
 ---@param ctx CombatContext
 function accumulators.clear(ctx)
@@ -215,7 +178,7 @@ function accumulators.clear(ctx)
     ctx.damageByUnitIdGroup = {}
     ctx.damageTakenByUnitId = {}
     ctx.damageUnknownByUnitId = {}
-    ctx.healingStats = accumulators.newHealingStats()
+    ctx.healingStats = BattleScrolls.structures.newHealingStats()
     ctx.procs = {}
     ctx.abilityInfo = {}
 end

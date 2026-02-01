@@ -119,23 +119,6 @@ end
 -- Factory Functions
 -- ============================================================================
 
----Creates a new EffectStats entry (uses hstructure)
----@param abilityId number
----@param effectType number
----@return EffectStats
-function effects.newStats(abilityId, effectType)
-    return BattleScrolls.structures.newEffectStats(abilityId, effectType)
-end
-
----Creates a new EffectStatsWithAttribution entry (used for boss and group effects)
----Extends EffectStats with player attribution tracking (uses hstructure)
----@param abilityId number
----@param effectType number
----@return EffectStatsWithAttribution
-function effects.newStatsWithAttribution(abilityId, effectType)
-    return BattleScrolls.structures.newEffectStatsWithAttribution(abilityId, effectType)
-end
-
 ---Creates a new EffectInstance for tracking active effects
 ---@param abilityId number
 ---@param effectType number
@@ -160,13 +143,6 @@ function effects.newInstance(abilityId, effectType, stackCount, appliedByPlayer,
     return instance
 end
 
----Creates a new UnitAliveState for tracking unit alive time (uses hstructure)
----@param startAlive boolean Whether unit starts alive
----@param startTimeMs number|nil Start time (defaults to GetGameTimeMilliseconds())
----@return UnitAliveState
-function effects.newUnitAliveState(startAlive, startTimeMs)
-    return BattleScrolls.structures.newUnitAliveState(startAlive, startTimeMs)
-end
 
 -- ============================================================================
 -- Helper Functions
@@ -347,14 +323,13 @@ local function updateStatsOnUpdated(stats, instance, stackCount, appliedByPlayer
     instance.stackCount = stackCount
 end
 
----Ensures a unit has alive state initialized, starting as alive from fightStartTimeMs
+---Ensures a unit has alive state initialized, starting as alive from now
 ---@param ctx EffectContext
 ---@param key string unitTag for bosses, displayName for group members
 ---@param startAlive boolean|nil Whether to start alive (default true)
 local function ensureUnitAliveState(ctx, key, startAlive)
     if not ctx.unitAliveState[key] then
-        -- Use fightStartTimeMs so alive time counts from combat start, not first event
-        ctx.unitAliveState[key] = effects.newUnitAliveState(startAlive ~= false, ctx.fightStartTimeMs)
+        ctx.unitAliveState[key] = BattleScrolls.structures.newUnitAliveState(startAlive ~= false)
     end
 end
 
@@ -403,7 +378,7 @@ local function backfillEffectsForUnitTag(ctx, unitTag, storage, effectTypeFilter
         if abilityId and abilityId > 0 and (not effectTypeFilter or effectType == effectTypeFilter) then
             -- Initialize stats if first time seeing this effect
             if not storage[abilityId] then
-                storage[abilityId] = effects.newStatsWithAttribution(abilityId, effectType)
+                storage[abilityId] = BattleScrolls.structures.newEffectStatsWithAttribution(abilityId, effectType)
             end
 
             local stats = storage[abilityId]
@@ -453,7 +428,7 @@ local function handleUnitEffectChange(ctx, storage, storageKey, effectSlot, unit
 
         -- Initialize stats if first time seeing this effect
         if not storage[storageKey][abilityId] then
-            storage[storageKey][abilityId] = effects.newStatsWithAttribution(abilityId, effectType)
+            storage[storageKey][abilityId] = BattleScrolls.structures.newEffectStatsWithAttribution(abilityId, effectType)
         end
 
         -- Finalize old instance if exists (rapid reapplication case)
@@ -578,7 +553,7 @@ function effects.handlePlayerEffect(ctx, changeType, effectSlot, effectType, sta
     -- Initialize player alive state if we haven't yet
     if not ctx.playerAliveState then
         local isDead = IsUnitDead("player")
-        ctx.playerAliveState = effects.newUnitAliveState(not isDead, ctx.fightStartTimeMs)
+        ctx.playerAliveState = BattleScrolls.structures.newUnitAliveState(not isDead, ctx.fightStartTimeMs)
     end
 
     -- If player is dead, ignore ALL effect events (effects were finalized on death)
@@ -592,7 +567,7 @@ function effects.handlePlayerEffect(ctx, changeType, effectSlot, effectType, sta
     if changeType == EFFECT_RESULT_GAINED then
         -- Initialize stats if first time seeing this effect
         if not ctx.effectsOnPlayer[abilityId] then
-            ctx.effectsOnPlayer[abilityId] = effects.newStatsWithAttribution(abilityId, effectType)
+            ctx.effectsOnPlayer[abilityId] = BattleScrolls.structures.newEffectStatsWithAttribution(abilityId, effectType)
         end
 
         local stats = ctx.effectsOnPlayer[abilityId]
@@ -932,7 +907,7 @@ local function reconcilePlayerAliveState(ctx)
     local isActuallyDead = IsUnitDead("player")
 
     if not ctx.playerAliveState then
-        ctx.playerAliveState = effects.newUnitAliveState(not isActuallyDead, ctx.fightStartTimeMs)
+        ctx.playerAliveState = BattleScrolls.structures.newUnitAliveState(not isActuallyDead, ctx.fightStartTimeMs)
         return not isActuallyDead
     end
 
@@ -1069,7 +1044,7 @@ local function reconcileEffects(ctx, unitTag, storage, storageKey, effectTypeFil
             -- Track new effect in this slot
             local newAbilityId = current.abilityId
             if not storage[newAbilityId] then
-                storage[newAbilityId] = effects.newStatsWithAttribution(newAbilityId, current.effectType)
+                storage[newAbilityId] = BattleScrolls.structures.newEffectStatsWithAttribution(newAbilityId, current.effectType)
             end
             updateStatsOnGained(storage[newAbilityId], current.stackCount, current.appliedByPlayer)
 
@@ -1092,7 +1067,7 @@ local function reconcileEffects(ctx, unitTag, storage, storageKey, effectTypeFil
 
             local abilityId = current.abilityId
             if not storage[abilityId] then
-                storage[abilityId] = effects.newStatsWithAttribution(abilityId, current.effectType)
+                storage[abilityId] = BattleScrolls.structures.newEffectStatsWithAttribution(abilityId, current.effectType)
             end
             updateStatsOnGained(storage[abilityId], current.stackCount, current.appliedByPlayer)
 
@@ -1117,7 +1092,7 @@ local function reconcileEffects(ctx, unitTag, storage, storageKey, effectTypeFil
         if not reconTrackedKeys[effectSlot] then
             local abilityId = current.abilityId
             if not storage[abilityId] then
-                storage[abilityId] = effects.newStatsWithAttribution(abilityId, current.effectType)
+                storage[abilityId] = BattleScrolls.structures.newEffectStatsWithAttribution(abilityId, current.effectType)
             end
             updateStatsOnGained(storage[abilityId], current.stackCount, current.appliedByPlayer)
 

@@ -35,6 +35,9 @@ local constants = {}
 
 BattleScrolls.constants = constants
 
+-- The maximum supported DPS, anything above may be represented by math.huge when transferring
+constants.huge = 1000000
+
 constants.BOSS_TAGS = BOSS_TAGS
 
 constants.SingleTargetDamageProcAbilityIds = {

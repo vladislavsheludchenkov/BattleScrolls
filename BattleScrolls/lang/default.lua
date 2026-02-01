@@ -567,6 +567,14 @@ ZO_CreateStringId("BATTLESCROLLS_LOCK_INSTANCE_SIZE", "This zone: <<1>>")
 ZO_CreateStringId("BATTLESCROLLS_LOCK_LIMIT", "Memory limit: <<1>>")
 
 -------------------------
+-- Favorite Effects
+-------------------------
+ZO_CreateStringId("BATTLESCROLLS_FAVORITE_EFFECT", "Favorite")
+ZO_CreateStringId("BATTLESCROLLS_UNFAVORITE_EFFECT", "Unfavorite")
+ZO_CreateStringId("BATTLESCROLLS_CLEAR_ALL_FAVORITES", "Clear All Favorites")
+ZO_CreateStringId("BATTLESCROLLS_CLEAR_ALL_FAVORITES_TOOLTIP", "Remove all effects from favorites. Favorite effects are shown at the top of every effects list.")
+
+-------------------------
 -- Dynamic Overview Panel
 -------------------------
 ZO_CreateStringId("BATTLESCROLLS_OVERVIEW_DAMAGE_TAKEN", "Damage Taken")

@@ -2,6 +2,12 @@
 -- GC Module
 -- Controlled incremental garbage collection with rate limiting
 --
+-- The reason this exists is that the game doesn't always
+-- reclaim the memory if GC doesn't run often enough, even if
+-- GC eventually performed. That was observed for at least
+-- hstructures and strings
+-- See: https://www.esoui.com/forums/showthread.php?t=11507
+--
 -- Instead of scattered collectgarbage() calls, this module
 -- provides a RequestGC() API that performs incremental GC
 -- in small steps, yielding between each. Cooldown equals
@@ -45,9 +51,8 @@ local function isGarbageCollected()
 end
 
 ---Runs one GC cycle as an Effect
----@return Effect<nil>
-local function gcCycleEffect()
-    return LibEffect.Async(function()
+---@type Effect<nil>
+local gcCycleEffect = LibEffect.Async(function()
         local cycleStartMs = GetGameTimeMilliseconds()
 
         local finishedByStep = false
@@ -63,7 +68,7 @@ local function gcCycleEffect()
                 -- Plant sentinel AFTER first step (mid-cycle)
                 -- Objects created mid-cycle aren't collected until NEXT cycle,
                 -- so if sentinel is gone, at least one full cycle completed.
-                -- This is a fallback for when another addon steals our 'true'.
+                -- This is a fallback for when something else steals our 'true'.
                 if not sentinelPlanted then
                     plantGarbage()
                     sentinelPlanted = true
@@ -84,7 +89,8 @@ local function gcCycleEffect()
         if elapsedMs > 0 then
             LibEffect.Sleep(elapsedMs):Await()
         end
-    end)            :Ensure(function()
+    end)
+    :Ensure(function()
         GC._fiber = nil
         GC._remainingCycles = GC._remainingCycles - 1
 
@@ -93,7 +99,6 @@ local function gcCycleEffect()
             GC:_StartCycle()
         end
     end)
-end
 
 ---Starts a new GC cycle
 function GC:_StartCycle()
@@ -101,13 +106,7 @@ function GC:_StartCycle()
         return -- Already running
     end
 
-    self._fiber = gcCycleEffect():Run()
-end
-
----Check if GC is currently running (includes sleep cooldown period)
----@return boolean True if GC cycle is active
-function GC:_IsActive()
-    return self._fiber ~= nil
+    self._fiber = gcCycleEffect:Run()
 end
 
 ---Request garbage collection cycles
@@ -115,7 +114,7 @@ end
 function GC:RequestGC(count)
     count = count or 1
 
-    if self:_IsActive() then
+    if self._fiber ~= nil then
         -- Ensure 'count' MORE cycles after the current one finishes
         local needed = count + 1
         if self._remainingCycles < needed then

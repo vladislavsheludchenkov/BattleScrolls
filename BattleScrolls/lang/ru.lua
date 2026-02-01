@@ -568,6 +568,14 @@ local strings = {
     [BATTLESCROLLS_LOCK_LOCKED_SIZE] = "Заблокировано: <<1>>",
     [BATTLESCROLLS_LOCK_INSTANCE_SIZE] = "Эта область: <<1>>",
     [BATTLESCROLLS_LOCK_LIMIT] = "Лимит памяти: <<1>>",
+
+    -------------------------
+    -- Favorite Effects
+    -------------------------
+    [BATTLESCROLLS_FAVORITE_EFFECT] = "В избранное",
+    [BATTLESCROLLS_UNFAVORITE_EFFECT] = "Убрать из избранного",
+    [BATTLESCROLLS_CLEAR_ALL_FAVORITES] = "Очистить все избранное",
+    [BATTLESCROLLS_CLEAR_ALL_FAVORITES_TOOLTIP] = "Удалить все избранные эффекты. Избранные эффекты отображаются в верхней части каждого списка эффектов.",
 }
 
 BS_STRINGS = strings

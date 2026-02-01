@@ -724,8 +724,9 @@ end
 ---@param percent number Uptime percentage (0-100)
 ---@param previousControl Control|nil Previous control to anchor below
 ---@param stats { applications: number|nil, playerPercent: number|nil, maxStacks: number|nil, suffix: string|nil }|nil Optional stats for second row
+---@param isFavorite boolean|nil Whether this effect is favorited
 ---@return Control|nil bar The bar control
-function OverviewPanel:AddEffectBar(abilityId, percent, previousControl, stats)
+function OverviewPanel:AddEffectBar(abilityId, percent, previousControl, stats, isFavorite)
     if not self.q4Container then return nil end
 
     usageCounters.effectBar = usageCounters.effectBar + 1
@@ -741,6 +742,12 @@ function OverviewPanel:AddEffectBar(abilityId, percent, previousControl, stats)
 
     -- Set icon frame (square for active, circle for passive)
     SetupIconFrame(bar, abilityIcon)
+
+    -- Show/hide favorite star
+    local favoriteIcon = bar:GetNamedChild("FavoriteIcon")
+    if favoriteIcon then
+        favoriteIcon:SetHidden(not isFavorite)
+    end
 
     -- Set name with optional suffix
     local nameLabel = bar:GetNamedChild("Name")
@@ -822,8 +829,9 @@ end
 ---@param percent number Uptime percentage (0-100)
 ---@param previousControl Control|nil Previous control to anchor below
 ---@param stats { applications: number|nil, playerPercent: number|nil, maxStacks: number|nil, suffix: string|nil }|nil Optional stats
+---@param isFavorite boolean|nil Whether this effect is favorited
 ---@return Control|nil row The row control
-function OverviewPanel:AddEffectRow(abilityId, percent, previousControl, stats)
+function OverviewPanel:AddEffectRow(abilityId, percent, previousControl, stats, isFavorite)
     if not self.q4Container then return nil end
 
     usageCounters.effectRow = usageCounters.effectRow + 1
@@ -839,6 +847,12 @@ function OverviewPanel:AddEffectRow(abilityId, percent, previousControl, stats)
 
     -- Set icon frame (square for active, circle for passive)
     SetupIconFrame(row, abilityIcon)
+
+    -- Show/hide favorite star
+    local favoriteIcon = row:GetNamedChild("FavoriteIcon")
+    if favoriteIcon then
+        favoriteIcon:SetHidden(not isFavorite)
+    end
 
     -- Set name with optional suffix
     local nameLabel = row:GetNamedChild("Name")
@@ -895,8 +909,9 @@ end
 ---@param percent number Uptime percentage (0-100)
 ---@param previousControl Control|nil Previous control to anchor below
 ---@param stats { applications: number|nil, playerPercent: number|nil, maxStacks: number|nil, peakInstances: number|nil }|nil Optional stats
+---@param isFavorite boolean|nil Whether this effect is favorited
 ---@return Control|nil row The row control
-function OverviewPanel:AddQ2EffectRow(abilityId, percent, previousControl, stats)
+function OverviewPanel:AddQ2EffectRow(abilityId, percent, previousControl, stats, isFavorite)
     usageCounters.q2EffectRow = usageCounters.q2EffectRow + 1
     local index = usageCounters.q2EffectRow
 
@@ -910,6 +925,12 @@ function OverviewPanel:AddQ2EffectRow(abilityId, percent, previousControl, stats
 
     -- Set icon frame (square for active, circle for passive)
     SetupIconFrame(row, abilityIcon)
+
+    -- Show/hide favorite star
+    local favoriteIcon = row:GetNamedChild("FavoriteIcon")
+    if favoriteIcon then
+        favoriteIcon:SetHidden(not isFavorite)
+    end
 
     -- Set name
     local nameLabel = row:GetNamedChild("Name")

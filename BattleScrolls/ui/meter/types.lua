@@ -62,19 +62,26 @@
 ---@field isBossFight boolean Whether current fight has bosses
 ---@field growUpward boolean If true, rows should grow upward from anchor
 ---@field playerDisplayName string|nil Current player's display name (for highlighting)
+---@field highlightFallbackName string|nil Suggested name to highlight when displaying preview (doesn't include actual player name)
 ---@field groupDPS number|nil Total group DPS (all targets)
 ---@field bossGroupDPS number|nil Total group DPS (boss only, nil if not boss fight)
 ---@field dpsMeter DPSMeter Reference to main DPS meter
 
----@class GroupMemberEntry
+---@class GroupMemberBase
 ---@field name string Player display name
+---@field role number LFG_ROLE_* constant (DPS, HEAL, TANK)
+
+---@class GroupMemberDamageEntry : GroupMemberBase
 ---@field allDPS number DPS against all targets
 ---@field bossDPS number|nil DPS against bosses only
+---@field showHealing false
+
+---@class GroupMemberHealingEntry : GroupMemberBase
 ---@field rawHPS number Raw healing per second
 ---@field effectiveHPS number Effective (non-overheal) HPS
----@field showHealing boolean Whether this member should be in HPS section
----@field sortValue number Value used for sorting (highest first)
----@field role number LFG_ROLE_* constant (DPS, HEAL, TANK)
+---@field showHealing true
+
+---@alias GroupMemberEntry GroupMemberDamageEntry | GroupMemberHealingEntry
 
 ---@alias DPSMeterState
 ---| "HIDDEN"

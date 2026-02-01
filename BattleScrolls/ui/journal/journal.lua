@@ -75,6 +75,7 @@ local canAddToMainMenu = false
 ---@field selectedInstanceTab InstanceTab Selected instance filter tab
 ---@field selectedEncounterTab EncounterTab Selected encounter filter tab
 ---@field pendingTabIndex number|nil Tab index to select after refresh
+---@field statsRefreshPending boolean|nil True if favorites changed and list can be re-sorted to account for it
 ---@field filters table<StatsTab, JournalFilters> Filter state by tab
 ---@field overviewPanel BattleScrolls_Journal_OverviewPanel|nil Overview panel instance
 ---@field instanceList ZO_ParametricScrollList Instance list control
@@ -445,6 +446,61 @@ function BattleScrolls_Journal_Gamepad:InitializeKeybindStripDescriptors()
                     or self.selectedTab == STATS_TAB.EFFECTS
             end,
             sound = SOUNDS.GAMEPAD_MENU_FORWARD,
+        },
+        -- Favorite effect keybind
+        {
+            keybind = "UI_SHORTCUT_TERTIARY",
+            name = function()
+                local targetData = self.statsList:GetTargetData()
+                if targetData and targetData.effectAbilityId then
+                    local favorites = BattleScrolls.storage.savedVariables.settings.favoriteEffects
+                    if favorites[targetData.effectAbilityId] then
+                        return GetString(BATTLESCROLLS_UNFAVORITE_EFFECT)
+                    end
+                end
+                return GetString(BATTLESCROLLS_FAVORITE_EFFECT)
+            end,
+            callback = function()
+                local targetData = self.statsList:GetTargetData()
+                if targetData and targetData.effectAbilityId then
+                    -- Save current index so the list doesn't jump to the top after refresh
+                    self.restoreSelectedIndex = self.statsList:GetSelectedIndex()
+                    local favorites = BattleScrolls.storage.savedVariables.settings.favoriteEffects
+                    if favorites[targetData.effectAbilityId] then
+                        favorites[targetData.effectAbilityId] = nil
+                        PlaySound(SOUNDS.CHAMPION_STAR_STAGE_DOWN)
+                    else
+                        favorites[targetData.effectAbilityId] = true
+                        PlaySound(SOUNDS.CHAMPION_STAR_STAGE_UP)
+                    end
+
+                    for i = 1, self.statsList:GetNumEntries() do
+                        local entry = self.statsList:GetEntryData(i)
+                        if entry.effectAbilityId then
+                            entry.isFavorite = favorites[entry.effectAbilityId]
+                        end
+                    end
+
+                    self.statsRefreshPending = true
+                    self.statsList:Commit()
+                end
+            end,
+            visible = function()
+                if self.selectedTab ~= STATS_TAB.EFFECTS then return false end
+                local targetData = self.statsList:GetTargetData()
+                return targetData and targetData.effectAbilityId ~= nil
+            end,
+        },
+        {
+            keybind = "UI_SHORTCUT_RIGHT_STICK",
+            name = GetString(SI_GAMEPAD_GROUP_FINDER_SEARCH_RESULTS_REFRESH_KEYBIND),
+            callback = function()
+                self:RefreshList(true)
+            end,
+            visible = function()
+                return self.statsRefreshPending or false
+            end,
+            sound = SOUNDS.GROUP_FINDER_REFRESH_SEARCH,
         },
     }
 

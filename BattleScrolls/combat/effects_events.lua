@@ -3,7 +3,6 @@ if not SemisPlaygroundCheckAccess() then
 end
 
 -- Effect Event Registration for BattleScrolls
--- Lightweight event handlers that call effects module directly (no queue)
 
 BattleScrolls = BattleScrolls or {}
 

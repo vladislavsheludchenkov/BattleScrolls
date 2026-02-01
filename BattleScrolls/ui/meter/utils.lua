@@ -32,12 +32,15 @@ end
 
 -- ==================== Formatting ====================
 
+local moreThanAMillion = "> " .. ZO_AbbreviateAndLocalizeNumber(1000000, 1, false)
 ---Format DPS number for display (abbreviated)
 ---@param dps number
 ---@return string
 function utils.FormatDPS(dps)
     if dps < 1000 then
         return string.format("%.0f", dps)
+    elseif dps == math.huge then
+        return moreThanAMillion
     else
         return ZO_AbbreviateAndLocalizeNumber(dps, 1, false) or tostring(dps)
     end

@@ -172,6 +172,11 @@
                     <Anchor point="TOPLEFT" offsetX="0" offsetY="4"/>
                     <Dimensions x="46" y="46"/>
                 </Texture>
+                <!-- Favorite star overlay -->
+                <Texture name="$(parent)FavoriteIcon" textureFile="EsoUI/Art/Collections/Favorite_StarOnly.dds" hidden="true" tier="HIGH" level="4">
+                    <Dimensions x="24" y="24"/>
+                    <Anchor point="TOPLEFT" relativeTo="$(parent)Icon" relativePoint="TOPLEFT" offsetX="-4" offsetY="-4"/>
+                </Texture>
                 <!-- Square edge frame for active abilities (Backdrop) -->
                 <Backdrop name="$(parent)EdgeFrame" tier="HIGH"
                           edgeColor="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL"
@@ -238,6 +243,11 @@
                 <Texture name="$(parent)Icon" pixelRoundingEnabled="false" tier="HIGH">
                     <Anchor point="TOPLEFT" offsetX="0" offsetY="4"/>
                     <Dimensions x="46" y="46"/>
+                </Texture>
+                <!-- Favorite star overlay -->
+                <Texture name="$(parent)FavoriteIcon" textureFile="EsoUI/Art/Collections/Favorite_StarOnly.dds" hidden="true" tier="HIGH" level="4">
+                    <Dimensions x="24" y="24"/>
+                    <Anchor point="TOPLEFT" relativeTo="$(parent)Icon" relativePoint="TOPLEFT" offsetX="-4" offsetY="-4"/>
                 </Texture>
                 <!-- Square edge frame for active abilities -->
                 <Backdrop name="$(parent)EdgeFrame" tier="HIGH"

@@ -37,6 +37,7 @@ combat/effects_events.lua
 combat/effects_reconcile.lua
 combat/state.lua
 combat/scribe.lua
+combat/ticker.lua
 
 ; Storage domain
 storage/bitcodec.lua

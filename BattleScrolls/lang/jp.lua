@@ -566,6 +566,14 @@ local strings = {
     [BATTLESCROLLS_LOCK_LOCKED_SIZE] = "現在ロック中: <<1>>",
     [BATTLESCROLLS_LOCK_INSTANCE_SIZE] = "このゾーン: <<1>>",
     [BATTLESCROLLS_LOCK_LIMIT] = "メモリ制限: <<1>>",
+
+    -------------------------
+    -- Favorite Effects
+    -------------------------
+    [BATTLESCROLLS_FAVORITE_EFFECT] = "お気に入り",
+    [BATTLESCROLLS_UNFAVORITE_EFFECT] = "お気に入り解除",
+    [BATTLESCROLLS_CLEAR_ALL_FAVORITES] = "すべてのお気に入りをクリア",
+    [BATTLESCROLLS_CLEAR_ALL_FAVORITES_TOOLTIP] = "すべてのお気に入りエフェクトを削除します。お気に入りのエフェクトは各エフェクトリストの上部に表示されます。",
 }
 
 -- Register translations

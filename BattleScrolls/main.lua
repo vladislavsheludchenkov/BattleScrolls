@@ -7,7 +7,7 @@
 --
 -- Initialization order:
 --   1. Infrastructure (binaryStorage, storage) - SavedVariables
---   2. Combat tracking (state, scribe) - Event subscriptions
+--   2. Combat tracking (state, scribe, ticker) - Event subscriptions
 --   3. Network (dpsShare, dpsSender) - Group communication
 --   4. UI (dpsMeter, onboarding) - Display components
 -----------------------------------------------------------
@@ -36,6 +36,7 @@ function BattleScrolls.OnAddOnLoaded(_, addonName)
         BattleScrolls.effectsEvents:Initialize()
         BattleScrolls.effectsReconciler:Initialize()
         BattleScrolls.scribe:Initialize()
+        BattleScrolls.combatTicker:Initialize()
         BattleScrolls.dpsShare:Initialize()
         BattleScrolls.dpsSender:Initialize()
         BattleScrolls.dpsMeter:Initialize()

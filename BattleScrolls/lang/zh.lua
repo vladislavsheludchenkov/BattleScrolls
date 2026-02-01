@@ -566,6 +566,14 @@ local strings = {
     [BATTLESCROLLS_LOCK_LOCKED_SIZE] = "当前已锁定：<<1>>",
     [BATTLESCROLLS_LOCK_INSTANCE_SIZE] = "此区域：<<1>>",
     [BATTLESCROLLS_LOCK_LIMIT] = "内存限制：<<1>>",
+
+    -------------------------
+    -- Favorite Effects
+    -------------------------
+    [BATTLESCROLLS_FAVORITE_EFFECT] = "收藏",
+    [BATTLESCROLLS_UNFAVORITE_EFFECT] = "取消收藏",
+    [BATTLESCROLLS_CLEAR_ALL_FAVORITES] = "清除所有收藏",
+    [BATTLESCROLLS_CLEAR_ALL_FAVORITES_TOOLTIP] = "移除所有收藏的效果。收藏的效果会显示在每个效果列表的顶部。",
 }
 
 -- Register translations

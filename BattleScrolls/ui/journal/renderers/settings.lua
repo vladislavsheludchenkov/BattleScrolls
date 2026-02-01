@@ -835,6 +835,33 @@ function SettingsRenderer.renderSettings(list, onRefresh)
 
     end -- if effectTrackingEnabled
 
+    -- Clear All Favorites button (only shown when favorites exist)
+    local favorites = settings and settings.favoriteEffects
+    if favorites and next(favorites) ~= nil then
+        local clearFavoritesData = {
+            text = GetString(BATTLESCROLLS_CLEAR_ALL_FAVORITES),
+            tooltipTitle = GetString(BATTLESCROLLS_CLEAR_ALL_FAVORITES),
+            tooltipText = GetString(BATTLESCROLLS_CLEAR_ALL_FAVORITES_TOOLTIP),
+            callback = function()
+                BattleScrolls.journal.dialogs.showBasicDialog({
+                    title = GetString(BATTLESCROLLS_CLEAR_ALL_FAVORITES),
+                    mainText = GetString(BATTLESCROLLS_CLEAR_ALL_FAVORITES_TOOLTIP),
+                    onConfirm = function()
+                        -- Wipe the favorites table (replace with empty table so defaults merge correctly)
+                        if settings then
+                            -- Clear all entries from the table
+                            for k in pairs(settings.favoriteEffects) do
+                                settings.favoriteEffects[k] = nil
+                            end
+                        end
+                        onRefresh()
+                    end,
+                })
+            end,
+        }
+        list:AddEntry("ZO_GamepadOptionsLabelRow", clearFavoritesData)
+    end
+
     -- =====================
     -- Performance Section
     -- =====================

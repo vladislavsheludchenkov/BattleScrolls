@@ -46,12 +46,20 @@ BattleScrolls = BattleScrolls or {}
 local utils = BattleScrolls.dpsMeterUtils
 local registry = BattleScrolls.dpsMeterDesigns
 
----@class DPSMeterGroupData
+---@class DPSMeterGroupDataBase
+---@field role number LFG_ROLE_* constant (DPS, HEAL, TANK)
+
+---@class DPSMeterGroupDataDamage : DPSMeterGroupDataBase
+---@field messageType "damage"
 ---@field allTargetsDPS number DPS against all targets
----@field bossDPS number|nil DPS against bosses only
+---@field bossDPS number|nil DPS against bosses only (nil if no boss fight)
+
+---@class DPSMeterGroupDataHealing : DPSMeterGroupDataBase
+---@field messageType "healing"
 ---@field rawHPS number Raw healing per second
 ---@field effectiveHPS number Effective (non-overheal) HPS
----@field role number LFG_ROLE_* constant (DPS, HEAL, TANK)
+
+---@alias DPSMeterGroupData DPSMeterGroupDataDamage|DPSMeterGroupDataHealing
 
 ---@class DPSMeterPersonalValues
 ---@field dps number Personal DPS (all targets)
@@ -62,7 +70,7 @@ local registry = BattleScrolls.dpsMeterDesigns
 ---@field bossDPS number Personal boss DPS
 ---@field bossShare number Personal boss damage share
 
----@class DPSMeter
+---@class DPSMeter : StateObserver, TickListener
 ---@field personalControl Control|nil TopLevelControl for personal meter
 ---@field groupControl Control|nil TopLevelControl for group meter
 ---@field state DPSMeterState Current display state
@@ -109,7 +117,6 @@ local dpsMeter = {
 BattleScrolls.dpsMeter = dpsMeter
 
 -- Constants
-local UPDATE_INTERVAL_MS = 200
 local PREVIEW_DURATION_MS = 1200
 
 ---@type GroupMemberEntry[]
@@ -131,10 +138,8 @@ function dpsMeter:GetGroupDPS()
         local hasBossDPS = false
 
         for _, data in pairs(self.groupMetrics) do
-            local allDPS = data.allTargetsDPS or 0
-            local rawHPS = data.rawHPS or 0
-            if allDPS >= rawHPS then
-                totalDPS = totalDPS + allDPS
+            if data.messageType == "damage" then
+                totalDPS = totalDPS + (data.allTargetsDPS or 0)
                 if data.bossDPS then
                     totalBossDPS = totalBossDPS + data.bossDPS
                     hasBossDPS = true
@@ -181,8 +186,9 @@ function dpsMeter:Initialize()
         self:ApplyGroupScale()
         LibEffect.YieldWithGC():Await()
 
-        -- Register as state observer
+        -- Register as state observer and tick listener
         BattleScrolls.state:RegisterObserver(self)
+        BattleScrolls.combatTicker:registerListener(self)
 
         -- Hide when menus are open (HUD is hidden)
         HUD_SCENE:RegisterCallback("StateChange", function(_oldState, newState)
@@ -192,8 +198,8 @@ function dpsMeter:Initialize()
             self:OnHUDStateChange(newState)
         end)
 
-        BattleScrolls.dpsShare:RegisterCallback("BattleScrolls_DPSMeter", function(unitTag, allTargetsDPS, bossDPS, rawHPS, effectiveHPS)
-            self:OnGroupDataArrived(unitTag, allTargetsDPS, bossDPS, rawHPS, effectiveHPS)
+        BattleScrolls.dpsShare:RegisterCallback("BattleScrolls_DPSMeter", function(unitTag, data)
+            self:OnGroupDataArrived(unitTag, data)
         end)
 
         -- BattleScrolls.log.Info("DPSMeter initialized")
@@ -578,37 +584,34 @@ function dpsMeter:ShowPreview()
             local tankRank = 0
 
             for i = 1, 12 do
-                local data = PREVIEW_DATA[i]
-                if data.isHealer then
+                local previewEntry = PREVIEW_DATA[i]
+                if previewEntry.isHealer then
                     healerRank = healerRank + 1
                     local rawHPS = 60000 - (healerRank - 1) * 8000
                     local effectiveHPS = rawHPS * (0.90 - (healerRank - 1) * 0.05)
-                    self.groupMetrics[data.name] = {
-                        allTargetsDPS = rawHPS * 0.1,
-                        bossDPS = rawHPS * 0.08,
+                    self.groupMetrics[previewEntry.name] = {
+                        messageType = "healing",
                         rawHPS = rawHPS,
                         effectiveHPS = effectiveHPS,
-                        role = data.role
+                        role = previewEntry.role,
                     }
-                elseif data.role == LFG_ROLE_TANK then
+                elseif previewEntry.role == LFG_ROLE_TANK then
                     tankRank = tankRank + 1
                     local dps = 8000 - (tankRank - 1) * 2000
-                    self.groupMetrics[data.name] = {
+                    self.groupMetrics[previewEntry.name] = {
+                        messageType = "damage",
                         allTargetsDPS = dps,
                         bossDPS = dps * 0.85,
-                        rawHPS = 0,
-                        effectiveHPS = 0,
-                        role = data.role
+                        role = previewEntry.role,
                     }
                 else
                     ddRank = ddRank + 1
                     local dps = 80000 - (ddRank - 1) * 5000
-                    self.groupMetrics[data.name] = {
+                    self.groupMetrics[previewEntry.name] = {
+                        messageType = "damage",
                         allTargetsDPS = dps,
                         bossDPS = dps * 0.85,
-                        rawHPS = 0,
-                        effectiveHPS = 0,
-                        role = data.role
+                        role = previewEntry.role,
                     }
                 end
             end
@@ -766,18 +769,10 @@ function dpsMeter:OnStateInitialized()
     if self.groupControl and self:IsGroupEnabled() then
         self.groupControl:SetHidden(false)
     end
-
-    EVENT_MANAGER:RegisterForUpdate("BattleScrolls_DPSMeter_Update", UPDATE_INTERVAL_MS, function()
-        self:UpdateDisplay()
-    end)
 end
 
----Called when combat ends
+---Called when combat ends (final render already happened via ticker's final tick)
 function dpsMeter:OnStatePreReset()
-    EVENT_MANAGER:UnregisterForUpdate("BattleScrolls_DPSMeter_Update")
-
-    self:UpdateDisplay(true)
-
     -- Record when combat ended for linger time calculations
     self.lastCombatEndTimeMs = GetGameTimeMilliseconds()
 
@@ -845,20 +840,21 @@ function dpsMeter:UpdateGroupDisplay(forceRender)
     utils.ClearMembers(reusableMembers)
 
     for displayName, data in pairs(self.groupMetrics) do
-        local allDPS = data.allTargetsDPS or 0
-        local bossDPS = data.bossDPS
-        local rawHPS = data.rawHPS or 0
-        local effectiveHPS = data.effectiveHPS or 0
-        local showHealing = rawHPS > allDPS
-        local sortValue = showHealing and rawHPS or (self.isBossFight and bossDPS or allDPS)
+        local showHealing = data.messageType == "healing"
+        local sortValue
+        if showHealing then
+            sortValue = data.rawHPS or 0
+        else
+            sortValue = self.isBossFight and data.bossDPS or (data.allTargetsDPS or 0)
+        end
 
         if sortValue and sortValue > 0 then
             local entry = utils.GetMemberEntry()
             entry.name = displayName
-            entry.allDPS = allDPS
-            entry.bossDPS = bossDPS
-            entry.rawHPS = rawHPS
-            entry.effectiveHPS = effectiveHPS
+            entry.allDPS = not showHealing and (data.allTargetsDPS or 0) or nil
+            entry.bossDPS = not showHealing and data.bossDPS or nil
+            entry.rawHPS = showHealing and (data.rawHPS or 0) or nil
+            entry.effectiveHPS = showHealing and (data.effectiveHPS or 0) or nil
             entry.showHealing = showHealing
             entry.sortValue = sortValue
             entry.role = data.role
@@ -931,66 +927,51 @@ function dpsMeter:UpdateGroupDisplay(forceRender)
     end
 end
 
----Update the display with current values (async)
----@param force boolean|nil If true, cancels current computation and starts new one with snapshot
-function dpsMeter:UpdateDisplay(force)
-    -- Skip updates during preview to preserve preview display
+---TickListener callback: called every 200ms during combat with a shared calculator
+---@param calc ArithmancerInstance
+function dpsMeter:OnCombatTick(calc)
     if self.isPreviewActive then return end
+    if self.state ~= "ACTIVE" then return end
 
-    if self.task ~= nil then
-        if force == true then
-            self.task:Cancel()
-        else
-            return
-        end
+    local isBossFight = calc:isBossFight()
+    local durationS = calc:getDurationS()
+
+    -- Compute all values needed by personal designs
+    local personalDPS = calc:personalDPS()
+    local personalShare = calc:personalShare()
+    local personalRawHPS = calc:personalRawHPSOut()
+    local personalTotalRawHealingOut = calc:personalTotalRawHealingOut()
+    local personalTotalEffectiveHealingOut = calc:personalTotalEffectiveHealingOut()
+
+    local bossPersonalDPS = 0
+    local bossPersonalShare = 0
+    if isBossFight then
+        bossPersonalDPS = calc:bossPersonalDPS()
+        bossPersonalShare = calc:bossPersonalShare()
     end
 
-    local source = force and BattleScrolls.state:Snapshot() or BattleScrolls.state
+    -- Compute group values
+    local groupTotalDamage = calc:groupTotalDamage()
+    local bossGroupTotalDamage = 0
+    if isBossFight then
+        bossGroupTotalDamage = calc:bossGroupTotalDamage()
+    end
 
-    self.task = LibEffect.Async(function()
-        local calc = BattleScrolls.arithmancer:New(source)
-        local isBossFight = calc:isBossFight()
-        local durationS = calc:getDurationS()
+    local groupDPS = durationS > 0 and groupTotalDamage / durationS or nil
+    local bossGroupDPS = (durationS > 0 and bossGroupTotalDamage > 0) and bossGroupTotalDamage / durationS or nil
 
-        -- Compute all values needed by personal designs
-        local personalDPS = calc:personalDPS()
-        local personalShare = calc:personalShare()
-        local personalRawHPS = calc:personalRawHPSOut()
-        local personalTotalRawHealingOut = calc:personalTotalRawHealingOut()
-        local personalTotalEffectiveHealingOut = calc:personalTotalEffectiveHealingOut()
+    -- Build personal values for designs
+    local personalValues = {
+        dps = personalDPS,
+        share = personalShare,
+        rawHPS = personalRawHPS,
+        totalRawHealingOut = personalTotalRawHealingOut,
+        totalEffectiveHealingOut = personalTotalEffectiveHealingOut,
+        bossDPS = bossPersonalDPS,
+        bossShare = bossPersonalShare,
+    }
 
-        local bossPersonalDPS = 0
-        local bossPersonalShare = 0
-        if isBossFight then
-            bossPersonalDPS = calc:bossPersonalDPS()
-            bossPersonalShare = calc:bossPersonalShare()
-        end
-
-        -- Compute group values
-        local groupTotalDamage = calc:groupTotalDamage()
-        local bossGroupTotalDamage = 0
-        if isBossFight then
-            bossGroupTotalDamage = calc:bossGroupTotalDamage()
-        end
-
-        local groupDPS = durationS > 0 and groupTotalDamage / durationS or nil
-        local bossGroupDPS = (durationS > 0 and bossGroupTotalDamage > 0) and bossGroupTotalDamage / durationS or nil
-
-        -- Build personal values for designs
-        local personalValues = {
-            dps = personalDPS,
-            share = personalShare,
-            rawHPS = personalRawHPS,
-            totalRawHealingOut = personalTotalRawHealingOut,
-            totalEffectiveHealingOut = personalTotalEffectiveHealingOut,
-            bossDPS = bossPersonalDPS,
-            bossShare = bossPersonalShare,
-        }
-
-        self:RenderDisplay(calc, personalValues, groupDPS, bossGroupDPS)
-    end):Ensure(function()
-        self.task = nil
-    end):Run()
+    self:RenderDisplay(calc, personalValues, groupDPS, bossGroupDPS)
 end
 
 ---Render the display with calculated values
@@ -1044,11 +1025,8 @@ end
 
 ---Handle group member data arrival
 ---@param unitTag string Unit tag (e.g., "group1")
----@param allTargetsDPS number DPS against all targets
----@param bossDPS number|nil DPS against bosses only
----@param rawHPS number Raw healing per second
----@param effectiveHPS number Effective HPS
-function dpsMeter:OnGroupDataArrived(unitTag, allTargetsDPS, bossDPS, rawHPS, effectiveHPS)
+---@param typedData DPSShareTypedData Typed damage or healing data
+function dpsMeter:OnGroupDataArrived(unitTag, typedData)
     local displayName = GetUnitDisplayName(unitTag)
     if not displayName then return end
 
@@ -1059,11 +1037,13 @@ function dpsMeter:OnGroupDataArrived(unitTag, allTargetsDPS, bossDPS, rawHPS, ef
         role = GetGroupMemberSelectedRole(unitTag) or LFG_ROLE_DPS
     end
 
+    ---@type DPSMeterGroupData
     local data = {
-        allTargetsDPS = allTargetsDPS,
-        bossDPS = bossDPS,
-        rawHPS = rawHPS,
-        effectiveHPS = effectiveHPS,
+        messageType = typedData.messageType,
+        allTargetsDPS = typedData.allTargetsDPS,
+        bossDPS = typedData.bossDPS,
+        rawHPS = typedData.rawHPS,
+        effectiveHPS = typedData.effectiveHPS,
         role = role,
     }
 
@@ -1082,12 +1062,6 @@ end
 
 ---Cleanup all event registrations for hot reload support
 function dpsMeter:Cleanup()
-    -- Cancel any running task
-    if self.task then
-        self.task:Cancel()
-        self.task = nil
-    end
-
     -- Cancel any timers
     if self.lingerTimerId then
         zo_removeCallLater(self.lingerTimerId)
@@ -1098,8 +1072,10 @@ function dpsMeter:Cleanup()
         self.previewTimerId = nil
     end
 
-    -- Unregister update timer
-    EVENT_MANAGER:UnregisterForUpdate("BattleScrolls_DPSMeter_Update")
+    -- Unregister from tick listener
+    if BattleScrolls.combatTicker then
+        BattleScrolls.combatTicker:unregisterListener(self)
+    end
 
     -- Unregister from state observer
     if BattleScrolls.state and BattleScrolls.state.UnregisterObserver then

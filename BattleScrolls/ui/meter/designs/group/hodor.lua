@@ -202,8 +202,8 @@ function design:Render(members, ctx)
             table.insert(allRows, { control = row, isHeader = false, isNewSection = false })
         end
 
-        -- Add Total row if 2+ DPS members
-        if #dpsMembers >= 2 and ctx.groupDPS then
+        -- Add Total row
+        if ctx.groupDPS then
             rowIndex = rowIndex + 1
             if rowIndex <= MAX_ROWS then
                 local totalRow = rows[rowIndex]

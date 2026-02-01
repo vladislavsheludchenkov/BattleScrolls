@@ -42,6 +42,7 @@ function factories.CreateHodorRow(name, parent)
     -- Create row container
     local control = WINDOW_MANAGER:CreateControl(name, parent, CT_CONTROL)
     control:SetDimensions(factories.HODOR_ROW_WIDTH, factories.HODOR_ROW_HEIGHT)
+    control:SetHidden(true)
 
     -- Create background (black, opacity set dynamically) - using CT_BACKDROP for reliable rendering
     local bg = WINDOW_MANAGER:CreateControl(name .. "Background", control, CT_BACKDROP)
@@ -89,6 +90,7 @@ function factories.CreateBarsRow(name, parent)
     -- Create row container
     local control = WINDOW_MANAGER:CreateControl(name, parent, CT_CONTROL)
     control:SetDimensions(factories.BARS_ROW_WIDTH, factories.BARS_BAR_HEIGHT + 4)
+    control:SetHidden(true)
 
     -- Create background outline (full row background)
     local bgOutline = WINDOW_MANAGER:CreateControl(name .. "BackgroundOutline", control, CT_BACKDROP)

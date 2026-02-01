@@ -1,0 +1,9 @@
+New features:
+- You can now mark effects as favorite, which will pin them at the top of every list they appear in
+
+Bugfixes:
+- New group members joining mid-fight now have uptimes calculated only for the time they were present
+- Fixed some group DPS tracker designs displaying empty elements in the top left corner of the screen briefly when entering combat for the first time
+
+Minor changes:
+- Total DPS row in group tracker is now displayed even if there is only 1 person in DPS section

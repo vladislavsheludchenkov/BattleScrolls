@@ -114,8 +114,8 @@ function design:Render(members, ctx)
             table.insert(items, { text = text, font = TEXT_FONT, isHeader = false, isNewSection = false })
         end
 
-        -- Add Total row if 2+ DPS members
-        if #dpsMembers >= 2 and ctx.groupDPS then
+        -- Add Total row
+        if ctx.groupDPS then
             local totalText
             if ctx.isBossFight and ctx.bossGroupDPS then
                 totalText = string.format("%s: %s / %s",

@@ -84,12 +84,20 @@ local function formatGroupEffectValueBrief(avgUptimePercent, memberCount, player
     return string.format("%.1f%% %s (%d %s)", avgUptimePercent, GetString(BATTLESCROLLS_EFFECT_AVG), memberCount, GetString(BATTLESCROLLS_EFFECT_MEMBERS))
 end
 
----Sorts effects by uptime descending (async with yields)
+---Gets the favorites table from settings
+---@return table<number, boolean>
+local function getFavorites()
+    local storage = BattleScrolls.storage
+    return storage and storage.savedVariables and storage.savedVariables.settings and storage.savedVariables.settings.favoriteEffects or {}
+end
+
+---Sorts effects by uptime descending (async with yields), favorites first
 ---@param effects table<number, EffectStatsStorage|BossEffectStatsStorage|GroupEffectStatsStorage>
 ---@param durationMs number Reference duration for uptime calculation
 ---@return Effect<{ abilityId: number, stats: EffectStatsStorage|BossEffectStatsStorage|GroupEffectStatsStorage }[]>
 local function sortEffectsByUptimeAsync(effects, durationMs)
     return LibEffect.Async(function()
+        local favorites = getFavorites()
         local sorted = {}
         local count = 0
         for abilityId, stats in pairs(effects) do
@@ -101,7 +109,11 @@ local function sortEffectsByUptimeAsync(effects, durationMs)
             end
         end
         table.sort(sorted, function(a, b)
-            return a.uptime > b.uptime
+            local aFav = favorites[a.abilityId] or false
+            local bFav = favorites[b.abilityId] or false
+            if aFav ~= bFav then return aFav end
+            if a.uptime ~= b.uptime then return a.uptime > b.uptime end
+            return a.abilityId < b.abilityId
         end)
         return sorted
     end)
@@ -116,6 +128,7 @@ end
 ---@return Effect
 local function displayEffectEntriesAsync(list, sortedEffects, durationMs, headerText, formatValueFn)
     return LibEffect.Async(function()
+        local favorites = getFavorites()
         local isFirst = true
         for i, entry in ipairs(sortedEffects) do
             local abilityName = utils.getAbilityDisplayName(entry.abilityId)
@@ -126,6 +139,8 @@ local function displayEffectEntriesAsync(list, sortedEffects, durationMs, header
             entryData.iconFile = abilityIcon
             entryData:SetIconTintOnSelection(true)
             entryData:AddSubLabel(valueStr)
+            entryData.effectAbilityId = entry.abilityId
+            entryData.isFavorite = favorites[entry.abilityId] or false
             -- Store raw data for lazy tooltip building
             entryData.effectTooltipData = {
                 type = "effect",
@@ -155,6 +170,7 @@ end
 ---@return Effect<{ buffs: table[], debuffs: table[] }>
 local function separateBuffsAndDebuffsAsync(effects, durationMs)
     return LibEffect.Async(function()
+        local favorites = getFavorites()
         local buffs = {}
         local debuffs = {}
         local count = 0
@@ -170,12 +186,20 @@ local function separateBuffsAndDebuffsAsync(effects, durationMs)
                 LibEffect.Yield():Await()
             end
         end
-        -- Sort each by uptime descending
+        -- Sort each by favorites first, then uptime descending
         table.sort(buffs, function(a, b)
-            return a.uptime > b.uptime
+            local aFav = favorites[a.abilityId] or false
+            local bFav = favorites[b.abilityId] or false
+            if aFav ~= bFav then return aFav end
+            if a.uptime ~= b.uptime then return a.uptime > b.uptime end
+            return a.abilityId < b.abilityId
         end)
         table.sort(debuffs, function(a, b)
-            return a.uptime > b.uptime
+            local aFav = favorites[a.abilityId] or false
+            local bFav = favorites[b.abilityId] or false
+            if aFav ~= bFav then return aFav end
+            if a.uptime ~= b.uptime then return a.uptime > b.uptime end
+            return a.abilityId < b.abilityId
         end)
         return { buffs = buffs, debuffs = debuffs }
     end)
@@ -282,7 +306,10 @@ local function aggregateGroupBuffs(encounter, durationMs, groupFilter)
 
     -- Sort each member breakdown by uptime descending
     for _, breakdown in pairs(memberBreakdownByAbility) do
-        table.sort(breakdown, function(a, b) return a.uptimePercent > b.uptimePercent end)
+        table.sort(breakdown, function(a, b)
+            if a.uptimePercent ~= b.uptimePercent then return a.uptimePercent > b.uptimePercent end
+            return a.displayName < b.displayName
+        end)
     end
 
     return aggregatedByAbility, memberBreakdownByAbility, includeSelf, playerAliveTimeMs
@@ -448,7 +475,8 @@ function EffectsRenderer.renderEffects(ctx)
                 end
             end
             table.sort(bossList, function(a, b)
-                return a.totalUptime > b.totalUptime
+                if a.totalUptime ~= b.totalUptime then return a.totalUptime > b.totalUptime end
+                return a.unitTag < b.unitTag
             end)
 
             for i, boss in ipairs(bossList) do
@@ -498,8 +526,13 @@ function EffectsRenderer.renderEffects(ctx)
                         LibEffect.Yield():Await()
                     end
                 end
+                local favorites = getFavorites()
                 table.sort(sorted, function(a, b)
-                    return a.avgUptimePercent > b.avgUptimePercent
+                    local aFav = favorites[a.abilityId] or false
+                    local bFav = favorites[b.abilityId] or false
+                    if aFav ~= bFav then return aFav end
+                    if a.avgUptimePercent ~= b.avgUptimePercent then return a.avgUptimePercent > b.avgUptimePercent end
+                    return a.abilityId < b.abilityId
                 end)
                 LibEffect.Yield():Await()
 
@@ -513,6 +546,8 @@ function EffectsRenderer.renderEffects(ctx)
                     entryData.iconFile = abilityIcon  -- Store for frame type detection
                     entryData:SetIconTintOnSelection(true)
                     entryData:AddSubLabel(valueStr)
+                    entryData.effectAbilityId = entry.abilityId
+                    entryData.isFavorite = favorites[entry.abilityId] or false
                     -- Store raw data for lazy tooltip building
                     entryData.effectTooltipData = {
                         type = "group",
@@ -582,18 +617,26 @@ function EffectsRenderer.refreshPanelForEffects(panel, ctx)
                 return {}
             end
 
+            local favorites = getFavorites()
+
             -- First pass: collect all effects of the specified type with their uptimes
             local allEffects = {}
+            local favoriteEffects = {}
             for abilityId, stats in pairs(effectsTable) do
                 if stats.effectType == effectType or effectType == nil then
                     local peakInstances = stats.peakConcurrentInstances or 1
                     local effectiveDurationMs = referenceDurationMs * peakInstances
                     local uptime = effectiveDurationMs > 0 and (stats.totalActiveTimeMs / effectiveDurationMs) * 100 or 0
-                    table.insert(allEffects, {
+                    local entry = {
                         abilityId = abilityId,
                         uptime = uptime,
                         stats = stats,
-                    })
+                        isFavorite = favorites[abilityId] or false,
+                    }
+                    table.insert(allEffects, entry)
+                    if favorites[abilityId] then
+                        table.insert(favoriteEffects, entry)
+                    end
                 end
             end
 
@@ -601,23 +644,28 @@ function EffectsRenderer.refreshPanelForEffects(panel, ctx)
                 return {}
             end
 
-            -- Sort by uptime descending (highest first)
-            table.sort(allEffects, function(a, b) return a.uptime > b.uptime end)
+            -- Sort by favorites first, then uptime descending
+            table.sort(allEffects, function(a, b)
+                if a.isFavorite ~= b.isFavorite then return a.isFavorite end
+                if a.uptime ~= b.uptime then return a.uptime > b.uptime end
+                return a.abilityId < b.abilityId
+            end)
 
-            -- Try progressive thresholds, but always return something
+            -- Try progressive thresholds, but always include favorites regardless of threshold
             local gapEffects = {}     -- < 95%
             local imperfectEffects = {} -- < 100%
 
             for _, effect in ipairs(allEffects) do
-                if effect.uptime < UPTIME_THRESHOLD_IMPERFECT then
+                if effect.isFavorite or effect.uptime < UPTIME_THRESHOLD_IMPERFECT then
                     table.insert(imperfectEffects, effect)
                 end
-                if effect.uptime < UPTIME_THRESHOLD_GAPS then
+                if effect.isFavorite or effect.uptime < UPTIME_THRESHOLD_GAPS then
                     table.insert(gapEffects, effect)
                 end
             end
 
             -- Return based on what we found (prefer showing gaps, then imperfect, then all)
+            -- If only favorites matched a threshold, still use that result
             if #gapEffects > 0 then
                 return gapEffects
             end
@@ -643,7 +691,7 @@ function EffectsRenderer.refreshPanelForEffects(panel, ctx)
                     maxStacks = stats.maxStacks,
                     peakInstances = stats.peakConcurrentInstances,
                 }
-                lastControl = panel:AddQ2EffectRow(effect.abilityId, effect.uptime, lastControl, effectStats)
+                lastControl = panel:AddQ2EffectRow(effect.abilityId, effect.uptime, lastControl, effectStats, effect.isFavorite)
             end
         else
             -- No player buff effects recorded at all
@@ -678,10 +726,12 @@ function EffectsRenderer.refreshPanelForEffects(panel, ctx)
                 return {}
             end
 
+            local favorites = getFavorites()
             local allEffects = {}
             for abilityId, agg in pairs(aggregatedData) do
                 local avgUptime = computeUptime(agg)
                 local entry = buildEntry(abilityId, agg, avgUptime)
+                entry.isFavorite = favorites[abilityId] or false
                 table.insert(allEffects, entry)
             end
 
@@ -689,23 +739,25 @@ function EffectsRenderer.refreshPanelForEffects(panel, ctx)
                 return {}
             end
 
-            -- Sort by score (if present) descending, otherwise avgUptime descending
+            -- Sort by favorites first, then score (if present) descending, otherwise avgUptime descending
             table.sort(allEffects, function(a, b)
-                if a.score and b.score then
+                if a.isFavorite ~= b.isFavorite then return a.isFavorite end
+                if a.score and b.score and a.score ~= b.score then
                     return a.score > b.score
                 end
-                return a.avgUptime > b.avgUptime
+                if a.avgUptime ~= b.avgUptime then return a.avgUptime > b.avgUptime end
+                return a.abilityId < b.abilityId
             end)
 
-            -- Try progressive thresholds, but always return something
+            -- Try progressive thresholds, but always include favorites regardless of threshold
             local gapEffects = {}     -- < 95%
             local imperfectEffects = {} -- < 100%
 
             for _, effect in ipairs(allEffects) do
-                if effect.avgUptime < UPTIME_THRESHOLD_IMPERFECT then
+                if effect.isFavorite or effect.avgUptime < UPTIME_THRESHOLD_IMPERFECT then
                     table.insert(imperfectEffects, effect)
                 end
-                if effect.avgUptime < UPTIME_THRESHOLD_GAPS then
+                if effect.isFavorite or effect.avgUptime < UPTIME_THRESHOLD_GAPS then
                     table.insert(gapEffects, effect)
                 end
             end
@@ -776,7 +828,7 @@ function EffectsRenderer.refreshPanelForEffects(panel, ctx)
                     applications = effect.applications,
                     maxStacks = effect.maxStacks,
                 }
-                q3Control = panel:AddEffectBar(effect.abilityId, effect.avgUptime, q3Control, effectStats)
+                q3Control = panel:AddEffectBar(effect.abilityId, effect.avgUptime, q3Control, effectStats, effect.isFavorite)
             end
         elseif #bossDebuffs > 0 then
             -- No group buffs - show boss debuffs in Q3 (wider space, with bar)
@@ -792,7 +844,7 @@ function EffectsRenderer.refreshPanelForEffects(panel, ctx)
                 if effect.bossCount > 1 then
                     effectStats.suffix = string.format("(%d)", effect.bossCount)
                 end
-                q3Control = panel:AddEffectBar(effect.abilityId, effect.avgUptime, q3Control, effectStats)
+                q3Control = panel:AddEffectBar(effect.abilityId, effect.avgUptime, q3Control, effectStats, effect.isFavorite)
             end
         end
 
@@ -814,7 +866,7 @@ function EffectsRenderer.refreshPanelForEffects(panel, ctx)
                 if effect.bossCount > 1 then
                     effectStats.suffix = string.format("(%d)", effect.bossCount)
                 end
-                q4Control = panel:AddEffectRow(effect.abilityId, effect.avgUptime, q4Control, effectStats)
+                q4Control = panel:AddEffectRow(effect.abilityId, effect.avgUptime, q4Control, effectStats, effect.isFavorite)
             end
         end
     end)

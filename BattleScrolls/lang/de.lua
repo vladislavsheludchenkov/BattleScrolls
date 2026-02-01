@@ -566,6 +566,14 @@ local strings = {
     [BATTLESCROLLS_LOCK_LOCKED_SIZE] = "Derzeit gesperrt: <<1>>",
     [BATTLESCROLLS_LOCK_INSTANCE_SIZE] = "Dieses Gebiet: <<1>>",
     [BATTLESCROLLS_LOCK_LIMIT] = "Speicherlimit: <<1>>",
+
+    -------------------------
+    -- Favorite Effects
+    -------------------------
+    [BATTLESCROLLS_FAVORITE_EFFECT] = "Favorisieren",
+    [BATTLESCROLLS_UNFAVORITE_EFFECT] = "Favorit entfernen",
+    [BATTLESCROLLS_CLEAR_ALL_FAVORITES] = "Alle Favoriten löschen",
+    [BATTLESCROLLS_CLEAR_ALL_FAVORITES_TOOLTIP] = "Alle favorisierten Effekte entfernen. Favorisierte Effekte werden oben in jeder Effektliste angezeigt.",
 }
 
 -- Register translations

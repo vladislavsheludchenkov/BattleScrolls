@@ -6,7 +6,10 @@
 -- group members. Defines the protocol format and handles
 -- incoming data from other Battle Scrolls users.
 --
--- Protocol fields: allTargetsDPS, bossDPS, rawHPS, effectiveHPS
+-- Callbacks receive either DPSShareDamageData or DPSShareHealingData
+-- as a discriminated union based on the dominant metric.
+-- Old wire format (protocol 438) is classified on receive.
+-- New wire formats (430 damage, 431 healing) are natively typed.
 -----------------------------------------------------------
 
 if not SemisPlaygroundCheckAccess() then
@@ -15,79 +18,122 @@ end
 
 BattleScrolls = BattleScrolls or {}
 
----@class DPSShareData
+---@class DPSShareDamageData
+---@field messageType "damage"
 ---@field allTargetsDPS number DPS against all targets
 ---@field bossDPS number|nil DPS against boss targets only (nil if no boss fight)
+
+---@class DPSShareHealingData
+---@field messageType "healing"
 ---@field rawHPS number Raw healing per second output
 ---@field effectiveHPS number Effective (non-overheal) healing per second output
 
----@class DPSShareFields
----@field allTargetsDPS NumericField LibGroupBroadcast numeric field
----@field bossDPS OptionalField LibGroupBroadcast optional numeric field
----@field rawHPS NumericField LibGroupBroadcast numeric field
----@field effectiveHPS NumericField LibGroupBroadcast numeric field
----@field maxValue number Maximum value for numeric fields (2^20 - 1)
+---@alias DPSShareTypedData DPSShareDamageData | DPSShareHealingData
 
 ---@class DPSShare
----@field protocol Protocol|nil LibGroupBroadcast protocol instance
----@field fields DPSShareFields|nil Protocol field definitions
+---@field legacyProtocol Protocol|nil LibGroupBroadcast legacy protocol instance (438)
+---@field damageProtocol Protocol|nil LibGroupBroadcast damage protocol instance (430)
+---@field healingProtocol Protocol|nil LibGroupBroadcast healing protocol instance (431)
 local dpsShare = {}
 BattleScrolls.dpsShare = dpsShare
 
----@alias DPSShareCallback fun(unitTag: string, allTargetsDPS: number, bossDPS: number|nil, rawHPS: number, effectiveHPS: number): void
+---@alias DPSShareCallback fun(unitTag: string, data: DPSShareTypedData): void
 
 ---@type table<string, DPSShareCallback>
 local callbacks = {}
 
----Notify all registered callbacks with the received data
----@param unitTag string The unit tag of the sender ("player" for local, group unit tag for remote)
----@param data DPSShareData The received DPS/HPS data
-local notifyAllCallbacks = function(unitTag, data)
-    local allTargetsDPS = data.allTargetsDPS
-    local bossDPS = data.bossDPS
-    local rawHPS = data.rawHPS
-    local effectiveHPS = data.effectiveHPS
-
-    for _, callback in pairs(callbacks) do
-        callback(unitTag, allTargetsDPS, bossDPS, rawHPS, effectiveHPS)
+---Classify legacy 4-field data into a typed message based on dominant metric
+---@param allTargetsDPS number
+---@param bossDPS number|nil
+---@param rawHPS number
+---@param effectiveHPS number
+---@return DPSShareTypedData
+local function classifyLegacyData(allTargetsDPS, bossDPS, rawHPS, effectiveHPS)
+    if rawHPS > allTargetsDPS then
+        return { messageType = "healing", rawHPS = rawHPS, effectiveHPS = effectiveHPS }
+    else
+        return { messageType = "damage", allTargetsDPS = allTargetsDPS, bossDPS = bossDPS }
     end
 end
 
----Initialize the DPS sharing protocol with LibGroupBroadcast
----Registers protocol fields and sets up data reception callback
+---Notify all registered callbacks with typed data
+---@param unitTag string The unit tag of the sender ("player" for local, group unit tag for remote)
+---@param data DPSShareTypedData The typed DPS or HPS data
+local notifyAllCallbacks = function(unitTag, data)
+    for _, callback in pairs(callbacks) do
+        callback(unitTag, data)
+    end
+end
+
+---@diagnostic disable-next-line: unused-function, unused-local -- used in phase 2 when sending new format
+local function encodeMetric(x)
+    if x > 1000000 then
+        return 1023 -- corresponds to math.huge
+    elseif x <= 99 then
+        return math.floor(math.max(x, 0))
+    else
+        return 100 + zo_round(922 * math.log(x / 100) / math.log(10000))
+    end
+end
+
+local function decodeMetric(i)
+    if i >= 1023 then
+        return math.huge
+    elseif i <= 99 then
+        return i
+    else
+        return zo_round(100 * 10000 ^ ((i - 100) / 922))
+    end
+end
+
+---Initialize the DPS sharing protocols with LibGroupBroadcast
+---Registers legacy protocol (438) and new typed protocols (430 damage, 431 healing)
 function dpsShare:Initialize()
     local LGB = LibGroupBroadcast
     local handler = LGB:RegisterHandler("BattleScrolls")
     handler:SetDisplayName("Battle Scrolls")
     handler:SetDescription("Shares DPS and HPS data between group members using Battle Scrolls addon.")
 
-    local protocol = handler:DeclareProtocol(438, "BattleScrolls_DPSHPSData")
-    local allTargetsDpsField = LGB.CreateNumericField("allTargetsDPS", { minValue = 0, numBits = 20 })
+    -- Legacy protocol (438): 4-field format, classified on receive
+    local legacyProtocol = handler:DeclareProtocol(438, "BattleScrolls_DPSHPSData")
+    legacyProtocol:AddField(LGB.CreateNumericField("allTargetsDPS", { minValue = 0, numBits = 20 }))
+    legacyProtocol:AddField(LGB.CreateOptionalField(LGB.CreateNumericField("bossDPS", { minValue = 0, numBits = 20 })))
+    legacyProtocol:AddField(LGB.CreateNumericField("rawHPS", { minValue = 0, numBits = 20, trimValues = true }))
+    legacyProtocol:AddField(LGB.CreateNumericField("effectiveHPS", { minValue = 0, numBits = 20, trimValues = true }))
+    legacyProtocol:OnData(function(unitTag, data)
+        local typed = classifyLegacyData(data.allTargetsDPS, data.bossDPS, data.rawHPS, data.effectiveHPS)
+        notifyAllCallbacks(unitTag, typed)
+    end)
+    legacyProtocol:Finalize({ isRelevantInCombat = true, replaceQueuedMessages = true })
+    dpsShare.legacyProtocol = legacyProtocol
 
-    protocol:AddField(allTargetsDpsField)
+    -- Damage protocol (430): encoded allTargetsDPS + optional bossDPS
+    local damageProtocol = handler:DeclareProtocol(430, "BattleScrolls_DamageData")
+    damageProtocol:AddField(LGB.CreateNumericField("encodedAllDPS", { minValue = 0, numBits = 10 }))
+    damageProtocol:AddField(LGB.CreateOptionalField(LGB.CreateNumericField("encodedBossDPS", { minValue = 0, numBits = 10 })))
+    damageProtocol:OnData(function(unitTag, data)
+        local allTargetsDPS = decodeMetric(data.encodedAllDPS)
+        local bossDPS = data.encodedBossDPS and decodeMetric(data.encodedBossDPS) or nil
+        ---@type DPSShareDamageData
+        local typed = { messageType = "damage", allTargetsDPS = allTargetsDPS, bossDPS = bossDPS }
+        notifyAllCallbacks(unitTag, typed)
+    end)
+    damageProtocol:Finalize({ isRelevantInCombat = true, replaceQueuedMessages = true })
+    dpsShare.damageProtocol = damageProtocol
 
-    local bossDPSField = LGB.CreateOptionalField(LGB.CreateNumericField("bossDPS", { minValue = 0, numBits = 20 }))
-    protocol:AddField(bossDPSField)
-
-    local rawHPSField = LGB.CreateNumericField("rawHPS", { minValue = 0, numBits = 20, trimValues = true })
-    protocol:AddField(rawHPSField)
-
-    local effectiveHPSField = LGB.CreateNumericField("effectiveHPS", { minValue = 0, numBits = 20, trimValues = true })
-    protocol:AddField(effectiveHPSField)
-
-    protocol:OnData(notifyAllCallbacks)
-
-    protocol:Finalize({ isRelevantInCombat = true, replaceQueuedMessages = true })
-
-    dpsShare.protocol = protocol
-
-    dpsShare.fields = {
-        allTargetsDPS = allTargetsDpsField,
-        bossDPS = bossDPSField,
-        rawHPS = rawHPSField,
-        effectiveHPS = effectiveHPSField,
-        maxValue = 1048575 -- 2^20 - 1
-    }
+    -- Healing protocol (431): encoded rawHPS + effectiveHPS
+    local healingProtocol = handler:DeclareProtocol(431, "BattleScrolls_HealingData")
+    healingProtocol:AddField(LGB.CreateNumericField("encodedRawHPS", { minValue = 0, numBits = 10 }))
+    healingProtocol:AddField(LGB.CreateNumericField("encodedEffectiveHPS", { minValue = 0, numBits = 10 }))
+    healingProtocol:OnData(function(unitTag, data)
+        local rawHPS = decodeMetric(data.encodedRawHPS)
+        local effectiveHPS = decodeMetric(data.encodedEffectiveHPS)
+        ---@type DPSShareHealingData
+        local typed = { messageType = "healing", rawHPS = rawHPS, effectiveHPS = effectiveHPS }
+        notifyAllCallbacks(unitTag, typed)
+    end)
+    healingProtocol:Finalize({ isRelevantInCombat = true, replaceQueuedMessages = true })
+    dpsShare.healingProtocol = healingProtocol
 end
 
 --- @param name string The name of the callback.
@@ -102,22 +148,24 @@ function dpsShare:UnregisterCallback(name)
 end
 
 ---Send DPS/HPS data to group members and notify local callbacks
+---Sends old format over the wire (phase 1). Local callbacks receive typed data.
 ---@param allTargetsDPS number DPS against all targets
 ---@param bossDPS number|nil DPS against boss targets only
 ---@param rawHPS number Raw healing per second output
 ---@param effectiveHPS number Effective healing per second output
 function dpsShare:SendData(allTargetsDPS, bossDPS, rawHPS, effectiveHPS)
-    ---@type DPSShareData
-    local data = {
-        allTargetsDPS = allTargetsDPS,
-        bossDPS = bossDPS,
-        rawHPS = rawHPS,
-        effectiveHPS = effectiveHPS
-    }
-    if dpsShare.protocol then
-        dpsShare.protocol:Send(data)
+    -- Network: still old format (phase 1)
+    if dpsShare.legacyProtocol then
+        dpsShare.legacyProtocol:Send({
+            allTargetsDPS = allTargetsDPS,
+            bossDPS = bossDPS,
+            rawHPS = rawHPS,
+            effectiveHPS = effectiveHPS,
+        })
     end
 
-    notifyAllCallbacks("player", data)
+    -- Local: classify and emit typed
+    local typed = classifyLegacyData(allTargetsDPS, bossDPS, rawHPS, effectiveHPS)
+    notifyAllCallbacks("player", typed)
 end
 
