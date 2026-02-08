@@ -72,6 +72,35 @@ local BITS = {
     MAP_COUNT = 16,
 }
 
+-- Number of encoded items (breakdowns, healing breakdowns, effect stats, etc.)
+-- between yield checkpoints. Each item averages ~8-10 writeUInt calls, but the
+-- slow path for non-byte-aligned writes (30-bit damage totals) roughly doubles
+-- the cost
+local ITEMS_PER_YIELD = 50
+
+---@class EncodeProgress
+---@field count number Items encoded since last yield
+
+---Increments progress counter and yields if threshold reached.
+---Must only be called from within a LibEffect.Async coroutine.
+---@param progress EncodeProgress
+local function countAndMaybeYield(progress)
+    progress.count = progress.count + 1
+    if progress.count >= ITEMS_PER_YIELD then
+        progress.count = 0
+        LibEffect.YieldWithGC():Await()
+    end
+end
+
+---Yields if any items have been counted since last yield (flushes remaining work)
+---@param progress EncodeProgress
+local function flushProgress(progress)
+    if progress.count > 0 then
+        progress.count = 0
+        LibEffect.YieldWithGC():Await()
+    end
+end
+
 
 -- =============================================================================
 -- LOW-LEVEL WRITE HELPERS
@@ -193,7 +222,8 @@ end
 ---Writes a damage map to encoder
 ---@param encoder BitEncoder
 ---@param damageMap table<number, table<number, DamageDone|DamageByAbility>>|nil Nested: sourceId -> targetId -> damage
-local function writeDamageMap(encoder, damageMap)
+---@param progress EncodeProgress
+local function writeDamageMap(encoder, damageMap, progress)
     -- Count sources
     local sourceCount = 0
     for _ in pairs(damageMap or {}) do sourceCount = sourceCount + 1 end
@@ -219,6 +249,7 @@ local function writeDamageMap(encoder, damageMap)
             for abilityId, breakdown in pairs(byAbility) do
                 encoder:writeUInt(abilityId, BITS.ABILITY_ID)
                 writeDamageBreakdown(encoder, breakdown)
+                countAndMaybeYield(progress)
             end
         end
     end
@@ -258,7 +289,8 @@ end
 ---Writes HealingDoneDiffSource to encoder
 ---@param encoder BitEncoder
 ---@param healing HealingDoneDiffSource
-local function writeHealingDoneDiffSource(encoder, healing)
+---@param progress EncodeProgress
+local function writeHealingDoneDiffSource(encoder, healing, progress)
     writeHealingTotals(encoder, healing.total)
     -- v6+: byHotVsDirect computed on-demand from byAbilityId + abilityInfo
 
@@ -277,6 +309,7 @@ local function writeHealingDoneDiffSource(encoder, healing)
         for abilityId, breakdown in pairs(byAbility) do
             encoder:writeUInt(abilityId, BITS.ABILITY_ID)
             writeHealingBreakdown(encoder, breakdown)
+            countAndMaybeYield(progress)
         end
     end
 end
@@ -308,7 +341,8 @@ end
 ---Writes HealingDone to encoder
 ---@param encoder BitEncoder
 ---@param healing HealingDone
-local function writeHealingDone(encoder, healing)
+---@param progress EncodeProgress
+local function writeHealingDone(encoder, healing, progress)
     writeHealingTotals(encoder, healing.total)
     -- v6+: byHotVsDirect computed on-demand from byAbilityId + abilityInfo
 
@@ -319,6 +353,7 @@ local function writeHealingDone(encoder, healing)
     for abilityId, breakdown in pairs(healing.byAbilityId or {}) do
         encoder:writeUInt(abilityId, BITS.ABILITY_ID)
         writeHealingBreakdown(encoder, breakdown)
+        countAndMaybeYield(progress)
     end
 end
 
@@ -343,8 +378,9 @@ end
 ---Writes HealingStats to encoder
 ---@param encoder BitEncoder
 ---@param healingStats HealingStats
-local function writeHealingStats(encoder, healingStats)
-    writeHealingDoneDiffSource(encoder, healingStats.selfHealing)
+---@param progress EncodeProgress
+local function writeHealingStats(encoder, healingStats, progress)
+    writeHealingDoneDiffSource(encoder, healingStats.selfHealing, progress)
 
     -- healingOutToGroup
     local outCount = 0
@@ -353,7 +389,7 @@ local function writeHealingStats(encoder, healingStats)
 
     for targetId, healing in pairs(healingStats.healingOutToGroup or {}) do
         encoder:writeUInt(targetId, BITS.UNIT_ID)
-        writeHealingDoneDiffSource(encoder, healing)
+        writeHealingDoneDiffSource(encoder, healing, progress)
     end
 
     -- healingInFromGroup
@@ -363,7 +399,7 @@ local function writeHealingStats(encoder, healingStats)
 
     for sourceId, healing in pairs(healingStats.healingInFromGroup or {}) do
         encoder:writeUInt(sourceId, BITS.UNIT_ID)
-        writeHealingDone(encoder, healing)
+        writeHealingDone(encoder, healing, progress)
     end
 end
 
@@ -453,7 +489,8 @@ end
 ---Writes effectsOnPlayer to encoder
 ---@param encoder BitEncoder
 ---@param effectsOnPlayer table<number, PlayerEffectStats>|nil
-local function writeEffectsOnPlayer(encoder, effectsOnPlayer)
+---@param progress EncodeProgress
+local function writeEffectsOnPlayer(encoder, effectsOnPlayer, progress)
     local count = 0
     for _ in pairs(effectsOnPlayer or {}) do count = count + 1 end
     encoder:writeUInt(count, BITS.MAP_COUNT)
@@ -461,6 +498,7 @@ local function writeEffectsOnPlayer(encoder, effectsOnPlayer)
     for abilityId, stats in pairs(effectsOnPlayer or {}) do
         encoder:writeUInt(abilityId, BITS.ABILITY_ID)
         writeEffectStats(encoder, stats)
+        countAndMaybeYield(progress)
     end
 end
 
@@ -483,7 +521,8 @@ end
 ---Writes effectsOnBosses to encoder
 ---@param encoder BitEncoder
 ---@param effectsOnBosses table<string, table<number, BossEffectStats>>|nil
-local function writeEffectsOnBosses(encoder, effectsOnBosses)
+---@param progress EncodeProgress
+local function writeEffectsOnBosses(encoder, effectsOnBosses, progress)
     local unitCount = 0
     for _ in pairs(effectsOnBosses or {}) do unitCount = unitCount + 1 end
     encoder:writeUInt(unitCount, BITS.MAP_COUNT)
@@ -498,6 +537,7 @@ local function writeEffectsOnBosses(encoder, effectsOnBosses)
         for abilityId, stats in pairs(byAbility) do
             encoder:writeUInt(abilityId, BITS.ABILITY_ID)
             writeEffectStats(encoder, stats)
+            countAndMaybeYield(progress)
         end
     end
 end
@@ -527,7 +567,8 @@ end
 ---Writes effectsOnGroup to encoder
 ---@param encoder BitEncoder
 ---@param effectsOnGroup table<string, table<number, GroupEffectStats>>|nil
-local function writeEffectsOnGroup(encoder, effectsOnGroup)
+---@param progress EncodeProgress
+local function writeEffectsOnGroup(encoder, effectsOnGroup, progress)
     local memberCount = 0
     for _ in pairs(effectsOnGroup or {}) do memberCount = memberCount + 1 end
     encoder:writeUInt(memberCount, BITS.MAP_COUNT)
@@ -542,6 +583,7 @@ local function writeEffectsOnGroup(encoder, effectsOnGroup)
         for abilityId, stats in pairs(byAbility) do
             encoder:writeUInt(abilityId, BITS.ABILITY_ID)
             writeEffectStats(encoder, stats)
+            countAndMaybeYield(progress)
         end
     end
 end
@@ -635,7 +677,8 @@ end
 ---Writes unitNames to encoder
 ---@param encoder BitEncoder
 ---@param unitNames table<number, string>|nil
-local function writeUnitNames(encoder, unitNames)
+---@param progress EncodeProgress
+local function writeUnitNames(encoder, unitNames, progress)
     unitNames = unitNames or {}
     local count = 0
     for _ in pairs(unitNames) do count = count + 1 end
@@ -644,6 +687,7 @@ local function writeUnitNames(encoder, unitNames)
     for unitId, name in pairs(unitNames) do
         encoder:writeUInt(unitId, BITS.UNIT_ID)
         encoder:writeString(name)
+        countAndMaybeYield(progress)
     end
 end
 
@@ -674,52 +718,41 @@ end
 function binaryStorage.encodeEncounterAsync(encounter)
     return LibEffect.Async(function()
         local encoder = BitEncoder.new()
+        local progress = { count = 0 }
 
-        -- Write all data directly to encoder, yielding between major sections
-        writeDamageMap(encoder, encounter.damageByUnitId)
-        LibEffect.YieldWithGC():Await()
-        writeDamageMap(encoder, encounter.damageByUnitIdGroup)
-        LibEffect.YieldWithGC():Await()
-        writeDamageMap(encoder, encounter.damageTakenByUnitId)
-        LibEffect.YieldWithGC():Await()
-        writeHealingStats(encoder, encounter.healingStats)
-        LibEffect.YieldWithGC():Await()
+        -- Heavy sections: damage maps and healing (yield based on data volume)
+        writeDamageMap(encoder, encounter.damageByUnitId, progress)
+        writeDamageMap(encoder, encounter.damageByUnitIdGroup, progress)
+        writeDamageMap(encoder, encounter.damageTakenByUnitId, progress)
+        writeHealingStats(encoder, encounter.healingStats, progress)
+        flushProgress(progress)
+
+        -- Light section: procs (always small, no per-item yields)
         writeProcs(encoder, encounter.procs)
-        LibEffect.YieldWithGC():Await()
-        writeEffectsOnPlayer(encoder, encounter.effectsOnPlayer)
-        LibEffect.YieldWithGC():Await()
-        writeEffectsOnBosses(encoder, encounter.effectsOnBosses)
-        LibEffect.YieldWithGC():Await()
-        writeEffectsOnGroup(encoder, encounter.effectsOnGroup)
-        LibEffect.YieldWithGC():Await()
-        writeBossNames(encoder, encounter.bossNames)
 
-        -- playerAliveTimeMs (optional)
+        -- Effects (yield based on data volume, consistent with damage/healing)
+        writeEffectsOnPlayer(encoder, encounter.effectsOnPlayer, progress)
+        writeEffectsOnBosses(encoder, encounter.effectsOnBosses, progress)
+        writeEffectsOnGroup(encoder, encounter.effectsOnGroup, progress)
+        flushProgress(progress)
+
+        -- Metadata (must match decode order in decodeEncounterAsync)
+        writeBossNames(encoder, encounter.bossNames)
         if encounter.playerAliveTimeMs then
             encoder:writeBit(true)
             encoder:writeUInt(encounter.playerAliveTimeMs, BITS.TIME_MS)
         else
             encoder:writeBit(false)
         end
-
-        LibEffect.YieldWithGC():Await()
-
         writeUnitAliveTimes(encoder, encounter.unitAliveTimeMs)
-
-        LibEffect.YieldWithGC():Await()
-
-        -- v7+: encode unitNames in encounter buffer
-        writeUnitNames(encoder, encounter.unitNames)
-
-        LibEffect.YieldWithGC():Await()
+        writeUnitNames(encoder, encounter.unitNames, progress)
+        flushProgress(progress)
 
         local chunks = encoder:finish()
 
-        -- Return encounter with binary data and preserved metadata
         return {
             _v = CURRENT_VERSION,
-            _data = chunks,  -- Array of base64 chunks (SavedVariables 2K string limit)
-            -- Preserved metadata for list display and filtering
+            _data = chunks,
             displayName = encounter.displayName,
             location = encounter.location,
             timestampS = encounter.timestampS,
@@ -843,14 +876,13 @@ end
 function binaryStorage.encodeInstanceFieldsAsync(abilityInfo)
     return LibEffect.Async(function()
         local encoder = BitEncoder.new()
+        local progress = { count = 0 }
 
-        -- Write abilityInfo with yields
         abilityInfo = abilityInfo or {}
         local count = 0
         for _ in pairs(abilityInfo) do count = count + 1 end
         encoder:writeUInt(count, BITS.MAP_COUNT)
 
-        local i = 0
         for abilityId, info in pairs(abilityInfo) do
             encoder:writeUInt(abilityId, BITS.ABILITY_ID)
 
@@ -866,12 +898,9 @@ function binaryStorage.encodeInstanceFieldsAsync(abilityInfo)
                 encoder:writeUInt(damageType, BITS_DAMAGE_TYPE)
             end
 
-            i = i + 1
-            if i % 50 == 0 then
-                LibEffect.YieldWithGC():Await()
-            end
+            countAndMaybeYield(progress)
         end
-        LibEffect.YieldWithGC():Await()
+        flushProgress(progress)
 
         local chunks = encoder:finish()
 

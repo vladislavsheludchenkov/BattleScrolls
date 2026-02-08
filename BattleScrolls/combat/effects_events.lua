@@ -32,9 +32,19 @@ end
 
 local function onBossEffect(_eventCode, changeType, effectSlot, _effectName, unitTag, beginTime, _endTime,
                             stackCount, _iconName, _deprecatedBuffType, effectType, _abilityType,
-                            _statusEffectType, _unitName, unitId, abilityId, sourceType)
+                            _statusEffectType, unitName, unitId, abilityId, sourceType)
     local s = BattleScrolls.state
     if not s or not s.inCombat then return end
+    -- Correlate boss unitTag↔unitId from authoritative effect events (non-faded only;
+    -- faded events can maybe carry stale unitIds from despawned bosses)
+    if changeType ~= EFFECT_RESULT_FADED then
+        -- Detect tag reuse before CorrelateBossUnitId replaces old BossData
+        if s.bossNames[unitTag] and s.bossNames[unitTag] ~= unitName then
+            local oldBossData = s.bossesByTag[unitTag]
+            effects.retireBossTag(s, unitTag, oldBossData and oldBossData.unitId)
+        end
+        s:CorrelateBossUnitId(unitTag, unitId, unitName)
+    end
     effects.handleBossEffect(s, changeType, effectSlot, unitTag, effectType, stackCount, abilityId, unitId, sourceType, beginTime)
 end
 
@@ -100,6 +110,16 @@ end
 local function onBossCreated(_eventCode, unitTag)
     local s = BattleScrolls.state
     if not s or not s.inCombat then return end
+    -- Detect tag reuse before state update (old BossData still accessible)
+    if s.bossNames[unitTag] then
+        local newName = GetRawUnitName(unitTag)
+        if s.bossNames[unitTag] ~= newName then
+            local oldBossData = s.bossesByTag[unitTag]
+            effects.retireBossTag(s, unitTag, oldBossData and oldBossData.unitId)
+        end
+    end
+    -- Notify state of boss unit creation (detects tag reuse for damage tracking)
+    s:OnBossUnitCreated(unitTag)
     -- Do full refresh which reconciles both alive state and effects
     effects.handleBossFullRefresh(s, unitTag)
 end

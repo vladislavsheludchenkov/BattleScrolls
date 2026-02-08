@@ -142,73 +142,73 @@ function BattleScrolls_Journal_Gamepad:Initialize(control)
     self.control = control
     self.defaultInstancePosition = 2
 
-    LibEffect.Sleep(1850):FlatMap(function()
-        return LibEffect.Async(function()
-            -- Create fragment
-            BATTLESCROLLS_JOURNAL_GAMEPAD_FRAGMENT = ZO_FadeSceneFragment:New(control)
-            BATTLESCROLLS_JOURNAL_GAMEPAD_FRAGMENT:RegisterCallback("StateChange", function(_oldState, newState)
-                if newState == SCENE_FRAGMENT_SHOWING then
-                    -- Check if onboarding needs to be shown
-                    if BattleScrolls.onboarding and BattleScrolls.onboarding:NeedsOnboarding() then
-                        BattleScrolls.onboarding:Show(function()
-                            -- Callback: refresh journal after onboarding completes
-                            self:RefreshList(true)
-                        end)
-                        return -- Don't initialize the normal journal UI
-                    end
+    LibEffect.Async(function()
+        LibEffect.Sleep(1850):Await()
 
-                    self.mode = NAVIGATION_MODE.INSTANCES
-                    self.selectedInstance = nil
-                    self.selectedEncounter = nil
-                    self.decodedEncounter = nil
-                    self.abilityInfo = nil
-                    self.unitNames = nil
-                    self.arithmancer = nil
-                    BattleScrolls.gc:RequestGC(5)
-                    self.selectedTab = nil
-                    self.selectedInstanceTab = INSTANCE_TAB.ALL
-                    self.selectedEncounterTab = ENCOUNTER_TAB.ALL
-                    self.pendingTabIndex = 1  -- Start at first tab
-                    self:ResetAllFilters()
-                    self:SetCurrentList(self.instanceList)
-                    self:RefreshList()
-                    self:SetActiveKeybinds(self.instanceKeybindStripDescriptor)
-                elseif newState == SCENE_FRAGMENT_HIDDEN then
-                    self:ResetTooltips()
-                    -- Deactivate any active settings control to release DIRECTIONAL_INPUT
-                    self:DeactivateSelectedSettingsControl()
-                    -- Clean up decoded data and request GC when leaving journal
-                    self.decodedEncounter = nil
-                    self.abilityInfo = nil
-                    self.unitNames = nil
-                    self.arithmancer = nil
-                    BattleScrolls.gc:RequestGC(2)
+        -- Create fragment
+        BATTLESCROLLS_JOURNAL_GAMEPAD_FRAGMENT = ZO_FadeSceneFragment:New(control)
+        BATTLESCROLLS_JOURNAL_GAMEPAD_FRAGMENT:RegisterCallback("StateChange", function(_oldState, newState)
+            if newState == SCENE_FRAGMENT_SHOWING then
+                -- Check if onboarding needs to be shown
+                if BattleScrolls.onboarding and BattleScrolls.onboarding:NeedsOnboarding() then
+                    BattleScrolls.onboarding:Show(function()
+                        -- Callback: refresh journal after onboarding completes
+                        self:RefreshList(true)
+                    end)
+                    return -- Don't initialize the normal journal UI
                 end
-            end)
-            LibEffect.YieldWithGC():Await()
 
-            -- Create scene
-            BATTLESCROLLS_JOURNAL_GAMEPAD_SCENE = ZO_Scene:New("battleScrollsJournalGamepad", SCENE_MANAGER)
-            BATTLESCROLLS_JOURNAL_GAMEPAD_SCENE:AddFragmentGroup(FRAGMENT_GROUP.GAMEPAD_DRIVEN_UI_WINDOW)
-            BATTLESCROLLS_JOURNAL_GAMEPAD_SCENE:AddFragmentGroup(FRAGMENT_GROUP.FRAME_TARGET_GAMEPAD)
-            BATTLESCROLLS_JOURNAL_GAMEPAD_SCENE:AddFragment(GAMEPAD_NAV_QUADRANT_1_BACKGROUND_FRAGMENT)
-            BATTLESCROLLS_JOURNAL_GAMEPAD_SCENE:AddFragment(GAMEPAD_GENERIC_FOOTER_FRAGMENT)
-            BATTLESCROLLS_JOURNAL_GAMEPAD_SCENE:AddFragment(GAMEPAD_MENU_SOUND_FRAGMENT)
-            BATTLESCROLLS_JOURNAL_GAMEPAD_SCENE:AddFragment(BATTLESCROLLS_JOURNAL_GAMEPAD_FRAGMENT)
-            LibEffect.YieldWithGC():Await()
-
-            -- Initialize base class
-            local ACTIVATE_ON_SHOW = true
-            ZO_Gamepad_ParametricList_Screen.Initialize(self, control, ZO_GAMEPAD_HEADER_TABBAR_CREATE, ACTIVATE_ON_SHOW, BATTLESCROLLS_JOURNAL_GAMEPAD_SCENE)
-
-            -- Enable gamepad input handling
-            self:SetListsUseTriggerKeybinds(true)
-            LibEffect.YieldWithGC():Await()
-
-            if canAddToMainMenu then
-                AddToMainMenu()
+                self.mode = NAVIGATION_MODE.INSTANCES
+                self.selectedInstance = nil
+                self.selectedEncounter = nil
+                self.decodedEncounter = nil
+                self.abilityInfo = nil
+                self.unitNames = nil
+                self.arithmancer = nil
+                BattleScrolls.gc:RequestGC(5)
+                self.selectedTab = nil
+                self.selectedInstanceTab = INSTANCE_TAB.ALL
+                self.selectedEncounterTab = ENCOUNTER_TAB.ALL
+                self.pendingTabIndex = 1  -- Start at first tab
+                self:ResetAllFilters()
+                self:SetCurrentList(self.instanceList)
+                self:RefreshList()
+                self:SetActiveKeybinds(self.instanceKeybindStripDescriptor)
+            elseif newState == SCENE_FRAGMENT_HIDDEN then
+                self:ResetTooltips()
+                -- Deactivate any active settings control to release DIRECTIONAL_INPUT
+                self:DeactivateSelectedSettingsControl()
+                -- Clean up decoded data and request GC when leaving journal
+                self.decodedEncounter = nil
+                self.abilityInfo = nil
+                self.unitNames = nil
+                self.arithmancer = nil
+                BattleScrolls.gc:RequestGC(2)
             end
         end)
+        LibEffect.YieldWithGC():Await()
+
+        -- Create scene
+        BATTLESCROLLS_JOURNAL_GAMEPAD_SCENE = ZO_Scene:New("battleScrollsJournalGamepad", SCENE_MANAGER)
+        BATTLESCROLLS_JOURNAL_GAMEPAD_SCENE:AddFragmentGroup(FRAGMENT_GROUP.GAMEPAD_DRIVEN_UI_WINDOW)
+        BATTLESCROLLS_JOURNAL_GAMEPAD_SCENE:AddFragmentGroup(FRAGMENT_GROUP.FRAME_TARGET_GAMEPAD)
+        BATTLESCROLLS_JOURNAL_GAMEPAD_SCENE:AddFragment(GAMEPAD_NAV_QUADRANT_1_BACKGROUND_FRAGMENT)
+        BATTLESCROLLS_JOURNAL_GAMEPAD_SCENE:AddFragment(GAMEPAD_GENERIC_FOOTER_FRAGMENT)
+        BATTLESCROLLS_JOURNAL_GAMEPAD_SCENE:AddFragment(GAMEPAD_MENU_SOUND_FRAGMENT)
+        BATTLESCROLLS_JOURNAL_GAMEPAD_SCENE:AddFragment(BATTLESCROLLS_JOURNAL_GAMEPAD_FRAGMENT)
+        LibEffect.YieldWithGC():Await()
+
+        -- Initialize base class
+        local ACTIVATE_ON_SHOW = true
+        ZO_Gamepad_ParametricList_Screen.Initialize(self, control, ZO_GAMEPAD_HEADER_TABBAR_CREATE, ACTIVATE_ON_SHOW, BATTLESCROLLS_JOURNAL_GAMEPAD_SCENE)
+
+        -- Enable gamepad input handling
+        self:SetListsUseTriggerKeybinds(true)
+        LibEffect.YieldWithGC():Await()
+
+        if canAddToMainMenu then
+            AddToMainMenu()
+        end
     end):Run()
 end
 

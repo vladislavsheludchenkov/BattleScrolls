@@ -94,12 +94,6 @@ constants.portalEffectsSet = {
     [121216] = true, -- Sunspire
 }
 
--- Zone IDs where boss unitId can change mid-fight
-constants.allowBossUnitIdOverrideZoneIds = {
-    -- Sunspire: Nahviintaas changes unit id mid fight (portal or flying phases)
-    [1121] = true
-}
-
 -- Copied from https://github.com/Shienar/AreaDamage/blob/main/table.lua
 constants.aoeAbilityIds = {
     -- CATEGORY: Item Set>Arena>Maelstrom Arena

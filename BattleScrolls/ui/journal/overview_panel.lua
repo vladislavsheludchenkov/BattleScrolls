@@ -383,19 +383,6 @@ function OverviewPanel:HideLoading()
     if self.q4Container then self.q4Container:SetHidden(false) end
 end
 
----Hides the loading indicator and shows content containers
----@return Effect<nil>
-function OverviewPanel:HideLoadingAsync()
-    return LibEffect.Async(function()
-        if self.loadingLabel then
-            self.loadingLabel:SetHidden(true)
-        end
-        -- Show all content containers (SetHidden is trivial, no yields needed)
-        if self.q2Container then self.q2Container:SetHidden(false) end
-        if self.q3Container then self.q3Container:SetHidden(false) end
-        if self.q4Container then self.q4Container:SetHidden(false) end
-    end)
-end
 
 -------------------------
 -- Display Helpers
@@ -1062,8 +1049,6 @@ function OverviewPanel:Refresh(journalUI)
             renderers.effects.refreshPanelForEffects(self, ctx):Await()
         end
 
-        -- Show panels with yields between each
-        self:HideLoadingAsync():Await()
         BattleScrolls.gc:RequestGC(5)
     end):Ensure(function()
         -- Fallback sync hide in case of cancellation/error

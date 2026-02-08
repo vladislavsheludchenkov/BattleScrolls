@@ -371,17 +371,16 @@ function scribe:ImportEncounterFromStateAsync()
     local decodedAbilityInfo = self.decodedAbilityInfo
 
     return LibEffect.Async(function()
-        -- Finalize any active effects on the state snapshot
-        -- (effects are now processed synchronously, no queue to drain)
+        -- Finalize active effects on the state snapshot (moderate: up to ~600 effects)
         BattleScrolls.effects.finalize(capturedState)
         LibEffect.YieldWithGC():Await()
 
-        -- Merge abilityInfo into decoded cache (trivial table assignments, no yield needed)
+        -- Prep: merge abilityInfo, replace names, build encounter, process procs,
+        -- compute display name. All lightweight operations grouped together.
         for abilityId, info in pairs(capturedState.abilityInfo) do
             decodedAbilityInfo[abilityId] = info
         end
 
-        -- Replace raw names with display names in captured state
         for unitId, name in pairs(capturedState.unitIdToName) do
             local formattedName = zo_strformat(SI_UNIT_NAME, name)
             local entry = rawToDisplay[name] or rawToDisplay[formattedName]
@@ -389,16 +388,12 @@ function scribe:ImportEncounterFromStateAsync()
                 capturedState.unitIdToName[unitId] = entry.displayName
             end
         end
-        rawToDisplay = nil  -- Allow GC
-        LibEffect.YieldWithGC():Await()
+        rawToDisplay = nil
 
-
-        -- Build alive times from captured state
         local durationMs = capturedState.lastDamageDoneMs - capturedState.fightStartTimeMs
         local playerAliveTimeMs = BattleScrolls.effects.getPlayerAliveTime(capturedState, durationMs)
         local unitAliveTimeMs = BattleScrolls.effects.getUnitAliveTimes(capturedState)
 
-        -- Build encounter object
         ---@type Encounter
         local encounter = {
             location = capturedLocation,
@@ -414,24 +409,22 @@ function scribe:ImportEncounterFromStateAsync()
             effectsOnBosses = capturedState.effectsOnBosses,
             effectsOnGroup = capturedState.effectsOnGroup,
             bossNames = next(capturedState.bossNames) and capturedState.bossNames or nil,
-            isPlayerFight = capturedState.isPlayerFight or nil, -- nil if false to save storage
-            isDummyFight = capturedState.isDummyFight or nil,   -- nil if false to save storage
+            isPlayerFight = capturedState.isPlayerFight or nil,
+            isDummyFight = capturedState.isDummyFight or nil,
             playerAliveTimeMs = playerAliveTimeMs ~= durationMs and playerAliveTimeMs or nil,
             unitAliveTimeMs = next(unitAliveTimeMs) and unitAliveTimeMs or nil,
         }
 
-        -- Build boss list
         if capturedState.isBossFight then
             for unitId in pairs(capturedState.bossesByUnitId) do
-                table.insert(encounter.bossesUnits, unitId)
+                if not capturedState.bossUnitIdRedirects[unitId] then
+                    table.insert(encounter.bossesUnits, unitId)
+                end
             end
         end
-        LibEffect.YieldWithGC():Await()
 
-        -- Process procs (yields per ability)
         for abilityId, events in pairs(capturedState.procs) do
             if #events > 0 then
-                -- Group by enemy
                 local countsByEnemy = {}
                 for _, event in ipairs(events) do
                     countsByEnemy[event.targetUnitId] = (countsByEnemy[event.targetUnitId] or 0) + 1
@@ -442,7 +435,6 @@ function scribe:ImportEncounterFromStateAsync()
                     table.insert(procsByEnemy, { unitId = unitId, procCount = count })
                 end
 
-                -- Calculate intervals
                 local meanIntervalMs, medianIntervalMs = 0, 0
                 if #events > 1 then
                     local intervals = {}
@@ -461,36 +453,25 @@ function scribe:ImportEncounterFromStateAsync()
                     medianIntervalMs = medianIntervalMs,
                 })
             end
-            LibEffect.YieldWithGC():Await()
         end
 
-        -- Collect unitNames used in this encounter from captured state (v7+: stored per-encounter)
-        -- Must happen before capturedState is cleared for GC
         encounter.unitNames = capturedState.unitIdToName
-
-        -- Compute display name using only this encounter's unit names
         encounter.displayName = computeEncounterDisplayName(encounter, encounter.unitNames)
-
-        capturedState = nil  -- Allow GC
+        capturedState = nil
         LibEffect.YieldWithGC():Await()
 
-        -- Encode encounter to compact format and add to instance
+        -- Encode encounter to binary (yields internally based on data volume)
         local compactEncounter = BattleScrolls.storage.EncodeEncounterAsync(encounter):Await()
-        LibEffect.YieldWithGC():Await()
 
-        -- Re-encode instance fields (abilityInfo only, unitNames now per-encounter)
-        -- This ensures SavedVariables always has consistent compressed data
+        -- Re-encode instance fields (yields internally based on data volume)
         local encodedFields = BattleScrolls.binaryStorage.encodeInstanceFieldsAsync(
             decodedAbilityInfo):Await()
-        -- No yield between setting fields and inserting encounter to make
-        -- sure it's atomic
+        -- Atomic: set fields and insert encounter together
         instance._instanceData = encodedFields._instanceData
         table.insert(instance.encounters, compactEncounter)
-        -- Invalidate cached size since instance data changed
         instance._estimatedSize = nil
         LibEffect.YieldWithGC():Await()
 
-        -- Push instance to storage on first encounter
         if not capturedPushedToStorage then
             BattleScrolls.storage:PushInstance(instance)
             if instance == self.instance then
@@ -498,7 +479,6 @@ function scribe:ImportEncounterFromStateAsync()
             end
         end
 
-        -- GC after encoding (generates significant garbage, nothing important happening now)
         BattleScrolls.gc:RequestGC(2)
         BattleScrolls.storage:CleanupIfNecessaryAsync()
     end):Run()

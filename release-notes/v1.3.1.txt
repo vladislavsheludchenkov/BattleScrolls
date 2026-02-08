@@ -1,0 +1,3 @@
+Bugfixes:
+- Boss detection should be more reliable in the last Lucent Citadel encounter and some other boss fights when you get separated from the boss for some time (e.g. when going to do portals)
+- "1000ms limit hit" UI error should no longer sometimes happen after complex encounters (Lucent last encounter, Ossein first encounter)

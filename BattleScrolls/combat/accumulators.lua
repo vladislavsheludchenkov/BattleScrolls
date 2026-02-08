@@ -171,6 +171,76 @@ end
 -- HealingStats Factory and Clear
 -- ============================================================================
 
+-- ============================================================================
+-- Damage Merging (for boss unit ID redirects)
+-- ============================================================================
+
+---Merges one DamageBreakdown into another
+---@param into DamageBreakdown
+---@param from DamageBreakdown
+function accumulators.mergeDamageBreakdown(into, from)
+    into.total = into.total + from.total
+    into.rawTotal = into.rawTotal + from.rawTotal
+    into.ticks = into.ticks + from.ticks
+    into.critTicks = into.critTicks + from.critTicks
+    into.minTick = into.minTick and from.minTick and math.min(into.minTick, from.minTick) or into.minTick or from.minTick
+    into.maxTick = into.maxTick and from.maxTick and math.max(into.maxTick, from.maxTick) or into.maxTick or from.maxTick
+end
+
+---Merges one DamageDone into another
+---@param into DamageDone
+---@param from DamageDone
+function accumulators.mergeDamageDone(into, from)
+    into.total = into.total + from.total
+    for abilityId, fromBreakdown in pairs(from.byAbilityId) do
+        local intoBreakdown = into.byAbilityId[abilityId]
+        if intoBreakdown then
+            accumulators.mergeDamageBreakdown(intoBreakdown, fromBreakdown)
+        else
+            into.byAbilityId[abilityId] = fromBreakdown
+        end
+    end
+end
+
+---Retroactively merges all damage recorded under fromUnitId into toUnitId across all damage tables
+---Called when CorrelateBossUnitId establishes a redirect for a boss that got a new unitId
+---@param ctx CombatContext
+---@param fromUnitId number The new (redirected-from) unit ID
+---@param toUnitId number The canonical (redirected-to) unit ID
+function accumulators.redirectBossUnitId(ctx, fromUnitId, toUnitId)
+    -- Boss as target: damageByUnitId, damageByUnitIdGroup, damageUnknownByUnitId
+    local targetTables = { ctx.damageByUnitId, ctx.damageByUnitIdGroup, ctx.damageUnknownByUnitId }
+    for _, damageTable in ipairs(targetTables) do
+        for _, targetMap in pairs(damageTable) do
+            if targetMap[fromUnitId] then
+                if not targetMap[toUnitId] then
+                    targetMap[toUnitId] = BattleScrolls.structures.newDamageDone()
+                end
+                accumulators.mergeDamageDone(targetMap[toUnitId], targetMap[fromUnitId])
+                targetMap[fromUnitId] = nil
+            end
+        end
+    end
+
+    -- Boss as source: damageTakenByUnitId
+    if ctx.damageTakenByUnitId[fromUnitId] then
+        if not ctx.damageTakenByUnitId[toUnitId] then
+            ctx.damageTakenByUnitId[toUnitId] = {}
+        end
+        for targetId, fromDamage in pairs(ctx.damageTakenByUnitId[fromUnitId]) do
+            if not ctx.damageTakenByUnitId[toUnitId][targetId] then
+                ctx.damageTakenByUnitId[toUnitId][targetId] = BattleScrolls.structures.newDamageDone()
+            end
+            accumulators.mergeDamageDone(ctx.damageTakenByUnitId[toUnitId][targetId], fromDamage)
+        end
+        ctx.damageTakenByUnitId[fromUnitId] = nil
+    end
+end
+
+-- ============================================================================
+-- State Clear
+-- ============================================================================
+
 ---Clears combat tracking state (damage, healing, procs, ability info)
 ---@param ctx CombatContext
 function accumulators.clear(ctx)

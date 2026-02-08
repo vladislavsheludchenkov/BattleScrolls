@@ -848,10 +848,7 @@ end
 ---@param encounter CompactEncounter The binary-encoded encounter
 ---@return Effect Effect that resolves to Encounter
 function storage.DecodeEncounterAsync(encounter)
-    return LibEffect.Async(function()
-        local decoded = BattleScrolls.binaryStorage.decodeEncounterAsync(encounter):Await()
-        return computeTabVisibility(decoded)
-    end)
+    return BattleScrolls.binaryStorage.decodeEncounterAsync(encounter):Map(computeTabVisibility)
 end
 
 -- =============================================================================

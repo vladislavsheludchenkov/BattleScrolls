@@ -130,7 +130,8 @@ BattleScrolls = BattleScrolls or {}
 ---@class BossData
 ---@field name string Boss name
 ---@field unitTag string Boss unit tag ("boss1", "boss2", etc.)
----@field unitId number|nil Boss unit ID (nil until first damage event)
+---@field unitId number|nil Boss unit ID (nil until first damage or effect event)
+---@field confirmed boolean Whether unitId was set via effect event (authoritative) vs name matching (tentative)
 
 ---Main combat tracking state
 ---@class BattleScrollsState : EffectContext
@@ -150,9 +151,9 @@ BattleScrolls = BattleScrolls or {}
 ---@field damageTakenByUnitId table<number, table<number, DamageDone>> Damage taken, nested: sourceUnitId -> targetUnitId -> damage
 ---@field damageUnknownByUnitId table<number, table<number, DamageDone>> Damage with unknown friendliness, nested: sourceUnitId -> targetUnitId -> damage
 ---@field healingStats HealingStats
----@field knownBossNames table<string, boolean>
 ---@field bossesByTag table<string, BossData>
 ---@field bossesByUnitId table<number, BossData>
+---@field bossUnitIdRedirects table<number, number> Maps newUnitId → canonicalUnitId (merging if boss unit recreated on client)
 ---@field failedToAssignBossUnitIds table<number, boolean>
 ---@field lastDamageDoneMs number
 ---@field effectsOnPlayer table<number, PlayerEffectStats> Effects on player with attribution, keyed by abilityId
@@ -331,12 +332,12 @@ function BattleScrolls.state:Reset()
     self.currentZoneId = 0
     self.unitIdToName = {}
     self.unitIdToIsFriendly = {}
-    self.knownBossNames = {}
 
     -- Clear combat tracking state via accumulators module
     BattleScrolls.accumulators.clear(self)
     self.bossesByTag = {}
     self.bossesByUnitId = {}
+    self.bossUnitIdRedirects = {}
     self.failedToAssignBossUnitIds = {}
     self.lastDamageDoneMs = 0
 
@@ -369,7 +370,6 @@ function BattleScrolls.state:Snapshot()
     snapshot.damageTakenByUnitId = self.damageTakenByUnitId
     snapshot.damageUnknownByUnitId = self.damageUnknownByUnitId
     snapshot.healingStats = self.healingStats
-    snapshot.knownBossNames = self.knownBossNames
     snapshot.bossesByTag = self.bossesByTag
     snapshot.bossesByUnitId = self.bossesByUnitId
     snapshot.failedToAssignBossUnitIds = self.failedToAssignBossUnitIds
@@ -381,6 +381,7 @@ function BattleScrolls.state:Snapshot()
     snapshot.playerAliveState = self.playerAliveState
     snapshot.unitAliveState = self.unitAliveState
     snapshot.bossNames = self.bossNames
+    snapshot.bossUnitIdRedirects = self.bossUnitIdRedirects
 
     return snapshot
 end
@@ -412,7 +413,7 @@ function BattleScrolls.state:ShouldReset()
 
     for i = BOSS_RANK_ITERATION_BEGIN, BOSS_RANK_ITERATION_END do
         local bossTag = BOSS_TAGS[i]
-        if DoesUnitExist(bossTag) then
+        if GetRawUnitName(bossTag) ~= "" and not IsUnitDead(bossTag) then
             local bossHP, maxBossHP, _ = GetUnitPower(bossTag, COMBAT_MECHANIC_FLAGS_HEALTH)
             totalBossHP = totalBossHP + bossHP
             maxTotalBossHP = maxTotalBossHP + maxBossHP
@@ -436,20 +437,136 @@ end
 function BattleScrolls.state:RefreshBosses()
     for i = BOSS_RANK_ITERATION_BEGIN, BOSS_RANK_ITERATION_END do
         local bossTag = BOSS_TAGS[i]
-        if DoesUnitExist(bossTag) then
+        local bossName = GetRawUnitName(bossTag)
+        if bossName ~= "" and not IsUnitDead(bossTag) then
             local bossData = self.bossesByTag[bossTag]
             if not bossData then
-                local bossName = GetRawUnitName(bossTag)
-                bossData = {
+                -- New tag: create BossData
+                self.bossesByTag[bossTag] = {
                     name = bossName,
                     unitTag = bossTag,
                     unitId = nil,
+                    confirmed = false,
                 }
-                self.bossesByTag[bossTag] = bossData
-                self.knownBossNames[bossName] = true
+            elseif bossData.name ~= bossName then
+                -- Tag reuse: different boss name on same tag. Old BossData stays in bossesByUnitId.
+                self.bossesByTag[bossTag] = {
+                    name = bossName,
+                    unitTag = bossTag,
+                    unitId = nil,
+                    confirmed = false,
+                }
             end
         end
     end
+end
+
+---Correlates a boss unit tag with a unit ID from an effect event (authoritative source).
+---Called from onBossEffect on every non-faded boss effect event. Fast path (unitId unchanged)
+---is two table lookups + comparison.
+---@param unitTag string Boss unit tag ("boss1", etc.)
+---@param unitId number Unit ID from the effect event
+---@param unitName string Boss unit name from the effect event
+function BattleScrolls.state:CorrelateBossUnitId(unitTag, unitId, unitName)
+    -- Ensure every boss unitId has a name in unitIdToName. Effect events are often
+    -- the first source of a boss unitId (before any damage event), and without this,
+    -- the unitId can end up in bossesUnits with no corresponding name entry.
+    self:UpdateUnitName(unitId, unitName)
+
+    local bossData = self.bossesByTag[unitTag]
+    if not bossData then
+        -- Tag not tracked yet (effect arrived before RefreshBosses). Create entry now.
+        bossData = {
+            name = unitName,
+            unitTag = unitTag,
+            unitId = unitId,
+            confirmed = true,
+        }
+        self.bossesByTag[unitTag] = bossData
+        self.bossesByUnitId[unitId] = bossData
+        self.failedToAssignBossUnitIds[unitId] = nil
+        return
+    end
+
+    if bossData.unitId == unitId then
+        -- Common case: same unit ID, just confirm it
+        bossData.confirmed = true
+        return
+    end
+
+    if self.bossUnitIdRedirects[unitId] then
+        return -- Already redirected, nothing to do
+    end
+
+    if bossData.unitId == nil then
+        -- Fresh assignment from effect event (authoritative)
+        bossData.unitId = unitId
+        bossData.confirmed = true
+        self.bossesByUnitId[unitId] = bossData
+        -- Clear from failed set in case damage events had tried and failed
+        self.failedToAssignBossUnitIds[unitId] = nil
+    elseif bossData.confirmed then
+        if bossData.name ~= unitName then
+            -- Tag reuse missed by OnBossUnitCreated/RefreshBosses: different boss on same tag.
+            -- Old BossData stays in bossesByUnitId. Create new entry for the new boss.
+            bossData = {
+                name = unitName,
+                unitTag = unitTag,
+                unitId = unitId,
+                confirmed = true,
+            }
+            self.bossesByTag[unitTag] = bossData
+            self.bossesByUnitId[unitId] = bossData
+            self.failedToAssignBossUnitIds[unitId] = nil
+        else
+            -- Same boss, new unitId (boss unit recreated on client, e.g. after portal)
+            -- Set up redirect: future damage to new unitId → canonical unitId
+            local canonicalUnitId = bossData.unitId
+            self.bossUnitIdRedirects[unitId] = canonicalUnitId
+            self.bossesByUnitId[unitId] = bossData
+            self.failedToAssignBossUnitIds[unitId] = nil
+            -- Ensure canonical unitId has a name (it may only have been set via effects,
+            -- never via a personal damage event)
+            self:UpdateUnitName(canonicalUnitId, unitName)
+            -- Retroactively merge any damage already recorded under the new unitId
+            BattleScrolls.accumulators.redirectBossUnitId(self, unitId, canonicalUnitId)
+        end
+    else
+        -- Tentative assignment was wrong (e.g. copy got matched first)
+        -- Remove the wrong mapping, replace with authoritative one
+        local oldUnitId = bossData.unitId
+        self.bossesByUnitId[oldUnitId] = nil
+        bossData.unitId = unitId
+        bossData.confirmed = true
+        self.bossesByUnitId[unitId] = bossData
+        self.failedToAssignBossUnitIds[unitId] = nil
+    end
+end
+
+---Handles EVENT_UNIT_CREATED for boss tags. Detects tag reuse (different boss name on same tag).
+---@param unitTag string Boss unit tag ("boss1", etc.)
+function BattleScrolls.state:OnBossUnitCreated(unitTag)
+    local bossData = self.bossesByTag[unitTag]
+    local bossName = GetRawUnitName(unitTag)
+    if not bossData then
+        -- First time seeing this tag during combat
+        self.bossesByTag[unitTag] = {
+            name = bossName,
+            unitTag = unitTag,
+            unitId = nil,
+            confirmed = false,
+        }
+    elseif bossData.name ~= bossName then
+        -- Tag reuse: different boss. Old BossData stays in bossesByUnitId.
+        self.bossesByTag[unitTag] = {
+            name = bossName,
+            unitTag = unitTag,
+            unitId = nil,
+            confirmed = false,
+        }
+    end
+    -- Same name: do nothing. Keep existing BossData with canonical unitId.
+    -- CorrelateBossUnitId will establish a redirect when the first effect event arrives.
 end
 
 -- Local aliases for constants (performance)
@@ -465,8 +582,6 @@ local healingResultsSet = BattleScrolls.constants.healingResultsSet
 local ignoredHealingAbilityIds = BattleScrolls.constants.ignoredHealingAbilityIds
 ---@type table<number, boolean>
 local portalEffectsSet = BattleScrolls.constants.portalEffectsSet
----@type table<number, boolean>
-local allowBossUnitIdOverrideZoneIds = BattleScrolls.constants.allowBossUnitIdOverrideZoneIds
 
 ---Central combat event dispatcher with Lua-side filtering
 ---Routes events to appropriate handlers based on source/target type and result
@@ -732,6 +847,10 @@ function BattleScrolls.state:ApplyPersonalDamage(result, sourceName, sourceType,
     self:UpdateUnitFriendliness(sourceUnitID, sourceType)
     self:UpdateUnitFriendliness(targetUnitID, targetType)
 
+    -- Redirect boss unit IDs (merging if boss unit recreated on the client,
+    -- for example after going in and out of the portal)
+    targetUnitID = self.bossUnitIdRedirects[targetUnitID] or targetUnitID
+
     local isDot = isOverTimeResult(result)
     local isCrit = isCriticalResult(result)
 
@@ -739,28 +858,22 @@ function BattleScrolls.state:ApplyPersonalDamage(result, sourceName, sourceType,
 
     BattleScrolls.accumulators.damage(self.damageByUnitId, sourceUnitID, targetUnitID, abilityID, hitValue, overflow, isCrit)
 
-    if self.knownBossNames[targetName] then
+    -- Boss assignment: try to link this targetUnitID to a known boss
+    if self.bossesByUnitId[targetUnitID] then
         self.isBossFight = true
-
+    elseif not self.failedToAssignBossUnitIds[targetUnitID] then
+        -- Name-match fallback: only assign to bosses that don't have a unitId yet
+        for _, bossData in pairs(self.bossesByTag) do
+            if bossData.name == targetName and bossData.unitId == nil then
+                bossData.unitId = targetUnitID
+                bossData.confirmed = false
+                self.bossesByUnitId[targetUnitID] = bossData
+                self.isBossFight = true
+                break
+            end
+        end
         if not self.bossesByUnitId[targetUnitID] then
-            -- Find the boss data for this unit ID
-            local targetBossData
-            for _, bossData in pairs(self.bossesByTag) do
-                if bossData.name == targetName and (bossData.unitId == nil or allowBossUnitIdOverrideZoneIds[self.currentZoneId]) then
-                    targetBossData = bossData
-                    bossData.unitId = targetUnitID
-                    break
-                end
-            end
-
-            if targetBossData then
-                self.bossesByUnitId[targetUnitID] = targetBossData
-            else
-                if not self.failedToAssignBossUnitIds[targetUnitID] then
-                    -- BattleScrolls.log.Warn(string.format("Couldn't assign boss data for unit ID %d with name %s", targetUnitID, targetName))
-                    self.failedToAssignBossUnitIds[targetUnitID] = true
-                end
-            end
+            self.failedToAssignBossUnitIds[targetUnitID] = true
         end
     end
 
@@ -846,6 +959,10 @@ end
 ---@param overflow number
 ---@param _damageType number
 function BattleScrolls.state:ApplyGroupDamage(result, sourceUnitID, targetUnitID, abilityID, hitValue, overflow, _damageType)
+    -- Redirect boss unit IDs (merging if boss unit recreated on the client,
+    -- for example after going in and out of the portal)
+    targetUnitID = self.bossUnitIdRedirects[targetUnitID] or targetUnitID
+
     local isCrit = isCriticalResult(result)
 
     if self.unitIdToIsFriendly[targetUnitID] == nil then
@@ -1015,6 +1132,10 @@ function BattleScrolls.state:OnDamageTaken(_, result, _isError, _abilityName, _a
     self:UpdateUnitName(targetUnitID, targetName)
     self:UpdateUnitFriendliness(sourceUnitID, sourceType)
     self:UpdateUnitFriendliness(targetUnitID, targetType)
+
+    -- Redirect boss unit IDs as source (merging if boss unit recreated on the client,
+    -- for example after going in and out of the portal)
+    sourceUnitID = self.bossUnitIdRedirects[sourceUnitID] or sourceUnitID
 
     local isDot = isOverTimeResult(result)
     local isCrit = isCriticalResult(result)

@@ -179,8 +179,11 @@ end
 ---@return boolean isBoss
 local function getUnitStorageKey(ctx, unitTag)
     if unitTag:find(PATTERN_BOSS) then
-        if not ctx.bossNames[unitTag] and DoesUnitExist(unitTag) then
-            ctx.bossNames[unitTag] = GetRawUnitName(unitTag)
+        if not ctx.bossNames[unitTag] then
+            local name = GetRawUnitName(unitTag)
+            if name ~= "" and not IsUnitDead(unitTag) then
+                ctx.bossNames[unitTag] = name
+            end
         end
         return unitTag, true
     else
@@ -478,6 +481,60 @@ local function handleUnitEffectChange(ctx, storage, storageKey, effectSlot, unit
                 updateStatsOnUpdated(storage[instanceKey][instance.abilityId], instance, stackCount, appliedByPlayer, beginTime, GetGameTimeMilliseconds())
             end
         end
+    end
+end
+
+-- ============================================================================
+-- Boss Tag Reuse
+-- ============================================================================
+
+---Retires effect data for a boss tag that is being reused by a different boss.
+---Moves effectsOnBosses, unitAliveState, and bossNames entries from unitTag
+---to a retired key so the new boss starts with a clean slate.
+---@param ctx EffectContext
+---@param unitTag string The boss tag being reused (e.g., "boss1")
+---@param retiredUnitId number|nil The old boss's unitId (if known)
+function effects.retireBossTag(ctx, unitTag, retiredUnitId)
+    -- Short-circuit: nothing to retire if we never captured data for this tag
+    if not ctx.bossNames[unitTag] then return end
+
+    -- Compute retired key: prefer unitId, fall back to boss name
+    local retiredKey
+    if retiredUnitId then
+        retiredKey = unitTag .. "#" .. tostring(retiredUnitId)
+    else
+        retiredKey = unitTag .. "#" .. ctx.bossNames[unitTag]
+    end
+
+    -- Move effect stats
+    if ctx.effectsOnBosses[unitTag] then
+        ctx.effectsOnBosses[retiredKey] = ctx.effectsOnBosses[unitTag]
+        ctx.effectsOnBosses[unitTag] = nil
+    end
+
+    -- Move alive state
+    if ctx.unitAliveState[unitTag] then
+        ctx.unitAliveState[retiredKey] = ctx.unitAliveState[unitTag]
+        ctx.unitAliveState[unitTag] = nil
+    end
+
+    -- Move boss name
+    ctx.bossNames[retiredKey] = ctx.bossNames[unitTag]
+    ctx.bossNames[unitTag] = nil
+
+    -- Finalize any remaining active effects under this unitTag (safety: should be empty
+    -- since the old boss died, but handles edge cases)
+    local slots = ctx.activeEffects[unitTag]
+    if slots then
+        local nowMs = GetGameTimeMilliseconds()
+        for effectSlot, instance in pairs(slots) do
+            if ctx.effectsOnBosses[retiredKey] and ctx.effectsOnBosses[retiredKey][instance.abilityId] then
+                finalizeStatsWithAttribution(ctx.effectsOnBosses[retiredKey][instance.abilityId], instance, nowMs)
+            end
+            recycleInstance(instance)
+            slots[effectSlot] = nil
+        end
+        ctx.activeEffects[unitTag] = nil
     end
 end
 
@@ -942,8 +999,8 @@ local function reconcileUnitAliveState(ctx, storageKey, unitTag)
     local isActuallyDead
 
     if isBoss then
-        -- Boss: dead if doesn't exist OR IsUnitDead
-        isActuallyDead = not DoesUnitExist(unitTag) or IsUnitDead(unitTag)
+        -- Boss: dead if no unit name (truly gone) OR IsUnitDead
+        isActuallyDead = GetRawUnitName(unitTag) == "" or IsUnitDead(unitTag)
     else
         -- Group member: dead if IsUnitDead OR offline
         -- Note: DoesUnitExist is intentionally NOT checked here
@@ -1146,16 +1203,24 @@ function effects.handleBossFullRefresh(ctx, unitTag)
     if not ctx.initialized then return end
     if not effects.isEnabled() then return end
     if not isBossDebuffsEnabled() then return end
-    if not DoesUnitExist(unitTag) then return end
 
-    -- Capture boss name if not already captured
-    if not ctx.bossNames[unitTag] then
-        ctx.bossNames[unitTag] = GetRawUnitName(unitTag)
+    local currentName = GetRawUnitName(unitTag)
+
+    -- Detect tag reuse: if current boss name differs from tracked name, retire old data
+    -- (only meaningful when a boss actually exists in the slot)
+    if currentName ~= "" then
+        if ctx.bossNames[unitTag] and ctx.bossNames[unitTag] ~= currentName then
+            effects.retireBossTag(ctx, unitTag, nil)
+        end
+        if not ctx.bossNames[unitTag] then
+            ctx.bossNames[unitTag] = currentName
+        end
     end
 
-    -- Reconcile alive state first - this may call handleUnitDeath/handleUnitAlive
+    -- Reconcile alive state first - this catches missed death/despawn events
+    -- Must run even for dead/despawned bosses so we finalize effects and alive time
     if not reconcileUnitAliveState(ctx, unitTag, unitTag) then
-        return  -- Boss is dead, no effect reconciliation needed
+        return  -- Boss is dead/despawned, alive state was reconciled
     end
 
     -- Ensure storage exists
@@ -1215,7 +1280,7 @@ function effects.handleFullRefreshAll(ctx)
 
     for i = BOSS_RANK_ITERATION_BEGIN, BOSS_RANK_ITERATION_END do
         local bossTag = BOSS_TAGS[i]
-        if DoesUnitExist(bossTag) then
+        if GetRawUnitName(bossTag) ~= "" then
             effects.handleBossFullRefresh(ctx, bossTag)
         end
     end
@@ -1305,27 +1370,23 @@ function effects.backfill(ctx)
     if isBossDebuffsEnabled() then
         for i = BOSS_RANK_ITERATION_BEGIN, BOSS_RANK_ITERATION_END do
             local bossTag = BOSS_TAGS[i]
-            if DoesUnitExist(bossTag) then
-                local isDead = IsUnitDead(bossTag)
-
-                -- Skip dead bosses - don't track effects on them
-                if not isDead then
-                    -- Capture boss name proactively
-                    if not ctx.bossNames[bossTag] then
-                        ctx.bossNames[bossTag] = GetRawUnitName(bossTag)
-                    end
-
-                    -- Initialize alive state for this boss
-                    ensureUnitAliveState(ctx, bossTag, true)
-
-                    -- Ensure storage exists
-                    if not ctx.effectsOnBosses[bossTag] then
-                        ctx.effectsOnBosses[bossTag] = {}
-                    end
-
-                    -- Backfill debuffs on this boss
-                    backfillEffectsForUnitTag(ctx, bossTag, ctx.effectsOnBosses[bossTag], BUFF_EFFECT_TYPE_DEBUFF, bossTag)
+            local bossName = GetRawUnitName(bossTag)
+            if bossName ~= "" and not IsUnitDead(bossTag) then
+                -- Capture boss name proactively
+                if not ctx.bossNames[bossTag] then
+                    ctx.bossNames[bossTag] = bossName
                 end
+
+                -- Initialize alive state for this boss
+                ensureUnitAliveState(ctx, bossTag, true)
+
+                -- Ensure storage exists
+                if not ctx.effectsOnBosses[bossTag] then
+                    ctx.effectsOnBosses[bossTag] = {}
+                end
+
+                -- Backfill debuffs on this boss
+                backfillEffectsForUnitTag(ctx, bossTag, ctx.effectsOnBosses[bossTag], BUFF_EFFECT_TYPE_DEBUFF, bossTag)
             end
         end
     end

@@ -65,10 +65,10 @@ local function getUnitsForRecon()
     -- Player is always first
     addUnit("player", "player")
 
-    -- Bosses (only existing)
+    -- Bosses (existing — alive state is reconciled inside handleBossFullRefresh)
     for i = BOSS_RANK_ITERATION_BEGIN, BOSS_RANK_ITERATION_END do
         local bossTag = BOSS_TAGS[i]
-        if DoesUnitExist(bossTag) then
+        if GetRawUnitName(bossTag) ~= "" then
             addUnit(bossTag, bossTag)
         end
     end

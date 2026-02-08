@@ -565,6 +565,7 @@ local function runAsync(effect, fiber, onDone)
         end
 
         if coroutine.status(co) == "dead" then
+            onDone(false, "coroutine died unexpectedly (engine frame budget exceeded?)")
             return
         end
 
