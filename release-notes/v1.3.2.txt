@@ -1,0 +1,2 @@
+Bugfixes:
+- No longer tries to send DPS data to group while not actually grouped (by DakJaniels)

@@ -154,12 +154,9 @@ end
 ---@param rawHPS number Raw healing per second output
 ---@param effectiveHPS number Effective healing per second output
 function dpsShare:SendData(allTargetsDPS, bossDPS, rawHPS, effectiveHPS)
-    local groupSize = GetGroupSize()
-    if groupSize == 0 then
-        return
-    end
     -- Network: still old format (phase 1)
-    if dpsShare.legacyProtocol then
+    -- LGB will log a warning and will not send anything when trying to send data while not grouped
+    if dpsShare.legacyProtocol and IsUnitGrouped("player") then
         dpsShare.legacyProtocol:Send({
             allTargetsDPS = allTargetsDPS,
             bossDPS = bossDPS,
