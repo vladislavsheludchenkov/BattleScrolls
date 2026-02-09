@@ -154,6 +154,10 @@ end
 ---@param rawHPS number Raw healing per second output
 ---@param effectiveHPS number Effective healing per second output
 function dpsShare:SendData(allTargetsDPS, bossDPS, rawHPS, effectiveHPS)
+    local groupSize = GetGroupSize()
+    if groupSize == 0 then
+        return
+    end
     -- Network: still old format (phase 1)
     if dpsShare.legacyProtocol then
         dpsShare.legacyProtocol:Send({
