@@ -229,3 +229,50 @@ journal.EncounterIcons = {
 ---| 3 # TRASH
 ---| 4 # PLAYER
 ---| 5 # DUMMY
+
+-------------------------
+-- Shared Encounter Data
+-------------------------
+---@class SharedBossDamage
+---@field bossTag string Boss unit tag (e.g. "boss1")
+---@field tagSeq number Sequence within tag (0=first boss, increments on tag reuse)
+---@field damage number Total damage to this boss
+---@field critPercent number Critical hit percentage (0-1)
+---@field dotPercent number DoT damage percentage (0-1)
+---@field aoePercent number AoE damage percentage (0-1)
+---@field magicalPercent number Magical damage percentage (0-1, magic/fire/frost/shock)
+
+---@class SharedBossDamageTaken
+---@field bossTag string Boss unit tag
+---@field tagSeq number Sequence within tag
+---@field damage number Total damage taken from this boss
+
+---@class SharedDamageByType
+---@field type number Damage type enum value
+---@field damage number Total damage of this type
+
+---@class SharedHealing
+---@field rawOut number Raw healing output
+---@field effectiveOut number Effective healing output
+---@field rawSelf number Raw self-healing
+---@field effectiveSelf number Effective self-healing
+
+---@class SharedEncounterData
+---@field timestampS number Sender's fight start (Unix epoch)
+---@field durationMs number Sender's fight duration in ms
+---@field totalDamage number All-target personal damage
+---@field critPercent number Critical hit percentage (0-1)
+---@field dotPercent number DoT damage percentage (0-1)
+---@field aoePercent number AoE damage percentage (0-1)
+---@field maxHit number Single biggest hit
+---@field damageByType SharedDamageByType[] Damage breakdown by type
+---@field bossDamage SharedBossDamage[] Per-boss damage stats
+---@field totalDamageTaken number Total damage taken
+---@field bossDamageTaken SharedBossDamageTaken[] Per-boss damage taken
+---@field healing SharedHealing|nil Healing stats (nil if not a healer)
+---@field aliveTimeMs number|nil Player alive time in ms
+
+---@class SharedDataEntry
+---@field displayName string Sender's display name (undecorated)
+---@field data SharedEncounterData
+---@field role number|nil LFG_ROLE_* constant captured at match time

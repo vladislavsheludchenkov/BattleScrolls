@@ -132,6 +132,7 @@ BattleScrolls = BattleScrolls or {}
 ---@field unitTag string Boss unit tag ("boss1", "boss2", etc.)
 ---@field unitId number|nil Boss unit ID (nil until first damage or effect event)
 ---@field confirmed boolean Whether unitId was set via effect event (authoritative) vs name matching (tentative)
+---@field tagSeq number Sequence number within this tag (0=first boss, increments on tag reuse)
 
 ---Main combat tracking state
 ---@class BattleScrollsState : EffectContext
@@ -447,6 +448,7 @@ function BattleScrolls.state:RefreshBosses()
                     unitTag = bossTag,
                     unitId = nil,
                     confirmed = false,
+                    tagSeq = 0,
                 }
             elseif bossData.name ~= bossName then
                 -- Tag reuse: different boss name on same tag. Old BossData stays in bossesByUnitId.
@@ -455,6 +457,7 @@ function BattleScrolls.state:RefreshBosses()
                     unitTag = bossTag,
                     unitId = nil,
                     confirmed = false,
+                    tagSeq = (bossData.tagSeq or 0) + 1,
                 }
             end
         end
@@ -481,6 +484,7 @@ function BattleScrolls.state:CorrelateBossUnitId(unitTag, unitId, unitName)
             unitTag = unitTag,
             unitId = unitId,
             confirmed = true,
+            tagSeq = 0,
         }
         self.bossesByTag[unitTag] = bossData
         self.bossesByUnitId[unitId] = bossData
@@ -514,6 +518,7 @@ function BattleScrolls.state:CorrelateBossUnitId(unitTag, unitId, unitName)
                 unitTag = unitTag,
                 unitId = unitId,
                 confirmed = true,
+                tagSeq = (bossData.tagSeq or 0) + 1,
             }
             self.bossesByTag[unitTag] = bossData
             self.bossesByUnitId[unitId] = bossData
@@ -555,6 +560,7 @@ function BattleScrolls.state:OnBossUnitCreated(unitTag)
             unitTag = unitTag,
             unitId = nil,
             confirmed = false,
+            tagSeq = 0,
         }
     elseif bossData.name ~= bossName then
         -- Tag reuse: different boss. Old BossData stays in bossesByUnitId.
@@ -563,6 +569,7 @@ function BattleScrolls.state:OnBossUnitCreated(unitTag)
             unitTag = unitTag,
             unitId = nil,
             confirmed = false,
+            tagSeq = (bossData.tagSeq or 0) + 1,
         }
     end
     -- Same name: do nothing. Keep existing BossData with canonical unitId.

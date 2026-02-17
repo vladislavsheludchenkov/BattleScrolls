@@ -45,8 +45,11 @@ storage/binary.lua
 storage/storage.lua
 
 ; Network domain
+network/lgb.lua
 network/dpsshare.lua
 network/dpssender.lua
+network/sharecoordinator.lua
+network/encountershare.lua
 
 ; Entry point
 main.lua

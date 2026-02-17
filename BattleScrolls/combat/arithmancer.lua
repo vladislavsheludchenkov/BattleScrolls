@@ -321,6 +321,7 @@ end
 ---@field healingOutSummary { rawHps: number, effectiveHps: number, total: number, rawTotal: number, overhealPercent: number }|nil
 ---@field selfHealingSummary { rawHps: number, effectiveHps: number, total: number, rawTotal: number, overhealPercent: number }|nil
 ---@field healingInSummary { rawHps: number, effectiveHps: number, total: number, rawTotal: number, overhealPercent: number }|nil
+---@field personalDamageByType table<DamageType, number>|nil
 
 ---@class ArithmancerInstance
 ---@field _source BattleScrollsState|Encounter
@@ -1284,4 +1285,195 @@ function ArithmancerInstance:getHealingInSummary(sourceFilter)
     end
 
     return result
+end
+
+---Returns damage by damage type aggregated across personal damage targets
+---@return table<DamageType, number> byDamageType Map of damageType -> total damage
+function ArithmancerInstance:personalDamageByType()
+    if self._cache.personalDamageByType ~= nil then
+        return self._cache.personalDamageByType
+    end
+
+    local damageTable = self._source.damageByUnitId
+    local abilityInfo = self._abilityInfo
+    local result = {}
+
+    if damageTable then
+        for _, byTarget in pairs(damageTable) do
+            for _, damage in pairs(byTarget) do
+                local types = Arithmancer.ComputeByDamageType(damage, abilityInfo)
+                for damageType, amount in pairs(types) do
+                    result[damageType] = (result[damageType] or 0) + amount
+                end
+            end
+        end
+    end
+
+    self._cache.personalDamageByType = result
+    return result
+end
+
+-- =============================================================================
+-- SHARED ENCOUNTER DATA
+-- =============================================================================
+
+---Build a SharedEncounterData summary for network sharing.
+---Uses aggregated stats from this arithmancer instance with per-boss breakdowns.
+---Reads bossTagSeqByUnitId from the source data.
+---@return SharedEncounterData
+function ArithmancerInstance:buildSharedEncounterData()
+    local source = self._source
+    local bossTagSeqByUnitId = source.bossTagSeqByUnitId
+
+    -- Aggregate stats
+    local totalDamage = self:personalTotalDamage()
+    local qualityData = self:getDamageQuality()
+    local critPercent = qualityData.critRate / 100  -- 0-1 range
+    local dotVsDirect = self:personalDotVsDirect()
+    local aoeVsSt = self:personalAoeVsSingleTarget()
+    local damageByTypeMap = self:personalDamageByType()
+    local totalDamageTaken = self:damageTakenTotal()
+
+    -- Convert damage by type map to array
+    ---@type SharedDamageByType[]
+    local damageByType = {}
+    for dmgType, amount in pairs(damageByTypeMap) do
+        table.insert(damageByType, { type = dmgType, damage = amount })
+    end
+
+    -- Per-boss damage (requires manual iteration with bossTagSeqByUnitId mapping)
+    ---@type SharedBossDamage[]
+    local bossDamage = {}
+    ---@type SharedBossDamageTaken[]
+    local bossDamageTaken = {}
+
+    if bossTagSeqByUnitId then
+        local computeTotal = Arithmancer.ComputeDamageTotal
+        local computeByDotOrDirect = Arithmancer.ComputeByDotOrDirect
+        local abilityInfo = self._abilityInfo
+
+        -- Per-boss damage output
+        ---@type table<string, { damage: number, dotDamage: number, aoeDamage: number, magicalDamage: number, ticks: number, critTicks: number }>
+        local bossDamageMap = {}
+        local aoeAbilityIds = BattleScrolls.constants.aoeAbilityIds
+        local magicalDamageTypes = {
+            [DAMAGE_TYPE_MAGIC] = true,
+            [DAMAGE_TYPE_FIRE] = true,
+            [DAMAGE_TYPE_COLD] = true,
+            [DAMAGE_TYPE_SHOCK] = true,
+        }
+        if source.damageByUnitId then
+            for _, byTarget in pairs(source.damageByUnitId) do
+                for targetId, dmg in pairs(byTarget) do
+                    local key = bossTagSeqByUnitId[targetId]
+                    if key then
+                        local entry = bossDamageMap[key]
+                        if not entry then
+                            entry = { damage = 0, dotDamage = 0, aoeDamage = 0, magicalDamage = 0, ticks = 0, critTicks = 0 }
+                            bossDamageMap[key] = entry
+                        end
+                        entry.damage = entry.damage + computeTotal(dmg)
+                        local dotDirect = computeByDotOrDirect(dmg, abilityInfo)
+                        entry.dotDamage = entry.dotDamage + dotDirect.dot
+                        for abilityId, breakdown in pairs(getAbilities(dmg)) do
+                            entry.ticks = entry.ticks + (breakdown.ticks or 0)
+                            entry.critTicks = entry.critTicks + (breakdown.critTicks or 0)
+                            -- AoE classification
+                            if aoeAbilityIds[abilityId] then
+                                entry.aoeDamage = entry.aoeDamage + breakdown.total
+                            end
+                            -- Magical classification (magic/fire/frost/shock)
+                            local info = abilityInfo[abilityId]
+                            if info and info.damageTypes then
+                                for dmgType in pairs(info.damageTypes) do
+                                    if magicalDamageTypes[dmgType] then
+                                        entry.magicalDamage = entry.magicalDamage + breakdown.total
+                                        break
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        for key, entry in pairs(bossDamageMap) do
+            local tag, seq = key:match("^(boss%d+):(%d+)$")
+            if tag then
+                local bossCritPercent = entry.ticks > 0 and (entry.critTicks / entry.ticks) or 0
+                local d = entry.damage
+                table.insert(bossDamage, {
+                    bossTag = tag,
+                    tagSeq = tonumber(seq) or 0,
+                    damage = d,
+                    critPercent = bossCritPercent,
+                    dotPercent = d > 0 and (entry.dotDamage / d) or 0,
+                    aoePercent = d > 0 and (entry.aoeDamage / d) or 0,
+                    magicalPercent = d > 0 and (entry.magicalDamage / d) or 0,
+                })
+            end
+        end
+
+        -- Per-boss damage taken (bosses are at first level: sourceUnitId -> targetUnitId -> damage)
+        ---@type table<string, number>
+        local bossDtMap = {}
+        if source.damageTakenByUnitId then
+            for sourceId, byTarget in pairs(source.damageTakenByUnitId) do
+                local key = bossTagSeqByUnitId[sourceId]
+                if key then
+                    for _, dmg in pairs(byTarget) do
+                        bossDtMap[key] = (bossDtMap[key] or 0) + computeTotal(dmg)
+                    end
+                end
+            end
+        end
+
+        for key, damage in pairs(bossDtMap) do
+            local tag, seq = key:match("^(boss%d+):(%d+)$")
+            if tag then
+                table.insert(bossDamageTaken, {
+                    bossTag = tag,
+                    tagSeq = tonumber(seq) or 0,
+                    damage = damage,
+                })
+            end
+        end
+    end
+
+    -- Healing
+    ---@type SharedHealing|nil
+    local healing = nil
+    local healOut = self:getHealingOutSummary()
+    local selfHeal = self:getSelfHealingSummary()
+    local rawOut = healOut.rawTotal
+    local effectiveOut = healOut.total
+    local rawSelf = selfHeal.rawTotal
+    local effectiveSelf = selfHeal.total
+
+    if rawOut > 0 or rawSelf > 0 then
+        healing = {
+            rawOut = rawOut,
+            effectiveOut = effectiveOut,
+            rawSelf = rawSelf,
+            effectiveSelf = effectiveSelf,
+        }
+    end
+
+    ---@type SharedEncounterData
+    return {
+        timestampS = source.timestampS or 0,
+        durationMs = source.durationMs or 0,
+        totalDamage = totalDamage,
+        critPercent = critPercent,
+        dotPercent = totalDamage > 0 and (dotVsDirect.dot / totalDamage) or 0,
+        aoePercent = totalDamage > 0 and (aoeVsSt.aoe / totalDamage) or 0,
+        maxHit = qualityData.maxHit,
+        damageByType = damageByType,
+        bossDamage = bossDamage,
+        totalDamageTaken = totalDamageTaken,
+        bossDamageTaken = bossDamageTaken,
+        healing = healing,
+        aliveTimeMs = source.playerAliveTimeMs,
+    }
 end

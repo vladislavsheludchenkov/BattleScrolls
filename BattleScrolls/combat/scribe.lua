@@ -301,43 +301,6 @@ function scribe:ImportEncounterFromStateAsync()
         return
     end
 
-    -- Check recording settings (sync, quick checks before async work)
-    local settings = BattleScrolls.storage.savedVariables.settings
-    local defaults = BattleScrolls.storage.defaults.settings
-
-    -- Global recording toggle
-    if settings and settings.recordingEnabled == false then return end
-
-    -- Zone filter: set of zone types
-    local recordInZones = settings and settings.recordInZones or defaults.recordInZones
-    -- Determine current zone type (priority: house > pvp > instanced/overland)
-    local currentZoneType
-    if self.instance.isHouse then
-        currentZoneType = "house"
-    elseif self.instance.isPvP then
-        currentZoneType = "pvp"
-    elseif self.instance.isOverland then
-        currentZoneType = "overland"
-    else
-        currentZoneType = "instanced"
-    end
-    if not recordInZones[currentZoneType] then return end
-
-    -- Fight filter: set of fight types
-    local recordInFights = settings and settings.recordInFights or defaults.recordInFights
-    -- Determine current fight type (priority: dummy > player > boss > trash)
-    local currentFightType
-    if state.isDummyFight then
-        currentFightType = "dummy"
-    elseif state.isPlayerFight then
-        currentFightType = "player"
-    elseif state.isBossFight then
-        currentFightType = "boss"
-    else
-        currentFightType = "trash"
-    end
-    if not recordInFights[currentFightType] then return end
-
     -- Capture references to state data (state:Reset() creates new tables, doesn't modify old ones)
     local capturedLocation = self.location
     ---@type BattleScrollsState|nil
@@ -375,8 +338,8 @@ function scribe:ImportEncounterFromStateAsync()
         BattleScrolls.effects.finalize(capturedState)
         LibEffect.YieldWithGC():Await()
 
-        -- Prep: merge abilityInfo, replace names, build encounter, process procs,
-        -- compute display name. All lightweight operations grouped together.
+        -- Merge abilityInfo and replace raw names with display names
+        -- (needed by encounter share's buildSharedEncounterData which reads damageByUnitId)
         for abilityId, info in pairs(capturedState.abilityInfo) do
             decodedAbilityInfo[abilityId] = info
         end
@@ -388,7 +351,6 @@ function scribe:ImportEncounterFromStateAsync()
                 capturedState.unitIdToName[unitId] = entry.displayName
             end
         end
-        rawToDisplay = nil
 
         local durationMs = capturedState.lastDamageDoneMs - capturedState.fightStartTimeMs
         local playerAliveTimeMs = BattleScrolls.effects.getPlayerAliveTime(capturedState, durationMs)
@@ -415,12 +377,16 @@ function scribe:ImportEncounterFromStateAsync()
             unitAliveTimeMs = next(unitAliveTimeMs) and unitAliveTimeMs or nil,
         }
 
+        local bossTagSeqByUnitId = nil
         if capturedState.isBossFight then
-            for unitId in pairs(capturedState.bossesByUnitId) do
+            bossTagSeqByUnitId = {}
+            for unitId, boss in pairs(capturedState.bossesByUnitId) do
                 if not capturedState.bossUnitIdRedirects[unitId] then
                     table.insert(encounter.bossesUnits, unitId)
+                    bossTagSeqByUnitId[unitId] = boss.unitTag .. ":" .. boss.tagSeq
                 end
             end
+            encounter.bossTagSeqByUnitId = bossTagSeqByUnitId
         end
 
         for abilityId, events in pairs(capturedState.procs) do
@@ -457,6 +423,51 @@ function scribe:ImportEncounterFromStateAsync()
 
         encounter.unitNames = capturedState.unitIdToName
         encounter.displayName = computeEncounterDisplayName(encounter, encounter.unitNames)
+
+        -- Send encounter data to group members (always, regardless of recording settings)
+        local arithmancer = BattleScrolls.arithmancer:New(encounter, capturedState.abilityInfo)
+        local sharedData = arithmancer:buildSharedEncounterData()
+        BattleScrolls.encounterShare:send(sharedData, encounter.timestampS)
+
+        -- Check recording settings (sharing already happened above)
+        local settings = BattleScrolls.storage.savedVariables.settings
+        local defaults = BattleScrolls.storage.defaults.settings
+
+        if settings and settings.recordingEnabled == false then
+            return
+        end
+
+        local recordInZones = settings and settings.recordInZones or defaults.recordInZones
+        local currentZoneType
+        if instance.isHouse then
+            currentZoneType = "house"
+        elseif instance.isPvP then
+            currentZoneType = "pvp"
+        elseif instance.isOverland then
+            currentZoneType = "overland"
+        else
+            currentZoneType = "instanced"
+        end
+        if not recordInZones[currentZoneType] then
+            return
+        end
+
+        local recordInFights = settings and settings.recordInFights or defaults.recordInFights
+        local currentFightType
+        if capturedState.isDummyFight then
+            currentFightType = "dummy"
+        elseif capturedState.isPlayerFight then
+            currentFightType = "player"
+        elseif capturedState.isBossFight then
+            currentFightType = "boss"
+        else
+            currentFightType = "trash"
+        end
+        if not recordInFights[currentFightType] then
+            return
+        end
+
+        rawToDisplay = nil
         capturedState = nil
         LibEffect.YieldWithGC():Await()
 

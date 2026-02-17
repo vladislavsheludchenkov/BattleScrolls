@@ -90,9 +90,10 @@ end
 ---Registers legacy protocol (438) and new typed protocols (430 damage, 431 healing)
 function dpsShare:Initialize()
     local LGB = LibGroupBroadcast
-    local handler = LGB:RegisterHandler("BattleScrolls")
-    handler:SetDisplayName("Battle Scrolls")
-    handler:SetDescription("Shares DPS and HPS data between group members using Battle Scrolls addon.")
+    local handler = BattleScrolls.lgbHandler
+    if not handler then
+        return
+    end
 
     -- Legacy protocol (438): 4-field format, classified on receive
     local legacyProtocol = handler:DeclareProtocol(438, "BattleScrolls_DPSHPSData")
