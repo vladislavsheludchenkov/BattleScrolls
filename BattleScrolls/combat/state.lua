@@ -164,6 +164,8 @@ BattleScrolls = BattleScrolls or {}
 ---@field playerAliveState UnitAliveState|nil Player alive/dead state (separate from unitAliveState)
 ---@field unitAliveState table<string, UnitAliveState> Per-unit alive/dead state tracking, keyed by unitTag (bosses) or displayName (group)
 ---@field bossNames table<string, string> Maps unitTag to boss name for UI display
+---@field playerDeathCount number Number of times player died this fight
+---@field deathRecaps DeathRecapSnapshot[] All captured death recaps (appended on each death)
 
 --- @type BattleScrollsState
 local state = {}
@@ -341,6 +343,8 @@ function BattleScrolls.state:Reset()
     self.bossUnitIdRedirects = {}
     self.failedToAssignBossUnitIds = {}
     self.lastDamageDoneMs = 0
+    self.playerDeathCount = 0
+    self.deathRecaps = {}
 
     -- Clear effect tracking state via effects module
     BattleScrolls.effects.clear(self)
@@ -383,6 +387,8 @@ function BattleScrolls.state:Snapshot()
     snapshot.unitAliveState = self.unitAliveState
     snapshot.bossNames = self.bossNames
     snapshot.bossUnitIdRedirects = self.bossUnitIdRedirects
+    snapshot.playerDeathCount = self.playerDeathCount
+    snapshot.deathRecaps = self.deathRecaps
 
     return snapshot
 end

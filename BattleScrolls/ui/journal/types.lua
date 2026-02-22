@@ -257,6 +257,31 @@ journal.EncounterIcons = {
 ---@field rawSelf number Raw self-healing
 ---@field effectiveSelf number Effective self-healing
 
+---@class SharedDeathRecapAttack
+---@field abilityId number
+---@field damage number
+
+---@class SharedDeathRecap
+---@field timeOffsetMs number Ms from fight start when death occurred
+---@field attacks SharedDeathRecapAttack[]
+
+---@class DeathRecapSnapshot
+---@field timeMs number Ms from fight start when death occurred
+---@field attacks SharedDeathRecapAttack[]
+
+---@class SharedDeaths
+---@field deathCount number Total deaths (1-15)
+---@field first SharedDeathRecap First death recap
+---@field last SharedDeathRecap|nil Last death (nil if same as first or only one death)
+
+---@class EncounterDeaths
+---@field deathCount number Total deaths (may exceed #recaps if a death had 0 killing attacks)
+---@field recaps SharedDeathRecap[] All death recaps with attack details
+
+---@class SharedDamageTakenAbility
+---@field abilityId number
+---@field damagePercent number 0-1 fraction of total damage taken
+
 ---@class SharedEncounterData
 ---@field timestampS number Sender's fight start (Unix epoch)
 ---@field durationMs number Sender's fight duration in ms
@@ -271,6 +296,8 @@ journal.EncounterIcons = {
 ---@field bossDamageTaken SharedBossDamageTaken[] Per-boss damage taken
 ---@field healing SharedHealing|nil Healing stats (nil if not a healer)
 ---@field aliveTimeMs number|nil Player alive time in ms
+---@field topDamageTakenAbilities SharedDamageTakenAbility[] Top 5 damage-taken abilities
+---@field deaths SharedDeaths|nil Death recap data (nil if player never died)
 
 ---@class SharedDataEntry
 ---@field displayName string Sender's display name (undecorated)

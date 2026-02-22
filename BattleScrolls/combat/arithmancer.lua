@@ -1441,6 +1441,49 @@ function ArithmancerInstance:buildSharedEncounterData()
         end
     end
 
+    -- Top 5 damage-taken abilities (aggregated across all sources)
+    ---@type SharedDamageTakenAbility[]
+    local topDamageTakenAbilities = {}
+    if totalDamageTaken > 0 and source.damageTakenByUnitId then
+        -- Aggregate damage by ability ID across all sources and targets
+        ---@type table<number, number>
+        local abilityDamageMap = {}
+        for _, byTarget in pairs(source.damageTakenByUnitId) do
+            for _, dmg in pairs(byTarget) do
+                for abilityId, breakdown in pairs(getAbilities(dmg)) do
+                    abilityDamageMap[abilityId] = (abilityDamageMap[abilityId] or 0) + breakdown.total
+                end
+            end
+        end
+
+        -- Sort by damage descending, take top 5
+        ---@type { abilityId: number, damage: number }[]
+        local sorted = {}
+        for abilityId, damage in pairs(abilityDamageMap) do
+            table.insert(sorted, { abilityId = abilityId, damage = damage })
+        end
+        table.sort(sorted, function(a, b) return a.damage > b.damage end)
+
+        for i = 1, math.min(#sorted, 5) do
+            table.insert(topDamageTakenAbilities, {
+                abilityId = sorted[i].abilityId,
+                damagePercent = sorted[i].damage / totalDamageTaken,
+            })
+        end
+    end
+
+    -- Deaths (first + optional last from encounter's deaths field)
+    ---@type SharedDeaths|nil
+    local deaths = nil
+    if source.deaths and source.deaths.deathCount > 0 then
+        local recaps = source.deaths.recaps
+        deaths = {
+            deathCount = math.min(source.deaths.deathCount, 16),
+            first = recaps[1] and { timeOffsetMs = recaps[1].timeOffsetMs, attacks = recaps[1].attacks } or nil,
+            last = recaps and #recaps > 1 and { timeOffsetMs = recaps[#recaps].timeOffsetMs, attacks = recaps[#recaps].attacks } or nil,
+        }
+    end
+
     -- Healing
     ---@type SharedHealing|nil
     local healing = nil
@@ -1475,5 +1518,7 @@ function ArithmancerInstance:buildSharedEncounterData()
         bossDamageTaken = bossDamageTaken,
         healing = healing,
         aliveTimeMs = source.playerAliveTimeMs,
+        topDamageTakenAbilities = topDamageTakenAbilities,
+        deaths = deaths,
     }
 end

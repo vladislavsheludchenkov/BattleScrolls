@@ -377,6 +377,16 @@ function scribe:ImportEncounterFromStateAsync()
             unitAliveTimeMs = next(unitAliveTimeMs) and unitAliveTimeMs or nil,
         }
 
+        -- Capture death recaps
+        local deathCount = capturedState.playerDeathCount or 0
+        if deathCount > 0 then
+            local recaps = {}
+            for _, snap in ipairs(capturedState.deathRecaps or {}) do
+                recaps[#recaps + 1] = { timeOffsetMs = snap.timeMs, attacks = snap.attacks }
+            end
+            encounter.deaths = { deathCount = deathCount, recaps = recaps }
+        end
+
         local bossTagSeqByUnitId = nil
         if capturedState.isBossFight then
             bossTagSeqByUnitId = {}

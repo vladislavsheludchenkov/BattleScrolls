@@ -5,7 +5,7 @@
 ## AddOnVersion: {{addon_version}}
 ## Version: {{version}}
 ## IsLibrary: False
-## DependsOn: LibGroupBroadcast>=91 LibAsync>=30100
+## DependsOn: LibGroupBroadcast>=95 LibAsync>=30100
 ## OptionalDependsOn: LibHarvensAddonSettings
 ## SavedVariables: BattleScrollsSavedVariables
 
@@ -35,6 +35,7 @@ combat/accumulators.lua
 combat/effects.lua
 combat/effects_events.lua
 combat/effects_reconcile.lua
+combat/deathrecap.lua
 combat/state.lua
 combat/scribe.lua
 combat/ticker.lua
@@ -48,7 +49,6 @@ storage/storage.lua
 network/lgb.lua
 network/dpsshare.lua
 network/dpssender.lua
-network/sharecoordinator.lua
 network/encountershare.lua
 
 ; Entry point
