@@ -1,0 +1,1 @@
+Temporarily make LibGroupBroadcast optional to work around console addon apocalypse happening

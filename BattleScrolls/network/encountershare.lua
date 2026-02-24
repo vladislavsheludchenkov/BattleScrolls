@@ -328,7 +328,7 @@ function encounterShare:Initialize()
                 LGB.CreateArrayField(
                     LGB.CreateTableField("attacks", {
                         LGB.CreateNumericField("abilityId", { minValue = 0, numBits = 20, trimValues = true }),
-                        LGB.CreateNumericField("damage", { minValue = 0, numBits = 10, precision = 100, trimValues = true }),
+                        LGB.CreateNumericField("damage", { minValue = 0, maxValue = 102300, numBits = 10, precision = 100, trimValues = true }),
                     }),
                     { maxLength = 6 }
                 ),

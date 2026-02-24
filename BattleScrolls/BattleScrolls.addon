@@ -5,8 +5,8 @@
 ## AddOnVersion: {{addon_version}}
 ## Version: {{version}}
 ## IsLibrary: False
-## DependsOn: LibGroupBroadcast>=95 LibAsync>=30100
-## OptionalDependsOn: LibHarvensAddonSettings
+## DependsOn: LibAsync>=30100
+## OptionalDependsOn: LibHarvensAddonSettings LibGroupBroadcast
 ## SavedVariables: BattleScrollsSavedVariables
 
 ; Localization - default (English) must load first
