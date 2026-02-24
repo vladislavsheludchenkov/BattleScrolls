@@ -11,7 +11,6 @@ BattleScrolls = BattleScrolls or {}
 
 local LGB = LibGroupBroadcast
 if not LGB then
-    BattleScrolls.log.Warn("LibGroupBroadcast not available")
     return
 end
 

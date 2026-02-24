@@ -1,0 +1,1 @@
+Fix UI error that appears when loading into the game with LibGroupBroadcast absent
