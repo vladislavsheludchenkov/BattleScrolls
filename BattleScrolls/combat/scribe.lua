@@ -162,7 +162,189 @@ local scribe = {
 }
 BattleScrolls.scribe = scribe
 
+-- =============================================================================
+-- ENCOUNTER SHARE MATCHING
+-- =============================================================================
+
+local MATCH_WINDOW_TOLERANCE_S = 5
+local RECENT_INSTANCE_CUTOFF_S = 3600
+
+---@class PendingEncounterEntry
+---@field startS number Fight start timestamp (real time seconds)
+---@field endS number Fight end timestamp (real time seconds)
+---@field sharedData SharedDataEntry[]|nil Shared data matched while encoding
+
+---@type PendingEncounterEntry[]
+local pendingEncounters = {}
+
+---@class DiscardedEncounterSink
+---@field startS number Fight start timestamp (real time seconds)
+---@field endS number Fight end timestamp (real time seconds)
+
+--- Lightweight time ranges for encounters discarded by recording filters.
+--- Participates in matchShare overlap so shared data from group members
+--- is absorbed here instead of incorrectly matching a nearby recorded encounter.
+---@type DiscardedEncounterSink[]
+local discardedSinks = {}
+
+---Compute time overlap between two time ranges
+---@param startA number Start of range A (seconds)
+---@param endA number End of range A (seconds)
+---@param startB number Start of range B (seconds)
+---@param endB number End of range B (seconds)
+---@return number overlap Overlap in seconds (negative if no overlap)
+local function computeOverlap(startA, endA, startB, endB)
+    local overlapStart = math.max(startA, startB)
+    local overlapEnd = math.min(endA, endB)
+    return overlapEnd - overlapStart
+end
+
+---Attempt to match shared data to an existing encounter
+---Uses time overlap across all candidates (live combat, stored history, pending encoding)
+---@param unitTag string Sender's unit tag
+---@param sharedData SharedEncounterData Reconstructed encounter data
+local function matchShare(unitTag, sharedData)
+    local displayName = BattleScrolls.utils.GetUndecoratedDisplayName(unitTag)
+    if not displayName or displayName == "" then
+        return
+    end
+
+    local sharedStart = sharedData.timestampS - MATCH_WINDOW_TOLERANCE_S
+    local sharedEnd = sharedData.timestampS + sharedData.durationMs / 1000 + MATCH_WINDOW_TOLERANCE_S
+
+    local bestOverlap = 0
+    ---@type "live"|"stored"|"pending"|"discarded"|nil
+    local bestType = nil
+    ---@type CompactEncounter|PendingEncounterEntry|nil
+    local bestTarget = nil
+
+    -- Check live combat
+    local state = BattleScrolls.state
+    if state.inCombat and state.initialized then
+        local localStart = state.fightStartRealTimeS - MATCH_WINDOW_TOLERANCE_S
+        local localEnd = GetTimeStamp() + MATCH_WINDOW_TOLERANCE_S
+        local overlap = computeOverlap(sharedStart, sharedEnd, localStart, localEnd)
+        if overlap > bestOverlap then
+            bestOverlap = overlap
+            bestType = "live"
+            bestTarget = nil
+        end
+    end
+
+    -- Check stored history
+    local history = BattleScrolls.storage.savedVariables.history
+    if history then
+        local now = GetTimeStamp()
+        local cutoff = now - RECENT_INSTANCE_CUTOFF_S
+        local scannedPastCutoff = false
+
+        for i = #history, 1, -1 do
+            local instance = history[i]
+
+            -- Stop after scanning one instance beyond the cutoff
+            if instance.timestampS < cutoff then
+                if scannedPastCutoff then
+                    break
+                end
+                scannedPastCutoff = true
+            end
+
+            for _, enc in ipairs(instance.encounters) do
+                local localStart = enc.timestampS - MATCH_WINDOW_TOLERANCE_S
+                local localEnd = enc.timestampS + enc.durationMs / 1000 + MATCH_WINDOW_TOLERANCE_S
+                local overlap = computeOverlap(sharedStart, sharedEnd, localStart, localEnd)
+                if overlap > bestOverlap then
+                    bestOverlap = overlap
+                    bestType = "stored"
+                    bestTarget = enc
+                end
+            end
+        end
+    end
+
+    -- Check pending encounters (currently being encoded)
+    for _, pending in ipairs(pendingEncounters) do
+        local localStart = pending.startS - MATCH_WINDOW_TOLERANCE_S
+        local localEnd = pending.endS + MATCH_WINDOW_TOLERANCE_S
+        local overlap = computeOverlap(sharedStart, sharedEnd, localStart, localEnd)
+        if overlap > bestOverlap then
+            bestOverlap = overlap
+            bestType = "pending"
+            bestTarget = pending
+        end
+    end
+
+    -- Check discarded encounter sinks (absorb shared data for encounters we chose not to record)
+    local sinkCutoff = GetTimeStamp() - RECENT_INSTANCE_CUTOFF_S
+    for i = #discardedSinks, 1, -1 do
+        local sink = discardedSinks[i]
+        if sink.endS < sinkCutoff then
+            table.remove(discardedSinks, i)
+        else
+            local localStart = sink.startS - MATCH_WINDOW_TOLERANCE_S
+            local localEnd = sink.endS + MATCH_WINDOW_TOLERANCE_S
+            local overlap = computeOverlap(sharedStart, sharedEnd, localStart, localEnd)
+            if overlap > bestOverlap then
+                bestOverlap = overlap
+                bestType = "discarded"
+                bestTarget = nil
+            end
+        end
+    end
+
+    ---@type SharedDataEntry
+    local entry = {
+        displayName = displayName,
+        data = sharedData,
+        role = BattleScrolls.utils.getUnitRole(unitTag),
+    }
+
+    -- Apply match
+    if bestType == "live" then
+        state.pendingSharedData = state.pendingSharedData or {}
+        table.insert(state.pendingSharedData, entry)
+        -- BattleScrolls.log.Debug(function()
+        --     return string.format("EncounterShare: matched %s to live combat", displayName)
+        -- end)
+    elseif bestType == "discarded" then
+        -- Intentionally dropped: this shared data belongs to an encounter we chose not to record
+        -- BattleScrolls.log.Debug(function()
+        --     return string.format("EncounterShare: absorbed %s into discarded sink", displayName)
+        -- end)
+    elseif bestTarget then
+        bestTarget.sharedData = bestTarget.sharedData or {}
+        table.insert(bestTarget.sharedData, entry)
+        -- BattleScrolls.log.Debug(function()
+        --     return string.format("EncounterShare: matched %s to %s encounter (ts=%d)",
+        --         displayName, bestType, bestTarget.timestampS or bestTarget.startS)
+        -- end)
+    end
+end
+
+---Remove a pending encounter entry from the list
+---@param entry PendingEncounterEntry
+local function removePendingEncounter(entry)
+    for i = #pendingEncounters, 1, -1 do
+        if pendingEncounters[i] == entry then
+            table.remove(pendingEncounters, i)
+            return
+        end
+    end
+end
+
+---Record a discarded encounter's time range so matchShare can absorb shared data for it
+---@param entry PendingEncounterEntry
+local function addDiscardedSink(entry)
+    table.insert(discardedSinks, {
+        startS = entry.startS,
+        endS = entry.endS,
+    })
+end
+
 function scribe:Initialize()
+    -- Register callback for incoming encounter share data
+    BattleScrolls.encounterShare:RegisterCallback("scribe", matchShare)
+
     -- Run initialization in async context so decode completes before OnPlayerActivated
     LibEffect.Async(function()
         -- Load instance from history or create new
@@ -243,6 +425,7 @@ function scribe:ResetForNewInstance()
     local isInstanced = CanExitInstanceImmediately()
     local isHouse = GetCurrentZoneHouseId() ~= 0
     local isPvP = IsPlayerInAvAWorld() or IsActiveWorldBattleground()
+    local isAdventureZone = IsInAdventureZone and IsInAdventureZone() or false
 
     -- Create new instance (no raw abilityInfo/unitNames - always use compressed format)
     ---@type InstanceStorage
@@ -251,6 +434,7 @@ function scribe:ResetForNewInstance()
         isOverland = not isInstanced,
         isHouse = isHouse,
         isPvP = isPvP,
+        isAdventureZone = isAdventureZone,
         left = false,
         timestampS = GetTimeStamp(),
         encounters = {},
@@ -312,7 +496,7 @@ function scribe:ImportEncounterFromStateAsync()
     ---@field isRaw boolean Whether the original name was raw (unformatted)
 
     -- Build rawToDisplay lookup (sync, small data from current group)
-    ---@type table<string, RawToDisplayEntry>|nil
+    ---@type table<string, RawToDisplayEntry>
     local rawToDisplay = {}
     ---@type string[]
     local unitTags = { "player" }
@@ -333,27 +517,23 @@ function scribe:ImportEncounterFromStateAsync()
     local instance = self.instance
     local decodedAbilityInfo = self.decodedAbilityInfo
 
+    -- Register pending encounter so matchShare can find it during the encoding window
+    local durationMs = capturedState.lastDamageDoneMs - capturedState.fightStartTimeMs
+    ---@type PendingEncounterEntry
+    local pendingEntry = {
+        startS = capturedState.fightStartRealTimeS,
+        endS = capturedState.fightStartRealTimeS + durationMs / 1000,
+    }
+    table.insert(pendingEncounters, pendingEntry)
+
     return LibEffect.Async(function()
         -- Finalize active effects on the state snapshot (moderate: up to ~600 effects)
-        BattleScrolls.effects.finalize(capturedState)
+        -- Pass lastDamageDoneMs so effect uptimes are consistent with fight duration
+        BattleScrolls.effects.finalize(capturedState, capturedState.lastDamageDoneMs)
         LibEffect.YieldWithGC():Await()
 
-        -- Merge abilityInfo and replace raw names with display names
-        -- (needed by encounter share's buildSharedEncounterData which reads damageByUnitId)
-        for abilityId, info in pairs(capturedState.abilityInfo) do
-            decodedAbilityInfo[abilityId] = info
-        end
-
-        for unitId, name in pairs(capturedState.unitIdToName) do
-            local formattedName = zo_strformat(SI_UNIT_NAME, name)
-            local entry = rawToDisplay[name] or rawToDisplay[formattedName]
-            if entry then
-                capturedState.unitIdToName[unitId] = entry.displayName
-            end
-        end
-
-        local durationMs = capturedState.lastDamageDoneMs - capturedState.fightStartTimeMs
-        local playerAliveTimeMs = BattleScrolls.effects.getPlayerAliveTime(capturedState, durationMs)
+        local playerAliveTimeMs = math.min(
+            BattleScrolls.effects.getPlayerAliveTime(capturedState, durationMs), durationMs)
         local unitAliveTimeMs = BattleScrolls.effects.getUnitAliveTimes(capturedState)
 
         ---@type Encounter
@@ -399,6 +579,68 @@ function scribe:ImportEncounterFromStateAsync()
             encounter.bossTagSeqByUnitId = bossTagSeqByUnitId
         end
 
+        -- Send encounter data to group members (always, regardless of recording settings)
+        local arithmancer = BattleScrolls.arithmancer:Make(encounter, capturedState.abilityInfo)
+        local sharedData = arithmancer:buildSharedEncounterData()
+        BattleScrolls.encounterShare:send(sharedData, encounter.timestampS)
+
+        -- Check recording settings (sharing already happened above)
+        local settings = BattleScrolls.storage.savedVariables.settings
+        local defaults = BattleScrolls.storage.defaults.settings
+
+        if settings and settings.recordingEnabled == false then
+            addDiscardedSink(pendingEntry)
+            return
+        end
+
+        local recordInAdventureZone = settings and settings.recordInAdventureZone or defaults.recordInAdventureZone
+        local recordInZones = settings and settings.recordInZones or defaults.recordInZones
+        local currentZoneType
+        if instance.isHouse then
+            currentZoneType = "house"
+        elseif instance.isPvP then
+            currentZoneType = "pvp"
+        elseif instance.isOverland then
+            currentZoneType = "overland"
+        else
+            currentZoneType = "instanced"
+        end
+        if instance.isAdventureZone and recordInAdventureZone then
+            -- Adventure zone override: skip zone type check
+        elseif not recordInZones[currentZoneType] then
+            addDiscardedSink(pendingEntry)
+            return
+        end
+
+        local recordInFights = settings and settings.recordInFights or defaults.recordInFights
+        local currentFightType
+        if capturedState.isDummyFight then
+            currentFightType = "dummy"
+        elseif capturedState.isPlayerFight then
+            currentFightType = "player"
+        elseif capturedState.isBossFight then
+            currentFightType = "boss"
+        else
+            currentFightType = "trash"
+        end
+        if not recordInFights[currentFightType] then
+            addDiscardedSink(pendingEntry)
+            return
+        end
+
+        -- Recording-only: merge abilityInfo, replace raw names with display names
+        for abilityId, info in pairs(capturedState.abilityInfo) do
+            decodedAbilityInfo[abilityId] = info
+        end
+
+        for unitId, name in pairs(capturedState.unitIdToName) do
+            local formattedName = zo_strformat(SI_UNIT_NAME, name)
+            local entry = rawToDisplay[name] or rawToDisplay[formattedName]
+            if entry then
+                capturedState.unitIdToName[unitId] = entry.displayName
+            end
+        end
+
         for abilityId, events in pairs(capturedState.procs) do
             if #events > 0 then
                 local countsByEnemy = {}
@@ -434,50 +676,20 @@ function scribe:ImportEncounterFromStateAsync()
         encounter.unitNames = capturedState.unitIdToName
         encounter.displayName = computeEncounterDisplayName(encounter, encounter.unitNames)
 
-        -- Send encounter data to group members (always, regardless of recording settings)
-        local arithmancer = BattleScrolls.arithmancer:New(encounter, capturedState.abilityInfo)
-        local sharedData = arithmancer:buildSharedEncounterData()
-        BattleScrolls.encounterShare:send(sharedData, encounter.timestampS)
-
-        -- Check recording settings (sharing already happened above)
-        local settings = BattleScrolls.storage.savedVariables.settings
-        local defaults = BattleScrolls.storage.defaults.settings
-
-        if settings and settings.recordingEnabled == false then
-            return
+        -- Build bossSeqNames mapping for cross-client boss identification (reuses bossTagSeqByUnitId built earlier)
+        if bossTagSeqByUnitId then
+            local bossSeqNames = {}
+            for unitId, key in pairs(bossTagSeqByUnitId) do
+                local name = encounter.unitNames[unitId]
+                if name then bossSeqNames[key] = name end
+            end
+            if next(bossSeqNames) then
+                encounter.bossSeqNames = bossSeqNames
+            end
         end
 
-        local recordInZones = settings and settings.recordInZones or defaults.recordInZones
-        local currentZoneType
-        if instance.isHouse then
-            currentZoneType = "house"
-        elseif instance.isPvP then
-            currentZoneType = "pvp"
-        elseif instance.isOverland then
-            currentZoneType = "overland"
-        else
-            currentZoneType = "instanced"
-        end
-        if not recordInZones[currentZoneType] then
-            return
-        end
-
-        local recordInFights = settings and settings.recordInFights or defaults.recordInFights
-        local currentFightType
-        if capturedState.isDummyFight then
-            currentFightType = "dummy"
-        elseif capturedState.isPlayerFight then
-            currentFightType = "player"
-        elseif capturedState.isBossFight then
-            currentFightType = "boss"
-        else
-            currentFightType = "trash"
-        end
-        if not recordInFights[currentFightType] then
-            return
-        end
-
-        rawToDisplay = nil
+        -- Extract shared data received during live combat before releasing snapshot
+        local capturedPendingSharedData = capturedState.pendingSharedData
         capturedState = nil
         LibEffect.YieldWithGC():Await()
 
@@ -491,7 +703,23 @@ function scribe:ImportEncounterFromStateAsync()
         instance._instanceData = encodedFields._instanceData
         table.insert(instance.encounters, compactEncounter)
         instance._estimatedSize = nil
+
         LibEffect.YieldWithGC():Await()
+
+        -- Transfer shared data from live combat and pending queue to the compact encounter
+        local allShared = capturedPendingSharedData
+        if pendingEntry.sharedData then
+            allShared = allShared or {}
+            for _, shared in ipairs(pendingEntry.sharedData) do
+                table.insert(allShared, shared)
+            end
+        end
+        if allShared then
+            compactEncounter.sharedData = allShared
+        end
+
+        -- Remove pending entry now that the encounter is stored and shared data transferred
+        removePendingEncounter(pendingEntry)
 
         if not capturedPushedToStorage then
             BattleScrolls.storage:PushInstance(instance)
@@ -502,5 +730,8 @@ function scribe:ImportEncounterFromStateAsync()
 
         BattleScrolls.gc:RequestGC(2)
         BattleScrolls.storage:CleanupIfNecessaryAsync()
+    end):Ensure(function()
+        -- Safety net: remove pending entry if async chain errors or is cancelled
+        removePendingEncounter(pendingEntry)
     end):Run()
 end

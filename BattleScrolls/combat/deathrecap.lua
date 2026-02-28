@@ -61,3 +61,7 @@ function deathRecap:Initialize()
         })
     end)
 end
+
+function deathRecap:Cleanup()
+    EVENT_MANAGER:UnregisterForEvent("BS_DeathRecap", EVENT_PLAYER_DEAD)
+end

@@ -108,8 +108,10 @@ function OverviewRenderer.renderOverview(ctx)
         -------------------------
         -- Boss Damage Done
         -------------------------
-        local bossPersonalTotalDamage = arithmancer:bossPersonalTotalDamage()
-        local bossGroupTotalDamage = arithmancer:bossGroupTotalDamage()
+        local Arithmancer = BattleScrolls.arithmancer
+        local bossCalc = Arithmancer:ForBosses(encounter, ctx.abilityInfo)
+        local bossPersonalTotalDamage = bossCalc and bossCalc:personalTotalDamage() or 0
+        local bossGroupTotalDamage = bossCalc and bossCalc:groupTotalDamage() or 0
 
         if bossPersonalTotalDamage > 0 then
             utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_PERSONAL_BOSS_DAMAGE), ZO_CommaDelimitNumber(bossPersonalTotalDamage), StatIcons.DAMAGE, GetString(BATTLESCROLLS_HEADER_BOSS_DAMAGE_DONE))
@@ -148,6 +150,9 @@ function OverviewRenderer.renderOverview(ctx)
         if damageTakenTotal > 0 then
             utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_TOTAL_DAMAGE_TAKEN), ZO_CommaDelimitNumber(damageTakenTotal), StatIcons.DAMAGE_TAKEN, GetString(BATTLESCROLLS_HEADER_DAMAGE_TAKEN))
             utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_DTPS), ZO_CommaDelimitNumber(math.floor(damageTakenTotal / durationSec)), StatIcons.DPS)
+            if encounter.deaths then
+                utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_DEATH_COUNT), tostring(encounter.deaths.deathCount), StatIcons.DEATH)
+            end
         end
         LibEffect.Yield():Await()
 
@@ -202,10 +207,11 @@ function OverviewRenderer.renderOverview(ctx)
 
                 local abilityIcon = GetAbilityIcon(procData.abilityId)
                 local valueStr
+                local totalProcsStr = zo_strformat(GetString(BATTLESCROLLS_STAT_TOTAL_PROCS), procData.totalProcs)
                 if procData.medianIntervalMs > 0 then
-                    valueStr = string.format("%d %s (%s %.1fs)", procData.totalProcs, GetString(BATTLESCROLLS_STAT_TOTAL_PROCS), GetString(BATTLESCROLLS_STAT_MEDIAN_INTERVAL), procData.medianIntervalMs / 1000)
+                    valueStr = string.format("%s (%s %.1fs)", totalProcsStr, GetString(BATTLESCROLLS_STAT_MEDIAN_INTERVAL), procData.medianIntervalMs / 1000)
                 else
-                    valueStr = string.format("%d %s", procData.totalProcs, GetString(BATTLESCROLLS_STAT_TOTAL_PROCS))
+                    valueStr = totalProcsStr
                 end
 
                 local entryData = ZO_GamepadEntryData:New(abilityName, abilityIcon)
@@ -299,14 +305,14 @@ function OverviewRenderer.refreshPanelForOverview(panel, ctx)
         local encounter = ctx.encounter
         local durationS = ctx.durationS
         local unitNames = ctx.unitNames
+        local abilityInfo = ctx.abilityInfo
         local DamageRenderer = journal.renderers.damage
         local HealingRenderer = journal.renderers.healing
 
-        -- Pre-compute data using Arithmancer summary methods
-        local isBossFight = arithmancer:isBossFight()
-
         -- Damage summaries: {dps, groupDps, share}
-        local bossDamageSummary = isBossFight and arithmancer:getDamageSummary(nil, nil, true) or nil
+        local Arithmancer = BattleScrolls.arithmancer
+        local bossCalc = Arithmancer:ForBosses(encounter, abilityInfo)
+        local bossDamageSummary = bossCalc and bossCalc:getDamageSummary() or nil
         local totalDamageSummary = arithmancer:getDamageSummary()
         local hasDamage = totalDamageSummary.dps > 0
         local personalDPS = totalDamageSummary.dps
@@ -340,18 +346,17 @@ function OverviewRenderer.refreshPanelForOverview(panel, ctx)
         local playerRole = DetectPlayerRole(personalDPS, prevalentHPS, personalDTPS)
 
         -- Pre-compute composition data: {dotPercent, directPercent, aoePercent, stPercent}
-        local compositionData = arithmancer:getDamageComposition(nil, nil, isBossFight)
+        local compositionCalc = bossCalc or arithmancer
+        local compositionData = compositionCalc:getDamageComposition()
 
         -- Pre-compute quality data: {critRate, maxHit}
-        local qualityData = arithmancer:getDamageQuality(nil, nil, isBossFight)
+        local qualityData = compositionCalc:getDamageQuality()
         local critRate = qualityData.critRate
         local maxHit = qualityData.maxHit
 
         -- Compute HoT% for the prevalent healing type
         local prevalentHotPercent = nil
         if prevalentHealingType and encounter.healingStats then
-            local Arithmancer = BattleScrolls.arithmancer
-            local abilityInfo = encounter.abilityInfo or {}
             local healingRawData = nil
 
             if prevalentHealingType == "selfHealing" then
@@ -418,15 +423,17 @@ function OverviewRenderer.refreshPanelForOverview(panel, ctx)
         if totalDamageSummary.groupDps and totalDamageSummary.groupDps > personalDPS then damageRowCount = damageRowCount + 1 end
         if critRate > 0 then damageRowCount = damageRowCount + 1 end
         if maxHit > 0 then damageRowCount = damageRowCount + 1 end
-        if compositionData.dotPercent and compositionData.dotPercent > 5 and compositionData.dotPercent < 95 then damageRowCount = damageRowCount + 1 end
-        if compositionData.aoePercent and compositionData.aoePercent > 5 and compositionData.aoePercent < 95 then damageRowCount = damageRowCount + 1 end
+        if compositionData.directPercent then damageRowCount = damageRowCount + 1 end
+        if compositionData.aoePercent then damageRowCount = damageRowCount + 1 end
 
         -- Healing: Raw HPS, Effective HPS, Overheal% (3) + optional HoT%
         local healingRowCount = 3
-        if prevalentHotPercent and prevalentHotPercent > 5 and prevalentHotPercent < 95 then healingRowCount = healingRowCount + 1 end
+        if prevalentHotPercent then healingRowCount = healingRowCount + 1 end
 
-        -- Damage Taken: DTPS, Total (2)
+        -- Damage Taken: DTPS, Total (2) + optional Death Count
+        local deathCount = encounter.deaths and encounter.deaths.deathCount or 0
         local damageTakenRowCount = 2
+        if deathCount > 0 then damageTakenRowCount = damageTakenRowCount + 1 end
 
         -- Define all Q2 sections with priority, displayOrder, condition, height, and render function
         ---@type { id: string, priority: number, displayOrder: number, condition: boolean, height: number, render: fun(lastControl: Control|nil): Control }[]
@@ -439,12 +446,7 @@ function OverviewRenderer.refreshPanelForOverview(panel, ctx)
                 height = CalculateSectionHeight(1),  -- Duration row only
                 render = function(lastControl)
                     lastControl = panel:AddSection(GetString(BATTLESCROLLS_OVERVIEW_ENCOUNTER), lastControl)
-                    local minutes = math.floor(durationS / 60)
-                    local seconds = durationS % 60
-                    local durationStr = minutes > 0
-                        and string.format("%d:%04.1f", minutes, seconds)
-                        or string.format("%.1fs", seconds)
-                    return panel:AddStatRow(GetString(BATTLESCROLLS_TOOLTIP_DURATION), durationStr, lastControl)
+                    return panel:AddStatRow(GetString(BATTLESCROLLS_TOOLTIP_DURATION), utils.formatPreciseDuration(encounter.durationMs), lastControl)
                 end,
             },
             {
@@ -454,15 +456,15 @@ function OverviewRenderer.refreshPanelForOverview(panel, ctx)
                 condition = hasDamage,
                 height = CalculateSectionHeight(damageRowCount),
                 render = function(lastControl)
-                    return utils.renderDamageOutputSection(
-                        panel, lastControl,
+                    return panel:renderDamageOutputSection(
+                        lastControl,
                         bossDps,
                         totalDamageSummary.dps,
                         totalDamageSummary.groupDps,
                         totalDamageSummary.share,
                         critRate,
                         maxHit,
-                        compositionData.dotPercent,
+                        compositionData.directPercent,
                         compositionData.aoePercent
                     )
                 end,
@@ -474,8 +476,8 @@ function OverviewRenderer.refreshPanelForOverview(panel, ctx)
                 condition = prevalentHealingData ~= nil,
                 height = CalculateSectionHeight(healingRowCount),
                 render = function(lastControl)
-                    return utils.renderHealingSectionCompact(
-                        panel, prevalentHealingLabel, lastControl,
+                    return panel:renderHealingSectionCompact(
+                        prevalentHealingLabel, lastControl,
                         prevalentHealingData.rawHps,
                         prevalentHealingData.effectiveHps,
                         prevalentHealingData.overhealPercent,
@@ -490,8 +492,8 @@ function OverviewRenderer.refreshPanelForOverview(panel, ctx)
                 condition = hasDamageTaken,
                 height = CalculateSectionHeight(damageTakenRowCount),
                 render = function(lastControl)
-                    return utils.renderDamageTakenSection(panel, lastControl,
-                        damageTakenSummary.dtps, damageTakenSummary.total)
+                    return panel:renderDamageTakenSection(lastControl,
+                        damageTakenSummary.dtps, damageTakenSummary.total, deathCount)
                 end,
             },
         }
@@ -639,7 +641,7 @@ function OverviewRenderer.refreshPanelForOverview(panel, ctx)
                     q4Control = panel:AddTargetRow(source.name, string.format("%s DTPS", utils.formatDPS(dtps)), q4Control)
                 end
             end
-        elseif isBossFight then
+        elseif bossCalc then
             -- For DPS in boss fights: show bosses
             local bossUnitIds = encounter.bossesUnits or {}
             local bossFilter = {}

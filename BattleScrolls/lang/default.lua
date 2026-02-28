@@ -39,6 +39,7 @@ ZO_CreateStringId("BATTLESCROLLS_TAB_HEALING_OUT", "Healing Out")
 ZO_CreateStringId("BATTLESCROLLS_TAB_SELF_HEALING", "Self Healing")
 ZO_CreateStringId("BATTLESCROLLS_TAB_HEALING_IN", "Healing In")
 ZO_CreateStringId("BATTLESCROLLS_TAB_EFFECTS", "Effects")
+ZO_CreateStringId("BATTLESCROLLS_TAB_GROUP", "Group")
 
 -------------------------
 -- Time Headers
@@ -153,6 +154,8 @@ ZO_CreateStringId("BATTLESCROLLS_SETTINGS_RECORD_TRASH_FIGHTS_TEXT", "Fights aga
 ZO_CreateStringId("BATTLESCROLLS_SETTINGS_RECORD_PLAYER_FIGHTS", "Record Player Fights")
 ZO_CreateStringId("BATTLESCROLLS_SETTINGS_RECORD_PLAYER_FIGHTS_TEXT", "PvP fights against other players.")
 ZO_CreateStringId("BATTLESCROLLS_SETTINGS_RECORD_DUMMY_FIGHTS", "Record Target Dummy Fights")
+ZO_CreateStringId("BATTLESCROLLS_SETTINGS_RECORD_IN_ADVENTURE_ZONE_TEXT",
+    "When enabled, overrides Overland and Instanced zone toggles and records all fights in <<1>>. When disabled, has no effect.")
 ZO_CreateStringId("BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TITLE", "Recording Filters")
 ZO_CreateStringId("BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT", "Zone and fight type filters are combined: a fight must match at least one zone AND one fight type to be recorded.")
 
@@ -244,7 +247,7 @@ ZO_CreateStringId("BATTLESCROLLS_STAT_HPS", "HPS")
 
 -- Proc Tracking
 ZO_CreateStringId("BATTLESCROLLS_HEADER_PROC_TRACKING", "Proc Tracking")
-ZO_CreateStringId("BATTLESCROLLS_STAT_TOTAL_PROCS", "procs")
+ZO_CreateStringId("BATTLESCROLLS_STAT_TOTAL_PROCS", "<<1[$d proc/$d procs]>>")
 ZO_CreateStringId("BATTLESCROLLS_STAT_MEDIAN_INTERVAL", "median")
 
 -------------------------
@@ -279,12 +282,6 @@ ZO_CreateStringId("BATTLESCROLLS_STAT_OVERHEAL", "Overheal")
 
 ZO_CreateStringId("BATTLESCROLLS_HEADER_RAW_HOT_VS_DIRECT", "Raw HoT vs Direct")
 ZO_CreateStringId("BATTLESCROLLS_HEADER_EFFECTIVE_HOT_VS_DIRECT", "Effective HoT vs Direct")
-ZO_CreateStringId("BATTLESCROLLS_HEADER_RAW_BY_TARGET", "Raw Healing By Target")
-ZO_CreateStringId("BATTLESCROLLS_HEADER_RAW_BY_ABILITY", "Raw Healing By Ability")
-ZO_CreateStringId("BATTLESCROLLS_HEADER_EFFECTIVE_BY_TARGET", "Effective Healing By Target")
-ZO_CreateStringId("BATTLESCROLLS_HEADER_EFFECTIVE_BY_ABILITY", "Effective Healing By Ability")
-ZO_CreateStringId("BATTLESCROLLS_HEADER_RAW_BY_SOURCE", "Raw Healing By Source")
-ZO_CreateStringId("BATTLESCROLLS_HEADER_EFFECTIVE_BY_SOURCE", "Effective Healing By Source")
 ZO_CreateStringId("BATTLESCROLLS_HEADER_RAW_HEALING_BY_TARGET", "Raw Healing By Target")
 ZO_CreateStringId("BATTLESCROLLS_HEADER_RAW_HEALING_BY_ABILITY", "Raw Healing By Ability")
 ZO_CreateStringId("BATTLESCROLLS_HEADER_EFFECTIVE_HEALING_BY_TARGET", "Effective Healing By Target")
@@ -306,7 +303,7 @@ ZO_CreateStringId("BATTLESCROLLS_HEADER_DEBUFFS_ON", "Debuffs on <<1>>")
 ZO_CreateStringId("BATTLESCROLLS_EFFECT_UPTIME", "uptime")
 ZO_CreateStringId("BATTLESCROLLS_EFFECT_YOURS", "yours")
 ZO_CreateStringId("BATTLESCROLLS_EFFECT_AVG", "avg")
-ZO_CreateStringId("BATTLESCROLLS_EFFECT_MEMBERS", "members")
+ZO_CreateStringId("BATTLESCROLLS_EFFECT_MEMBERS", "<<1[$d member/$d members]>>")
 
 -------------------------
 -- Effect Tooltips
@@ -381,7 +378,6 @@ ZO_CreateStringId("BATTLESCROLLS_FILTER_BY_SOURCE", "Filter by Source")
 ZO_CreateStringId("BATTLESCROLLS_FILTER_BY_TARGET", "Filter by Target")
 ZO_CreateStringId("BATTLESCROLLS_FILTER_BY_GROUP_MEMBER", "Filter by Group Member")
 ZO_CreateStringId("BATTLESCROLLS_FILTER", "Filter")
-ZO_CreateStringId("BATTLESCROLLS_FILTER_ACTIVE", "Filter (Active)")
 ZO_CreateStringId("BATTLESCROLLS_FILTER_RESET", "Reset")
 ZO_CreateStringId("BATTLESCROLLS_FILTER_DAMAGE_DONE_BY", "Damage Done By")
 ZO_CreateStringId("BATTLESCROLLS_FILTER_DAMAGE_DONE_TO", "Damage Done To")
@@ -426,10 +422,7 @@ ZO_CreateStringId("BATTLESCROLLS_OVERVIEW_QUALITY", "Quality")
 ZO_CreateStringId("BATTLESCROLLS_OVERVIEW_CRIT_RATE", "Crit Rate")
 ZO_CreateStringId("BATTLESCROLLS_OVERVIEW_MAX_HIT", "Max Hit")
 ZO_CreateStringId("BATTLESCROLLS_OVERVIEW_MAX_HEAL", "Max Heal")
-ZO_CreateStringId("BATTLESCROLLS_OVERVIEW_EFFICIENCY", "Efficiency")
 ZO_CreateStringId("BATTLESCROLLS_OVERVIEW_KEY_BUFFS", "Your Buffs")
-ZO_CreateStringId("BATTLESCROLLS_OVERVIEW_KEY_DEBUFFS", "Key Debuffs")
-ZO_CreateStringId("BATTLESCROLLS_OVERVIEW_UPTIMES", "Uptimes")
 ZO_CreateStringId("BATTLESCROLLS_OVERVIEW_NO_EFFECTS", "No effects recorded")
 
 -- Overview Panel Q3/Q4 Headers
@@ -457,14 +450,52 @@ ZO_CreateStringId("BATTLESCROLLS_TOOLTIP_DURATION", "Duration")
 -------------------------
 -- Group Stats
 -------------------------
-ZO_CreateStringId("BATTLESCROLLS_GROUP_DAMAGE", "Group Damage")
-ZO_CreateStringId("BATTLESCROLLS_GROUP_BOSS_DAMAGE", "Group Boss Damage")
-ZO_CreateStringId("BATTLESCROLLS_GROUP_DPS", "Group DPS")
-ZO_CreateStringId("BATTLESCROLLS_GROUP_BOSS_DPS", "Group Boss DPS")
 ZO_CreateStringId("BATTLESCROLLS_STAT_GROUP_DAMAGE", "Group Damage")
 ZO_CreateStringId("BATTLESCROLLS_STAT_GROUP_DPS", "Group DPS")
 ZO_CreateStringId("BATTLESCROLLS_STAT_GROUP_BOSS_DAMAGE", "Group Boss Damage")
 ZO_CreateStringId("BATTLESCROLLS_STAT_GROUP_BOSS_DPS", "Group Boss DPS")
+ZO_CreateStringId("BATTLESCROLLS_OVERVIEW_BOSS_DAMAGE", "Boss Damage")
+-- Group Tab Enhancements
+ZO_CreateStringId("BATTLESCROLLS_STAT_SURVIVABILITY", "Survivability")
+ZO_CreateStringId("BATTLESCROLLS_BOSS_DAMAGE_TAKEN", "Boss Damage Taken")
+
+-- Group Member Card Strings
+ZO_CreateStringId("BATTLESCROLLS_GROUP_CARD_OF_GROUP", "of group")
+ZO_CreateStringId("BATTLESCROLLS_GROUP_CARD_ALIVE", "Alive")
+
+-- Group Tab Redesign
+ZO_CreateStringId("BATTLESCROLLS_GROUP_DAMAGE_BY_TYPE", "Damage by Type")
+ZO_CreateStringId("BATTLESCROLLS_GROUP_VS_AVERAGE", "vs DD Average")
+ZO_CreateStringId("BATTLESCROLLS_GROUP_DD_COUNTED", "DDs Counted")
+ZO_CreateStringId("BATTLESCROLLS_GROUP_DAMAGE_OUTPUT", "Damage Output")
+ZO_CreateStringId("BATTLESCROLLS_GROUP_HEALING_OUTPUT", "Healing Output")
+ZO_CreateStringId("BATTLESCROLLS_GROUP_RANK", "Rank")
+ZO_CreateStringId("BATTLESCROLLS_GROUP_MAGICAL", "Magical")
+ZO_CreateStringId("BATTLESCROLLS_GROUP_DEATH", "Death")
+ZO_CreateStringId("BATTLESCROLLS_GROUP_FIRST_DEATH", "First Death")
+ZO_CreateStringId("BATTLESCROLLS_GROUP_LAST_DEATH", "Last Death")
+ZO_CreateStringId("BATTLESCROLLS_GROUP_DEATHS", "Deaths")
+ZO_CreateStringId("BATTLESCROLLS_GROUP_COL_DEATHS", "Deaths")
+ZO_CreateStringId("BATTLESCROLLS_GROUP_DEATH_COUNT", "<<1[$d Death/$d Deaths]>>")
+ZO_CreateStringId("BATTLESCROLLS_GROUP_METRIC_DPS", "<<1>> DPS")
+ZO_CreateStringId("BATTLESCROLLS_GROUP_METRIC_HPS", "<<1>> HPS")
+ZO_CreateStringId("BATTLESCROLLS_GROUP_METRIC_DTPS", "<<1>> DTPS")
+ZO_CreateStringId("BATTLESCROLLS_GROUP_METRIC_CRIT", "<<1>>% Crit")
+ZO_CreateStringId("BATTLESCROLLS_GROUP_METRIC_OVERHEAL", "<<1>>% Overheal")
+ZO_CreateStringId("BATTLESCROLLS_GROUP_TOP_INCOMING_DAMAGE", "Top Incoming Damage")
+ZO_CreateStringId("BATTLESCROLLS_GROUP_DEATH_AT", "at <<1>>")
+ZO_CreateStringId("BATTLESCROLLS_HEADER_DEATHS", "Deaths")
+ZO_CreateStringId("BATTLESCROLLS_STAT_DEATH_COUNT", "Death Count")
+ZO_CreateStringId("BATTLESCROLLS_DEATH_N", "Death <<1>>")
+
+-------------------------
+-- Group Context Tooltips
+-------------------------
+ZO_CreateStringId("BATTLESCROLLS_TOOLTIP_GROUP_TOTAL", "Group Total")
+ZO_CreateStringId("BATTLESCROLLS_TOOLTIP_GROUP_DPS", "Group DPS")
+ZO_CreateStringId("BATTLESCROLLS_TOOLTIP_GROUP_AVG", "DD Average")
+ZO_CreateStringId("BATTLESCROLLS_TOOLTIP_GROUP_BREAKDOWN", "Group Breakdown")
+ZO_CreateStringId("BATTLESCROLLS_TOOLTIP_GROUP_DAMAGE_TAKEN", "Group Damage Taken")
 
 -------------------------
 -- Overview Panel - Ability Stats
@@ -476,9 +507,9 @@ ZO_CreateStringId("BATTLESCROLLS_STAT_PER_SECOND", "<<1>>/s")
 -------------------------
 -- Overview Panel - Effect Stats
 -------------------------
-ZO_CreateStringId("BATTLESCROLLS_EFFECT_APPS_COUNT", "<<1>> apps")
+ZO_CreateStringId("BATTLESCROLLS_EFFECT_APPS_COUNT", "<<1[$d application/$d applications]>>")
 ZO_CreateStringId("BATTLESCROLLS_EFFECT_YOURS_PERCENT", "<<1>>% yours")
-ZO_CreateStringId("BATTLESCROLLS_EFFECT_STACKS_COUNT", "×<<1>> stacks")
+ZO_CreateStringId("BATTLESCROLLS_EFFECT_STACKS_COUNT", "×<<1[$d stack/$d stacks]>>")
 
 -------------------------
 -- Misc
@@ -582,3 +613,11 @@ ZO_CreateStringId("BATTLESCROLLS_OVERVIEW_TOP_HEALING", "Top Healing")
 ZO_CreateStringId("BATTLESCROLLS_OVERVIEW_TOP_INCOMING", "Top Incoming")
 ZO_CreateStringId("BATTLESCROLLS_OVERVIEW_HEALING_TARGETS", "Healing Targets")
 ZO_CreateStringId("BATTLESCROLLS_OVERVIEW_DAMAGE_SOURCES", "Damage Sources")
+
+-------------------------
+-- Group Table
+-------------------------
+ZO_CreateStringId("BATTLESCROLLS_GROUP_COL_NAME", "Name")
+ZO_CreateStringId("BATTLESCROLLS_GROUP_COL_TOTAL", "Total")
+ZO_CreateStringId("BATTLESCROLLS_GROUP_COL_CRIT", "Crit")
+ZO_CreateStringId("BATTLESCROLLS_GROUP_COL_ALIVE", "Alive")

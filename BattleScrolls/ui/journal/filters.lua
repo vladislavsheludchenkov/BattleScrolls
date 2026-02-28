@@ -173,22 +173,6 @@ function filters.applyPending(journalUI)
     BattleScrolls.gc:RequestGC(2)
 end
 
-function filters.togglePending(id)
-    pendingFilterState[id] = not pendingFilterState[id]
-end
-
-function filters.isPendingSelected(id)
-    return pendingFilterState[id] == true
-end
-
-function filters.togglePendingSource(id)
-    pendingSourceFilterState[id] = not pendingSourceFilterState[id]
-end
-
-function filters.isPendingSourceSelected(id)
-    return pendingSourceFilterState[id] == true
-end
-
 function filters.togglePendingSourceGroup(ids)
     local newState = not pendingSourceFilterState[ids[1]]
     for _, id in ipairs(ids) do

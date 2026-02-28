@@ -53,36 +53,6 @@ function utils.FormattedZoneName()
     return zo_strformat("<<C:1>>", rawName)
 end
 
----Creates a lazy-evaluated function
----@generic T
----@param f fun():T A function to lazily evaluate
----@return fun():T A function that, on the first evaluation, calls f, caches the result, and returns the cached result on subsequent calls
-function utils.lazy(f)
-    local cachedValue
-    local isCached = false
-    return function()
-        if not isCached then
-            cachedValue = f()
-            isCached = true
-        end
-        return cachedValue
-    end
-end
-
----Removes the first n elements from an array in place
----@generic T
----@param array T[] The array to modify
----@param n number The number of elements to remove from the start of the array
-function utils.removePrefixInPlace(array, n)
-    local len = #array
-    for i = 1, len - n do
-        array[i] = array[i + n]
-    end
-    for i = len - n + 1, len do
-        array[i] = nil
-    end
-end
-
 ---Calculates the median of an array of numbers
 ---@param values number[] Array of numbers (will be sorted in place)
 ---@return number Median value, or 0 if array is empty
@@ -117,22 +87,6 @@ function utils.formatTime(timestampS)
     return os.date("%H:%M", timestampS)
 end
 
----Ensures that a nested path exists in a table, creating empty tables as necessary
----@param table table The root table
----@param ... any The sequence of keys representing the path
----@return table The table at the end of the path
-function utils.ensurePathExists(table, ...)
-    local current = table
-    for i = 1, select("#", ...) do
-        local key = select(i, ...)
-        if current[key] == nil then
-            current[key] = {}
-        end
-        current = current[key]
-    end
-    return current
-end
-
 ---Counts the number of keys in a table
 ---@param t table The table to count keys in
 ---@return number The number of keys
@@ -157,6 +111,41 @@ function utils.GetScribeAwareAbilityDisplayName(abilityId)
     end
     ---@diagnostic disable-next-line: missing-parameter
     return zo_strformat("<<C:1>>", GetAbilityName(abilityId))
+end
+
+-- ==================== Role Icons & Helpers ====================
+
+utils.ROLE_ICONS = {
+    [LFG_ROLE_DPS]  = "/esoui/art/lfg/gamepad/lfg_roleicon_dps.dds",
+    [LFG_ROLE_HEAL] = "/esoui/art/lfg/gamepad/lfg_roleicon_healer.dds",
+    [LFG_ROLE_TANK] = "/esoui/art/lfg/gamepad/lfg_roleicon_tank.dds",
+}
+utils.DEFAULT_ROLE_ICON = "/esoui/art/lfg/gamepad/lfg_roleicon_dps.dds"
+
+---Get role icon texture path
+---@param role number LFG_ROLE_* constant
+---@return string texturePath
+function utils.GetRoleIcon(role)
+    return utils.ROLE_ICONS[role] or utils.DEFAULT_ROLE_ICON
+end
+
+---Get the LFG role for a unit tag.
+---For player: uses group role when grouped, otherwise selected LFG role.
+---For others: uses group role with DPS fallback.
+---Handles both nil and LFG_ROLE_INVALID (0) from GetGroupMemberSelectedRole.
+---@param unitTag string
+---@return number role LFG_ROLE_DPS, LFG_ROLE_HEAL, or LFG_ROLE_TANK
+function utils.getUnitRole(unitTag)
+    if AreUnitsEqual(unitTag, "player") then
+        if IsUnitGrouped("player") then
+            local role = GetGroupMemberSelectedRole(unitTag)
+            if role and role ~= LFG_ROLE_INVALID then return role end
+        end
+        return GetSelectedLFGRole()
+    end
+    local role = GetGroupMemberSelectedRole(unitTag)
+    if role and role ~= LFG_ROLE_INVALID then return role end
+    return LFG_ROLE_DPS
 end
 
 ---Gets the undecorated display name of a unit

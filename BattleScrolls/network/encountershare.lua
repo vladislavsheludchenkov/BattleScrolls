@@ -236,7 +236,7 @@ function encounterShare:send(sharedData, timestampS)
         encounterShare.protocol:Send(payload)
     end
     notifyAllCallbacks("player", sharedData)
-    BattleScrolls.log.Debug("EncounterShare: sent encounter data")
+    -- BattleScrolls.log.Debug("EncounterShare: sent encounter data")
 end
 
 -- =============================================================================
@@ -247,7 +247,7 @@ end
 function encounterShare:Initialize()
     local LGB = LibGroupBroadcast
     if not LGB then
-        BattleScrolls.log.Warn("EncounterShare: LibGroupBroadcast not available")
+        -- BattleScrolls.log.Warn("EncounterShare: LibGroupBroadcast not available")
         return
     end
 
@@ -339,7 +339,7 @@ function encounterShare:Initialize()
                     LGB.CreateArrayField(
                         LGB.CreateTableField("attacks", {
                             LGB.CreateNumericField("abilityId", { minValue = 0, numBits = 20, trimValues = true }),
-                            LGB.CreateNumericField("damage", { minValue = 0, numBits = 10, precision = 100, trimValues = true }),
+                            LGB.CreateNumericField("damage", { minValue = 0, maxValue = 102300, numBits = 10, precision = 100, trimValues = true }),
                         }),
                         { maxLength = 6 }
                     ),
@@ -352,5 +352,5 @@ function encounterShare:Initialize()
     shareProtocol:Finalize({ isRelevantInCombat = false, replaceQueuedMessages = false })
     encounterShare.protocol = shareProtocol
 
-    BattleScrolls.log.Info("EncounterShare: initialized")
+    -- BattleScrolls.log.Info("EncounterShare: initialized")
 end

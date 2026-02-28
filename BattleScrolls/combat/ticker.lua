@@ -13,7 +13,7 @@ BattleScrolls = BattleScrolls or {}
 local UPDATE_INTERVAL_MS = 300
 
 ---@class TickListener
----@field OnCombatTick fun(self: TickListener, calc: ArithmancerInstance)
+---@field OnCombatTick fun(self: TickListener, calc: ArithmancerInstance, bossCalc: ArithmancerInstance|nil)
 
 ---@class CombatTicker : StateObserver
 local combatTicker = {}
@@ -39,11 +39,13 @@ function combatTicker:unregisterListener(listener)
     end
 end
 
----Create a shared ArithmancerInstance and dispatch to all listeners
+---Create shared ArithmancerInstances and dispatch to all listeners
 local function tick()
-    local calc = BattleScrolls.arithmancer:New(BattleScrolls.state)
+    local state = BattleScrolls.state
+    local calc = BattleScrolls.arithmancer:Make(state)
+    local bossCalc = BattleScrolls.arithmancer:ForBosses(state)
     for _, listener in ipairs(listeners) do
-        listener:OnCombatTick(calc)
+        listener:OnCombatTick(calc, bossCalc)
     end
 end
 

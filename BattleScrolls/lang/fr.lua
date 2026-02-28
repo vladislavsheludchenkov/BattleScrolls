@@ -40,6 +40,7 @@ local strings = {
     [BATTLESCROLLS_TAB_SELF_HEALING] = "Auto-soins",
     [BATTLESCROLLS_TAB_HEALING_IN] = "Soins reçus",
     [BATTLESCROLLS_TAB_EFFECTS] = "Effets",
+    [BATTLESCROLLS_TAB_GROUP] = "Groupe",
 
     -------------------------
     -- Time Headers
@@ -114,6 +115,7 @@ local strings = {
     [BATTLESCROLLS_SETTINGS_RECORD_PLAYER_FIGHTS] = "Enregistrer les combats JcJ",
     [BATTLESCROLLS_SETTINGS_RECORD_PLAYER_FIGHTS_TEXT] = "Combats JcJ contre d'autres joueurs.",
     [BATTLESCROLLS_SETTINGS_RECORD_DUMMY_FIGHTS] = "Enregistrer les combats de mannequin",
+    [BATTLESCROLLS_SETTINGS_RECORD_IN_ADVENTURE_ZONE_TEXT] = "Lorsqu'activé, remplace les réglages Extérieur et Instances et enregistre tous les combats dans cette zone. Lorsque désactivé, n'a aucun effet.",
     [BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TITLE] = "Filtres d'enregistrement",
     [BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT] = "Les filtres de zone et de type de combat sont combinés: un combat doit correspondre à au moins une zone ET un type pour être enregistré.",
 
@@ -204,7 +206,7 @@ local strings = {
 
     -- Proc Tracking
     [BATTLESCROLLS_HEADER_PROC_TRACKING] = "Suivi des procs",
-    [BATTLESCROLLS_STAT_TOTAL_PROCS] = "procs",
+    [BATTLESCROLLS_STAT_TOTAL_PROCS] = "<<1[$d proc/$d procs]>>",
     [BATTLESCROLLS_STAT_MEDIAN_INTERVAL] = "médiane",
 
     -------------------------
@@ -239,12 +241,6 @@ local strings = {
 
     [BATTLESCROLLS_HEADER_RAW_HOT_VS_DIRECT] = "Brut: HoT vs Direct",
     [BATTLESCROLLS_HEADER_EFFECTIVE_HOT_VS_DIRECT] = "Effectif: HoT vs Direct",
-    [BATTLESCROLLS_HEADER_RAW_BY_TARGET] = "Soins bruts par cible",
-    [BATTLESCROLLS_HEADER_RAW_BY_ABILITY] = "Soins bruts par compétence",
-    [BATTLESCROLLS_HEADER_EFFECTIVE_BY_TARGET] = "Soins effectifs par cible",
-    [BATTLESCROLLS_HEADER_EFFECTIVE_BY_ABILITY] = "Soins effectifs par compétence",
-    [BATTLESCROLLS_HEADER_RAW_BY_SOURCE] = "Soins bruts par source",
-    [BATTLESCROLLS_HEADER_EFFECTIVE_BY_SOURCE] = "Soins effectifs par source",
     [BATTLESCROLLS_HEADER_RAW_HEALING_BY_TARGET] = "Soins bruts par cible",
     [BATTLESCROLLS_HEADER_RAW_HEALING_BY_ABILITY] = "Soins bruts par compétence",
     [BATTLESCROLLS_HEADER_EFFECTIVE_HEALING_BY_TARGET] = "Soins effectifs par cible",
@@ -266,7 +262,7 @@ local strings = {
     [BATTLESCROLLS_EFFECT_UPTIME] = "temps actif",
     [BATTLESCROLLS_EFFECT_YOURS] = "les vôtres",
     [BATTLESCROLLS_EFFECT_AVG] = "moy",
-    [BATTLESCROLLS_EFFECT_MEMBERS] = "membres",
+    [BATTLESCROLLS_EFFECT_MEMBERS] = "<<1[$d membre/$d membres]>>",
 
     -------------------------
     -- Effect Tooltips
@@ -341,7 +337,6 @@ local strings = {
     [BATTLESCROLLS_FILTER_BY_TARGET] = "Filtrer par cible",
     [BATTLESCROLLS_FILTER_BY_GROUP_MEMBER] = "Filtrer par membre",
     [BATTLESCROLLS_FILTER] = "Filtre",
-    [BATTLESCROLLS_FILTER_ACTIVE] = "Filtre (Actif)",
     [BATTLESCROLLS_FILTER_RESET] = "Réinitialiser",
     [BATTLESCROLLS_FILTER_DAMAGE_DONE_BY] = "Dégâts infligés par",
     [BATTLESCROLLS_FILTER_DAMAGE_DONE_TO] = "Dégâts infligés à",
@@ -429,10 +424,7 @@ local strings = {
     [BATTLESCROLLS_OVERVIEW_BOSS_DEBUFFS] = "Malus sur le boss",
 
     -- Group Stats
-    [BATTLESCROLLS_GROUP_DAMAGE] = "Dégâts de groupe",
-    [BATTLESCROLLS_GROUP_BOSS_DAMAGE] = "Dégâts au boss du groupe",
-    [BATTLESCROLLS_GROUP_DPS] = "DPS de groupe",
-    [BATTLESCROLLS_GROUP_BOSS_DPS] = "DPS au boss du groupe",
+    [BATTLESCROLLS_OVERVIEW_BOSS_DAMAGE] = "Dégâts au boss",
     [BATTLESCROLLS_STAT_GROUP_DAMAGE] = "Dégâts de groupe",
     [BATTLESCROLLS_STAT_GROUP_DPS] = "DPS de groupe",
     [BATTLESCROLLS_STAT_GROUP_BOSS_DAMAGE] = "Dégâts au boss du groupe",
@@ -444,9 +436,9 @@ local strings = {
     [BATTLESCROLLS_STAT_PER_SECOND] = "<<1>>/s",
 
     -- Overview Panel - Effect Stats
-    [BATTLESCROLLS_EFFECT_APPS_COUNT] = "<<1>> applic.",
+    [BATTLESCROLLS_EFFECT_APPS_COUNT] = "<<1[$d application/$d applications]>>",
     [BATTLESCROLLS_EFFECT_YOURS_PERCENT] = "<<1>>% à vous",
-    [BATTLESCROLLS_EFFECT_STACKS_COUNT] = "×<<1>> cumuls",
+    [BATTLESCROLLS_EFFECT_STACKS_COUNT] = "×<<1[$d charge/$d charges]>>",
 
     -- Overview Panel Summary
     [BATTLESCROLLS_OVERVIEW_ENCOUNTER] = "Rencontre",
@@ -459,10 +451,7 @@ local strings = {
     [BATTLESCROLLS_OVERVIEW_CRIT_RATE] = "Taux critique",
     [BATTLESCROLLS_OVERVIEW_MAX_HIT] = "Coup max",
     [BATTLESCROLLS_OVERVIEW_MAX_HEAL] = "Soin max",
-    [BATTLESCROLLS_OVERVIEW_EFFICIENCY] = "Efficacité",
     [BATTLESCROLLS_OVERVIEW_KEY_BUFFS] = "Vos bonus",
-    [BATTLESCROLLS_OVERVIEW_KEY_DEBUFFS] = "Malus clés",
-    [BATTLESCROLLS_OVERVIEW_UPTIMES] = "Temps actifs",
     [BATTLESCROLLS_OVERVIEW_NO_EFFECTS] = "Aucun effet enregistré",
 
     -- Overview Panel Short Labels
@@ -574,6 +563,54 @@ local strings = {
     [BATTLESCROLLS_UNFAVORITE_EFFECT] = "Retirer des favoris",
     [BATTLESCROLLS_CLEAR_ALL_FAVORITES] = "Effacer tous les favoris",
     [BATTLESCROLLS_CLEAR_ALL_FAVORITES_TOOLTIP] = "Supprimer tous les effets favoris. Les effets favoris sont affichés en haut de chaque liste d'effets.",
+
+    -------------------------
+    -- Group Tab Enhancements
+    -------------------------
+    [BATTLESCROLLS_STAT_SURVIVABILITY] = "Survie",
+    [BATTLESCROLLS_BOSS_DAMAGE_TAKEN] = "Dégâts subis du boss",
+
+    -- Group Member Card Strings
+    [BATTLESCROLLS_GROUP_CARD_OF_GROUP] = "du groupe",
+    [BATTLESCROLLS_GROUP_CARD_ALIVE] = "Vivant",
+
+    -- Group Tab Redesign
+    [BATTLESCROLLS_GROUP_DAMAGE_BY_TYPE] = "Dégâts par type",
+    [BATTLESCROLLS_GROUP_VS_AVERAGE] = "vs Moyenne DD",
+    [BATTLESCROLLS_GROUP_DD_COUNTED] = "DDs comptés",
+    [BATTLESCROLLS_GROUP_DAMAGE_OUTPUT] = "Dégâts infligés",
+    [BATTLESCROLLS_GROUP_HEALING_OUTPUT] = "Soins prodigués",
+    [BATTLESCROLLS_GROUP_RANK] = "Rang",
+    [BATTLESCROLLS_GROUP_MAGICAL] = "Magique",
+    [BATTLESCROLLS_GROUP_DEATH] = "Mort",
+    [BATTLESCROLLS_GROUP_FIRST_DEATH] = "Première Mort",
+    [BATTLESCROLLS_GROUP_LAST_DEATH] = "Dernière Mort",
+    [BATTLESCROLLS_GROUP_DEATHS] = "Morts",
+    [BATTLESCROLLS_GROUP_COL_DEATHS] = "Morts",
+    [BATTLESCROLLS_GROUP_DEATH_COUNT] = "<<1[$d Mort/$d Morts]>>",
+    [BATTLESCROLLS_GROUP_METRIC_DPS] = "<<1>> DPS",
+    [BATTLESCROLLS_GROUP_METRIC_HPS] = "<<1>> HPS",
+    [BATTLESCROLLS_GROUP_METRIC_DTPS] = "<<1>> DTPS",
+    [BATTLESCROLLS_GROUP_METRIC_CRIT] = "<<1>>% Crit",
+    [BATTLESCROLLS_GROUP_METRIC_OVERHEAL] = "<<1>>% Sur-soins",
+    [BATTLESCROLLS_GROUP_TOP_INCOMING_DAMAGE] = "Top Dégâts Reçus",
+    [BATTLESCROLLS_GROUP_DEATH_AT] = "à <<1>>",
+    [BATTLESCROLLS_HEADER_DEATHS] = "Morts",
+    [BATTLESCROLLS_STAT_DEATH_COUNT] = "Nombre de Morts",
+    [BATTLESCROLLS_DEATH_N] = "Mort <<1>>",
+
+    -- Group Context Tooltips
+    [BATTLESCROLLS_TOOLTIP_GROUP_TOTAL] = "Total du Groupe",
+    [BATTLESCROLLS_TOOLTIP_GROUP_DPS] = "DPS du Groupe",
+    [BATTLESCROLLS_TOOLTIP_GROUP_AVG] = "Moyenne DD",
+    [BATTLESCROLLS_TOOLTIP_GROUP_BREAKDOWN] = "Répartition du Groupe",
+    [BATTLESCROLLS_TOOLTIP_GROUP_DAMAGE_TAKEN] = "Dégâts Subis du Groupe",
+
+    -- Group Table
+    [BATTLESCROLLS_GROUP_COL_NAME] = "Nom",
+    [BATTLESCROLLS_GROUP_COL_TOTAL] = "Total",
+    [BATTLESCROLLS_GROUP_COL_CRIT] = "Crit",
+    [BATTLESCROLLS_GROUP_COL_ALIVE] = "Vivant",
 }
 
 -- Register translations

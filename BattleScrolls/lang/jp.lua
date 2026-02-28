@@ -40,6 +40,7 @@ local strings = {
     [BATTLESCROLLS_TAB_SELF_HEALING] = "自己回復",
     [BATTLESCROLLS_TAB_HEALING_IN] = "被回復",
     [BATTLESCROLLS_TAB_EFFECTS] = "効果",
+    [BATTLESCROLLS_TAB_GROUP] = "グループ",
 
     -------------------------
     -- Time Headers
@@ -114,6 +115,7 @@ local strings = {
     [BATTLESCROLLS_SETTINGS_RECORD_PLAYER_FIGHTS] = "PvP戦を記録",
     [BATTLESCROLLS_SETTINGS_RECORD_PLAYER_FIGHTS_TEXT] = "他のプレイヤーとのPvP戦闘。",
     [BATTLESCROLLS_SETTINGS_RECORD_DUMMY_FIGHTS] = "標的ダミー戦を記録",
+    [BATTLESCROLLS_SETTINGS_RECORD_IN_ADVENTURE_ZONE_TEXT] = "有効にすると、フィールドとインスタンスの設定を上書きし、<<1>>のすべての戦闘を記録します。無効の場合、効果はありません。",
     [BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TITLE] = "記録フィルター",
     [BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT] = "ゾーンと戦闘タイプのフィルターは組み合わされます：記録されるには、少なくとも1つのゾーンと1つのタイプに一致する必要があります。",
 
@@ -204,7 +206,7 @@ local strings = {
 
     -- Proc Tracking
     [BATTLESCROLLS_HEADER_PROC_TRACKING] = "プロック追跡",
-    [BATTLESCROLLS_STAT_TOTAL_PROCS] = "発動",
+    [BATTLESCROLLS_STAT_TOTAL_PROCS] = "<<1>>発動",
     [BATTLESCROLLS_STAT_MEDIAN_INTERVAL] = "中央値",
 
     -------------------------
@@ -239,12 +241,6 @@ local strings = {
 
     [BATTLESCROLLS_HEADER_RAW_HOT_VS_DIRECT] = "総: HoT vs 直接",
     [BATTLESCROLLS_HEADER_EFFECTIVE_HOT_VS_DIRECT] = "実効: HoT vs 直接",
-    [BATTLESCROLLS_HEADER_RAW_BY_TARGET] = "総回復（ターゲット別）",
-    [BATTLESCROLLS_HEADER_RAW_BY_ABILITY] = "総回復（スキル別）",
-    [BATTLESCROLLS_HEADER_EFFECTIVE_BY_TARGET] = "実効回復（ターゲット別）",
-    [BATTLESCROLLS_HEADER_EFFECTIVE_BY_ABILITY] = "実効回復（スキル別）",
-    [BATTLESCROLLS_HEADER_RAW_BY_SOURCE] = "総回復（ソース別）",
-    [BATTLESCROLLS_HEADER_EFFECTIVE_BY_SOURCE] = "実効回復（ソース別）",
     [BATTLESCROLLS_HEADER_RAW_HEALING_BY_TARGET] = "総回復（ターゲット別）",
     [BATTLESCROLLS_HEADER_RAW_HEALING_BY_ABILITY] = "総回復（スキル別）",
     [BATTLESCROLLS_HEADER_EFFECTIVE_HEALING_BY_TARGET] = "実効回復（ターゲット別）",
@@ -266,7 +262,7 @@ local strings = {
     [BATTLESCROLLS_EFFECT_UPTIME] = "稼働率",
     [BATTLESCROLLS_EFFECT_YOURS] = "あなた",
     [BATTLESCROLLS_EFFECT_AVG] = "平均",
-    [BATTLESCROLLS_EFFECT_MEMBERS] = "メンバー",
+    [BATTLESCROLLS_EFFECT_MEMBERS] = "<<1>> メンバー",
 
     -------------------------
     -- Effect Tooltips
@@ -341,7 +337,6 @@ local strings = {
     [BATTLESCROLLS_FILTER_BY_TARGET] = "ターゲットでフィルター",
     [BATTLESCROLLS_FILTER_BY_GROUP_MEMBER] = "メンバーでフィルター",
     [BATTLESCROLLS_FILTER] = "フィルター",
-    [BATTLESCROLLS_FILTER_ACTIVE] = "フィルター（有効）",
     [BATTLESCROLLS_FILTER_RESET] = "リセット",
     [BATTLESCROLLS_FILTER_DAMAGE_DONE_BY] = "ダメージ元",
     [BATTLESCROLLS_FILTER_DAMAGE_DONE_TO] = "ダメージ先",
@@ -429,10 +424,7 @@ local strings = {
     [BATTLESCROLLS_OVERVIEW_BOSS_DEBUFFS] = "ボスデバフ",
 
     -- Group Stats
-    [BATTLESCROLLS_GROUP_DAMAGE] = "グループダメージ",
-    [BATTLESCROLLS_GROUP_BOSS_DAMAGE] = "グループボスダメージ",
-    [BATTLESCROLLS_GROUP_DPS] = "グループDPS",
-    [BATTLESCROLLS_GROUP_BOSS_DPS] = "グループボスDPS",
+    [BATTLESCROLLS_OVERVIEW_BOSS_DAMAGE] = "ボスダメージ",
     [BATTLESCROLLS_STAT_GROUP_DAMAGE] = "グループダメージ",
     [BATTLESCROLLS_STAT_GROUP_DPS] = "グループDPS",
     [BATTLESCROLLS_STAT_GROUP_BOSS_DAMAGE] = "グループボスダメージ",
@@ -459,10 +451,7 @@ local strings = {
     [BATTLESCROLLS_OVERVIEW_CRIT_RATE] = "クリティカル率",
     [BATTLESCROLLS_OVERVIEW_MAX_HIT] = "最大ヒット",
     [BATTLESCROLLS_OVERVIEW_MAX_HEAL] = "最大ヒール",
-    [BATTLESCROLLS_OVERVIEW_EFFICIENCY] = "効率",
     [BATTLESCROLLS_OVERVIEW_KEY_BUFFS] = "あなたのバフ",
-    [BATTLESCROLLS_OVERVIEW_KEY_DEBUFFS] = "主要デバフ",
-    [BATTLESCROLLS_OVERVIEW_UPTIMES] = "稼働率",
     [BATTLESCROLLS_OVERVIEW_NO_EFFECTS] = "効果の記録なし",
 
     -- Overview Panel Short Labels
@@ -574,6 +563,54 @@ local strings = {
     [BATTLESCROLLS_UNFAVORITE_EFFECT] = "お気に入り解除",
     [BATTLESCROLLS_CLEAR_ALL_FAVORITES] = "すべてのお気に入りをクリア",
     [BATTLESCROLLS_CLEAR_ALL_FAVORITES_TOOLTIP] = "すべてのお気に入りエフェクトを削除します。お気に入りのエフェクトは各エフェクトリストの上部に表示されます。",
+
+    -------------------------
+    -- Group Tab Enhancements
+    -------------------------
+    [BATTLESCROLLS_STAT_SURVIVABILITY] = "生存性",
+    [BATTLESCROLLS_BOSS_DAMAGE_TAKEN] = "ボスからの被ダメージ",
+
+    -- Group Member Card Strings
+    [BATTLESCROLLS_GROUP_CARD_OF_GROUP] = "グループ比",
+    [BATTLESCROLLS_GROUP_CARD_ALIVE] = "生存",
+
+    -- Group Tab Redesign
+    [BATTLESCROLLS_GROUP_DAMAGE_BY_TYPE] = "タイプ別ダメージ",
+    [BATTLESCROLLS_GROUP_VS_AVERAGE] = "DD平均比",
+    [BATTLESCROLLS_GROUP_DD_COUNTED] = "対象DD数",
+    [BATTLESCROLLS_GROUP_DAMAGE_OUTPUT] = "ダメージ出力",
+    [BATTLESCROLLS_GROUP_HEALING_OUTPUT] = "ヒール出力",
+    [BATTLESCROLLS_GROUP_RANK] = "順位",
+    [BATTLESCROLLS_GROUP_MAGICAL] = "魔法",
+    [BATTLESCROLLS_GROUP_DEATH] = "死亡",
+    [BATTLESCROLLS_GROUP_FIRST_DEATH] = "最初の死亡",
+    [BATTLESCROLLS_GROUP_LAST_DEATH] = "最後の死亡",
+    [BATTLESCROLLS_GROUP_DEATHS] = "死亡",
+    [BATTLESCROLLS_GROUP_COL_DEATHS] = "死亡",
+    [BATTLESCROLLS_GROUP_DEATH_COUNT] = "死亡 <<1>>回",
+    [BATTLESCROLLS_GROUP_METRIC_DPS] = "<<1>> DPS",
+    [BATTLESCROLLS_GROUP_METRIC_HPS] = "<<1>> HPS",
+    [BATTLESCROLLS_GROUP_METRIC_DTPS] = "<<1>> DTPS",
+    [BATTLESCROLLS_GROUP_METRIC_CRIT] = "クリ <<1>>%",
+    [BATTLESCROLLS_GROUP_METRIC_OVERHEAL] = "過剰回復 <<1>>%",
+    [BATTLESCROLLS_GROUP_TOP_INCOMING_DAMAGE] = "被ダメージ上位",
+    [BATTLESCROLLS_GROUP_DEATH_AT] = "<<1>>時点",
+    [BATTLESCROLLS_HEADER_DEATHS] = "死亡",
+    [BATTLESCROLLS_STAT_DEATH_COUNT] = "死亡回数",
+    [BATTLESCROLLS_DEATH_N] = "死亡 <<1>>",
+
+    -- Group Context Tooltips
+    [BATTLESCROLLS_TOOLTIP_GROUP_TOTAL] = "グループ合計",
+    [BATTLESCROLLS_TOOLTIP_GROUP_DPS] = "グループDPS",
+    [BATTLESCROLLS_TOOLTIP_GROUP_AVG] = "DD平均",
+    [BATTLESCROLLS_TOOLTIP_GROUP_BREAKDOWN] = "グループ内訳",
+    [BATTLESCROLLS_TOOLTIP_GROUP_DAMAGE_TAKEN] = "グループ被ダメージ",
+
+    -- Group Table
+    [BATTLESCROLLS_GROUP_COL_NAME] = "名前",
+    [BATTLESCROLLS_GROUP_COL_TOTAL] = "合計",
+    [BATTLESCROLLS_GROUP_COL_CRIT] = "クリ",
+    [BATTLESCROLLS_GROUP_COL_ALIVE] = "生存",
 }
 
 -- Register translations

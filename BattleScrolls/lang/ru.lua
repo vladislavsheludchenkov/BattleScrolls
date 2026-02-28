@@ -41,6 +41,7 @@ local strings = {
     [BATTLESCROLLS_TAB_SELF_HEALING] = "Самоисцеление",
     [BATTLESCROLLS_TAB_HEALING_IN] = "Полученное исцеление",
     [BATTLESCROLLS_TAB_EFFECTS] = "Эффекты",
+    [BATTLESCROLLS_TAB_GROUP] = "Группа",
 
     -------------------------
     -- Time Headers
@@ -115,6 +116,7 @@ local strings = {
     [BATTLESCROLLS_SETTINGS_RECORD_PLAYER_FIGHTS] = "Записывать PvP-сражения",
     [BATTLESCROLLS_SETTINGS_RECORD_PLAYER_FIGHTS_TEXT] = "PvP-сражения против других игроков.",
     [BATTLESCROLLS_SETTINGS_RECORD_DUMMY_FIGHTS] = "Записывать сражения с манекеном",
+    [BATTLESCROLLS_SETTINGS_RECORD_IN_ADVENTURE_ZONE_TEXT] = "Если включено, игнорирует настройки для открытого мира и инстансов и записывает все сражения в этой зоне. Если выключено, ни на что не влияет.",
     [BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TITLE] = "Фильтры записи",
     [BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT] = "Фильтры областей и типов сражений комбинируются: сражение должно соответствовать хотя бы одной области И одному типу для записи.",
 
@@ -205,7 +207,7 @@ local strings = {
 
     -- Proc Tracking
     [BATTLESCROLLS_HEADER_PROC_TRACKING] = "Отслеживание активаций",
-    [BATTLESCROLLS_STAT_TOTAL_PROCS] = "активаций",
+    [BATTLESCROLLS_STAT_TOTAL_PROCS] = "<<1[$d активация/$d активации/$d активаций]>>",
     [BATTLESCROLLS_STAT_MEDIAN_INTERVAL] = "медиана",
 
     -------------------------
@@ -240,12 +242,6 @@ local strings = {
 
     [BATTLESCROLLS_HEADER_RAW_HOT_VS_DIRECT] = "Полное: HoT / Прямое",
     [BATTLESCROLLS_HEADER_EFFECTIVE_HOT_VS_DIRECT] = "Эфф.: HoT / Прямое",
-    [BATTLESCROLLS_HEADER_RAW_BY_TARGET] = "Полное по цели",
-    [BATTLESCROLLS_HEADER_RAW_BY_ABILITY] = "Полное по способности",
-    [BATTLESCROLLS_HEADER_EFFECTIVE_BY_TARGET] = "Эфф. по цели",
-    [BATTLESCROLLS_HEADER_EFFECTIVE_BY_ABILITY] = "Эфф. по способности",
-    [BATTLESCROLLS_HEADER_RAW_BY_SOURCE] = "Полное по источнику",
-    [BATTLESCROLLS_HEADER_EFFECTIVE_BY_SOURCE] = "Эфф. по источнику",
     [BATTLESCROLLS_HEADER_RAW_HEALING_BY_TARGET] = "Полное по цели",
     [BATTLESCROLLS_HEADER_RAW_HEALING_BY_ABILITY] = "Полное по способности",
     [BATTLESCROLLS_HEADER_EFFECTIVE_HEALING_BY_TARGET] = "Эфф. по цели",
@@ -267,7 +263,7 @@ local strings = {
     [BATTLESCROLLS_EFFECT_UPTIME] = "активность",
     [BATTLESCROLLS_EFFECT_YOURS] = "ваш",
     [BATTLESCROLLS_EFFECT_AVG] = "средн.",
-    [BATTLESCROLLS_EFFECT_MEMBERS] = "участников",
+    [BATTLESCROLLS_EFFECT_MEMBERS] = "<<1[$d участник/$d участника/$d участников]>>",
 
     -------------------------
     -- Effect Tooltips
@@ -342,7 +338,6 @@ local strings = {
     [BATTLESCROLLS_FILTER_BY_TARGET] = "Фильтр по цели",
     [BATTLESCROLLS_FILTER_BY_GROUP_MEMBER] = "Фильтр по группе",
     [BATTLESCROLLS_FILTER] = "Фильтр",
-    [BATTLESCROLLS_FILTER_ACTIVE] = "Фильтр (Активен)",
     [BATTLESCROLLS_FILTER_RESET] = "Сбросить",
     [BATTLESCROLLS_FILTER_DAMAGE_DONE_BY] = "Урон от",
     [BATTLESCROLLS_FILTER_DAMAGE_DONE_TO] = "Урон по",
@@ -431,10 +426,7 @@ local strings = {
     [BATTLESCROLLS_OVERVIEW_BOSS_DEBUFFS] = "Дебаффы на боссе",
 
     -- Group Stats
-    [BATTLESCROLLS_GROUP_DAMAGE] = "Урон группы",
-    [BATTLESCROLLS_GROUP_BOSS_DAMAGE] = "Урон группы боссу",
-    [BATTLESCROLLS_GROUP_DPS] = "DPS группы",
-    [BATTLESCROLLS_GROUP_BOSS_DPS] = "DPS группы по боссу",
+    [BATTLESCROLLS_OVERVIEW_BOSS_DAMAGE] = "Урон по боссу",
     [BATTLESCROLLS_STAT_GROUP_DAMAGE] = "Урон группы",
     [BATTLESCROLLS_STAT_GROUP_DPS] = "DPS группы",
     [BATTLESCROLLS_STAT_GROUP_BOSS_DAMAGE] = "Урон группы боссу",
@@ -446,9 +438,9 @@ local strings = {
     [BATTLESCROLLS_STAT_PER_SECOND] = "<<1>>/с",
 
     -- Overview Panel - Effect Stats
-    [BATTLESCROLLS_EFFECT_APPS_COUNT] = "<<1>> прим.",
+    [BATTLESCROLLS_EFFECT_APPS_COUNT] = "<<1[$d применение/$d применения/$d применений]>>",
     [BATTLESCROLLS_EFFECT_YOURS_PERCENT] = "<<1>>% ваш",
-    [BATTLESCROLLS_EFFECT_STACKS_COUNT] = "×<<1>> ст.",
+    [BATTLESCROLLS_EFFECT_STACKS_COUNT] = "×<<1[$d заряд/$d заряда/$d зарядов]>>",
 
     -- Overview Panel Summary
     [BATTLESCROLLS_OVERVIEW_ENCOUNTER] = "Бой",
@@ -461,10 +453,7 @@ local strings = {
     [BATTLESCROLLS_OVERVIEW_CRIT_RATE] = "Шанс крита",
     [BATTLESCROLLS_OVERVIEW_MAX_HIT] = "Макс. удар",
     [BATTLESCROLLS_OVERVIEW_MAX_HEAL] = "Макс. исцеление",
-    [BATTLESCROLLS_OVERVIEW_EFFICIENCY] = "Эффективность",
     [BATTLESCROLLS_OVERVIEW_KEY_BUFFS] = "Ваши баффы",
-    [BATTLESCROLLS_OVERVIEW_KEY_DEBUFFS] = "Ключевые дебаффы",
-    [BATTLESCROLLS_OVERVIEW_UPTIMES] = "Время действия",
     [BATTLESCROLLS_OVERVIEW_NO_EFFECTS] = "Нет записанных эффектов",
 
     -- Overview Panel Short Labels
@@ -576,6 +565,54 @@ local strings = {
     [BATTLESCROLLS_UNFAVORITE_EFFECT] = "Убрать из избранного",
     [BATTLESCROLLS_CLEAR_ALL_FAVORITES] = "Очистить все избранное",
     [BATTLESCROLLS_CLEAR_ALL_FAVORITES_TOOLTIP] = "Удалить все избранные эффекты. Избранные эффекты отображаются в верхней части каждого списка эффектов.",
+
+    -------------------------
+    -- Group Tab Enhancements
+    -------------------------
+    [BATTLESCROLLS_STAT_SURVIVABILITY] = "Выживаемость",
+    [BATTLESCROLLS_BOSS_DAMAGE_TAKEN] = "Урон от босса",
+
+    -- Group Member Card Strings
+    [BATTLESCROLLS_GROUP_CARD_OF_GROUP] = "от группы",
+    [BATTLESCROLLS_GROUP_CARD_ALIVE] = "Живой",
+
+    -- Group Tab Redesign
+    [BATTLESCROLLS_GROUP_DAMAGE_BY_TYPE] = "Урон по типу",
+    [BATTLESCROLLS_GROUP_VS_AVERAGE] = "от среднего DD",
+    [BATTLESCROLLS_GROUP_DD_COUNTED] = "DD учтено",
+    [BATTLESCROLLS_GROUP_DAMAGE_OUTPUT] = "Нанесённый урон",
+    [BATTLESCROLLS_GROUP_HEALING_OUTPUT] = "Исцеление",
+    [BATTLESCROLLS_GROUP_RANK] = "Место",
+    [BATTLESCROLLS_GROUP_MAGICAL] = "Магический",
+    [BATTLESCROLLS_GROUP_DEATH] = "Смерть",
+    [BATTLESCROLLS_GROUP_FIRST_DEATH] = "Первая смерть",
+    [BATTLESCROLLS_GROUP_LAST_DEATH] = "Последняя смерть",
+    [BATTLESCROLLS_GROUP_DEATHS] = "Смерти",
+    [BATTLESCROLLS_GROUP_COL_DEATHS] = "Смерти",
+    [BATTLESCROLLS_GROUP_DEATH_COUNT] = "<<1[$d смерть/$d смерти/$d смертей]>>",
+    [BATTLESCROLLS_GROUP_METRIC_DPS] = "<<1>> DPS",
+    [BATTLESCROLLS_GROUP_METRIC_HPS] = "<<1>> HPS",
+    [BATTLESCROLLS_GROUP_METRIC_DTPS] = "<<1>> DTPS",
+    [BATTLESCROLLS_GROUP_METRIC_CRIT] = "<<1>>% крит",
+    [BATTLESCROLLS_GROUP_METRIC_OVERHEAL] = "<<1>>% переисцеление",
+    [BATTLESCROLLS_GROUP_TOP_INCOMING_DAMAGE] = "Топ входящего урона",
+    [BATTLESCROLLS_GROUP_DEATH_AT] = "на <<1>>",
+    [BATTLESCROLLS_HEADER_DEATHS] = "Смерти",
+    [BATTLESCROLLS_STAT_DEATH_COUNT] = "Число смертей",
+    [BATTLESCROLLS_DEATH_N] = "Смерть <<1>>",
+
+    -- Group Context Tooltips
+    [BATTLESCROLLS_TOOLTIP_GROUP_TOTAL] = "Итого по группе",
+    [BATTLESCROLLS_TOOLTIP_GROUP_DPS] = "DPS группы",
+    [BATTLESCROLLS_TOOLTIP_GROUP_AVG] = "Среднее DD",
+    [BATTLESCROLLS_TOOLTIP_GROUP_BREAKDOWN] = "Разбивка по группе",
+    [BATTLESCROLLS_TOOLTIP_GROUP_DAMAGE_TAKEN] = "Полученный урон группы",
+
+    -- Group Table
+    [BATTLESCROLLS_GROUP_COL_NAME] = "Имя",
+    [BATTLESCROLLS_GROUP_COL_TOTAL] = "Всего",
+    [BATTLESCROLLS_GROUP_COL_CRIT] = "Крит",
+    [BATTLESCROLLS_GROUP_COL_ALIVE] = "Жив",
 }
 
 BS_STRINGS = strings

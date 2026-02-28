@@ -10,9 +10,13 @@
 --   local total = Arithmancer.ComputeDamageTotal(damageDone)
 --
 --   -- Instance: lazy calculator - nothing computed until accessed
---   local calc = Arithmancer:New(encounter, abilityInfo)
+--   local calc = Arithmancer:Make(encounter, abilityInfo)
 --   local dps = calc:personalDPS()  -- computed on first access, cached
 --   local share = calc:personalShare()  -- uses cached totals
+--
+--   -- Boss-filtered instance (auto-builds boss target filter)
+--   local bossCalc = Arithmancer:ForBosses(encounter, abilityInfo)
+--   local bossDps = bossCalc:personalDPS()  -- boss-only DPS
 -----------------------------------------------------------
 
 if not SemisPlaygroundCheckAccess() then
@@ -286,6 +290,29 @@ function Arithmancer.ComputeAoeVsSingleTarget(damageTable)
     return { aoe = aoeDamage, singleTarget = singleTargetDamage }
 end
 
+-- =============================================================================
+-- BOSS FILTER HELPER
+-- =============================================================================
+
+---Build a target filter containing boss unit IDs from encounter/state data
+---@param source BattleScrollsState|Encounter
+---@return table<number, boolean>|nil bossFilter nil if no boss data
+local function buildBossFilter(source)
+    if source.bossesUnits then
+        local filter = {}
+        for _, bossId in ipairs(source.bossesUnits) do
+            filter[bossId] = true
+        end
+        return filter
+    elseif source.bossesByUnitId then
+        local filter = {}
+        for unitId in pairs(source.bossesByUnitId) do
+            filter[unitId] = true
+        end
+        return filter
+    end
+    return nil
+end
 
 -- =============================================================================
 -- ARITHMANCER INSTANCE (LAZY COMPUTATION)
@@ -295,53 +322,156 @@ end
 ---@field durationS number|nil
 ---@field isBossFight boolean|nil
 ---@field personalTotalDamage number|nil
----@field bossPersonalTotalDamage number|nil
 ---@field groupTotalDamage number|nil
----@field bossGroupTotalDamage number|nil
 ---@field damageTakenTotal number|nil
 ---@field personalDTPS number|nil
 ---@field personalDPS number|nil
----@field bossPersonalDPS number|nil
 ---@field personalShare number|nil
----@field bossPersonalShare number|nil
 ---@field personalTotalRawHealingOut number|nil
 ---@field personalTotalEffectiveHealingOut number|nil
 ---@field personalRawHPSOut number|nil
 ---@field personalEffectiveHPSOut number|nil
 ---@field personalAoeVsSingleTarget { aoe: number, singleTarget: number }|nil
----@field bossAoeVsSingleTarget { aoe: number, singleTarget: number }|nil
 ---@field personalDotVsDirect { dot: number, direct: number }|nil
----@field bossDotVsDirect { dot: number, direct: number }|nil
----@field damageSummary { dps: number, groupDps: number|nil, share: number }|nil
----@field damageComposition { dotPercent: number|nil, directPercent: number|nil, aoePercent: number|nil, stPercent: number|nil }|nil
----@field damageQuality { critRate: number, maxHit: number }|nil
----@field damageTakenSummary { dtps: number, total: number }|nil
----@field damageTakenComposition { dotPercent: number|nil, directPercent: number|nil, aoePercent: number|nil, stPercent: number|nil }|nil
----@field damageTakenQuality { critRate: number, maxHit: number }|nil
----@field healingOutSummary { rawHps: number, effectiveHps: number, total: number, rawTotal: number, overhealPercent: number }|nil
----@field selfHealingSummary { rawHps: number, effectiveHps: number, total: number, rawTotal: number, overhealPercent: number }|nil
----@field healingInSummary { rawHps: number, effectiveHps: number, total: number, rawTotal: number, overhealPercent: number }|nil
 ---@field personalDamageByType table<DamageType, number>|nil
+---@field damageTakenDotVsDirect { dot: number, direct: number }|nil
+---@field damageTakenByType table<DamageType, number>|nil
+---@field damageSummary DamageSummary|nil
+---@field damageComposition DamageComposition|nil
+---@field damageQuality DamageQuality|nil
+---@field damageTakenSummary DamageTakenSummary|nil
+---@field damageTakenComposition DamageComposition|nil
+---@field damageTakenQuality DamageQuality|nil
+---@field healingOutSummary HealingSummary|nil
+---@field selfHealingSummary HealingSummary|nil
+---@field healingInSummary HealingSummary|nil
+---@field healingOutQuality HealingQuality|nil
+---@field selfHealingQuality HealingQuality|nil
+---@field healingInQuality HealingQuality|nil
+---@field _filteredDamageTable table<number, table<number, DamageDoneStorage>>|false|nil
+---@field _filteredDamageTakenTable table<number, table<number, DamageDoneStorage>>|false|nil
+---@field _filteredHealingOutTable table<number, HealingDoneDiffSource>|false|nil
+---@field _filteredHealingInTable table<number, HealingDone>|false|nil
 
 ---@class ArithmancerInstance
 ---@field _source BattleScrollsState|Encounter
 ---@field _abilityInfo table<number, AbilityInfo>
 ---@field _cache ArithmancerCache Cached computed values
+---@field _targetFilter table<number, boolean>|nil Target unit ID filter
+---@field _sourceFilter table<number, boolean>|nil Source unit ID filter
 local ArithmancerInstance = {}
 local instanceMeta = { __index = ArithmancerInstance }
 
----Creates a new Arithmancer instance with lazy computation.
+---Creates a new Arithmancer instance with lazy computation and optional filters.
 ---No computation is performed until methods are called.
 ---@param source BattleScrollsState|Encounter Either BattleScrollsState or Encounter
 ---@param abilityInfo table<number, AbilityInfo>|nil Ability metadata (optional, uses source.abilityInfo if not provided)
+---@param filters { targetFilter: table<number, boolean>|nil, sourceFilter: table<number, boolean>|nil }|nil Optional filters
 ---@return ArithmancerInstance
-function Arithmancer:New(source, abilityInfo)
+function Arithmancer:Make(source, abilityInfo, filters)
     local instance = {
         _source = source,
         _abilityInfo = abilityInfo or source.abilityInfo or {},
         _cache = {},
+        _targetFilter = filters and filters.targetFilter or nil,
+        _sourceFilter = filters and filters.sourceFilter or nil,
     }
     return setmetatable(instance, instanceMeta)
+end
+
+---Creates a boss-filtered Arithmancer instance.
+---Auto-builds a target filter from boss data. If extraFilters.targetFilter is provided,
+---it takes precedence over the auto-built filter.
+---Returns nil when there are no bosses in the encounter.
+---When bosses exist, the target filter is the boss set intersected with any user-provided
+---targetFilter (so user filters can only narrow, never widen beyond bosses).
+---An empty intersection (user deselected all bosses) returns a valid instance that produces 0s.
+---@param source BattleScrollsState|Encounter
+---@param abilityInfo table<number, AbilityInfo>|nil
+---@param extraFilters { targetFilter: table<number, boolean>|nil, sourceFilter: table<number, boolean>|nil }|nil
+---@return ArithmancerInstance|nil
+function Arithmancer:ForBosses(source, abilityInfo, extraFilters)
+    local bossFilter = buildBossFilter(source)
+    if not bossFilter or not next(bossFilter) then
+        return nil
+    end
+    -- Intersect with user's target filter if provided
+    local targetFilter = bossFilter
+    if extraFilters and extraFilters.targetFilter then
+        local intersected = {}
+        for unitId in pairs(extraFilters.targetFilter) do
+            if bossFilter[unitId] then
+                intersected[unitId] = true
+            end
+        end
+        targetFilter = intersected
+    end
+    local sourceFilter = extraFilters and extraFilters.sourceFilter or nil
+    local instance = {
+        _source = source,
+        _abilityInfo = abilityInfo or source.abilityInfo or {},
+        _cache = {},
+        _targetFilter = targetFilter,
+        _sourceFilter = sourceFilter,
+    }
+    return setmetatable(instance, instanceMeta)
+end
+
+
+-- =============================================================================
+-- FILTERED DATA ACCESSORS (Lazy, Cached)
+-- =============================================================================
+
+---Returns filtered damage table (damageByUnitId with targetFilter + sourceFilter applied)
+---@return table<number, table<number, DamageDoneStorage>>|nil
+function ArithmancerInstance:filteredDamageTable()
+    local cached = self._cache._filteredDamageTable
+    if cached ~= nil then
+        return cached ~= false and cached or nil
+    end
+    local result = Arithmancer.FilterDamageTable(self._source.damageByUnitId, self._targetFilter, self._sourceFilter)
+    self._cache._filteredDamageTable = result or false
+    return result
+end
+
+---Returns filtered damage taken table (damageTakenByUnitId with sourceFilter applied)
+---@return table<number, table<number, DamageDoneStorage>>|nil
+function ArithmancerInstance:filteredDamageTakenTable()
+    local cached = self._cache._filteredDamageTakenTable
+    if cached ~= nil then
+        return cached ~= false and cached or nil
+    end
+    local result = Arithmancer.FilterDamageTakenTable(self._source.damageTakenByUnitId, self._sourceFilter)
+    self._cache._filteredDamageTakenTable = result or false
+    return result
+end
+
+---Returns filtered healing out table (healingOutToGroup with targetFilter applied)
+---@return table<number, HealingDoneDiffSource>|nil
+function ArithmancerInstance:filteredHealingOutTable()
+    local cached = self._cache._filteredHealingOutTable
+    if cached ~= nil then
+        return cached ~= false and cached or nil
+    end
+    local healingStats = self._source.healingStats
+    local healingOut = healingStats and healingStats.healingOutToGroup or nil
+    local result = Arithmancer.FilterHealingOutTable(healingOut, self._targetFilter)
+    self._cache._filteredHealingOutTable = result or false
+    return result
+end
+
+---Returns filtered healing in table (healingInFromGroup with sourceFilter applied)
+---@return table<number, HealingDone>|nil
+function ArithmancerInstance:filteredHealingInTable()
+    local cached = self._cache._filteredHealingInTable
+    if cached ~= nil then
+        return cached ~= false and cached or nil
+    end
+    local healingStats = self._source.healingStats
+    local healingIn = healingStats and healingStats.healingInFromGroup or nil
+    local result = Arithmancer.FilterHealingInTable(healingIn, self._sourceFilter)
+    self._cache._filteredHealingInTable = result or false
+    return result
 end
 
 -- =============================================================================
@@ -393,72 +523,24 @@ end
 -- =============================================================================
 -- SYNC COMPUTED METHODS (Fast Computations - Return Values Directly)
 -- These methods compute totals synchronously (<1ms even for large encounters)
+-- All methods respect constructor filters via filtered data accessors.
 -- =============================================================================
 
----Returns personal total damage (all targets)
+---Returns personal total damage (filtered by targetFilter + sourceFilter)
 ---@return number
 function ArithmancerInstance:personalTotalDamage()
     if self._cache.personalTotalDamage ~= nil then
         return self._cache.personalTotalDamage
     end
 
-    local source = self._source
-    local computeTotal = Arithmancer.ComputeDamageTotal
-    local total = 0
-
-    for _, byTarget in pairs(source.damageByUnitId) do
-        for _, damage in pairs(byTarget) do
-            total = total + computeTotal(damage)
-        end
-    end
-
+    local total = Arithmancer.ComputeNestedTotal(self:filteredDamageTable())
     self._cache.personalTotalDamage = total
     return total
 end
 
----Returns boss personal total damage
----@return number
-function ArithmancerInstance:bossPersonalTotalDamage()
-    if self._cache.bossPersonalTotalDamage ~= nil then
-        return self._cache.bossPersonalTotalDamage
-    end
-
-    local source = self._source
-    local computeTotal = Arithmancer.ComputeDamageTotal
-
-    -- Build boss filter
-    local bossFilter = nil
-    if source.bossesUnits then
-        bossFilter = {}
-        for _, bossId in ipairs(source.bossesUnits) do
-            bossFilter[bossId] = true
-        end
-    elseif source.bossesByUnitId then
-        bossFilter = {}
-        for unitId in pairs(source.bossesByUnitId) do
-            bossFilter[unitId] = true
-        end
-    end
-
-    if not bossFilter then
-        self._cache.bossPersonalTotalDamage = 0
-        return 0
-    end
-
-    local total = 0
-    for _, byTarget in pairs(source.damageByUnitId) do
-        for targetId, damage in pairs(byTarget) do
-            if bossFilter[targetId] then
-                total = total + computeTotal(damage)
-            end
-        end
-    end
-
-    self._cache.bossPersonalTotalDamage = total
-    return total
-end
-
----Returns group total damage (personal + group, all targets)
+---Returns group total damage (personal + group, filtered by targetFilter only)
+---sourceFilter is intentionally not applied: the group denominator includes all
+---sources so that personalShare correctly reflects the player's contribution.
 ---@return number
 function ArithmancerInstance:groupTotalDamage()
     if self._cache.groupTotalDamage ~= nil then
@@ -466,116 +548,73 @@ function ArithmancerInstance:groupTotalDamage()
     end
 
     local source = self._source
-    local computeTotal = Arithmancer.ComputeDamageTotal
-    local total = 0
+    local targetFilter = self._targetFilter
 
-    -- Personal damage
-    for _, byTarget in pairs(source.damageByUnitId) do
-        for _, damage in pairs(byTarget) do
-            total = total + computeTotal(damage)
-        end
-    end
+    -- Personal damage (targetFilter only, no sourceFilter)
+    local filteredPersonal = Arithmancer.FilterDamageTable(source.damageByUnitId, targetFilter, nil)
+    local total = Arithmancer.ComputeNestedTotal(filteredPersonal)
 
-    -- Group damage
-    for _, byTarget in pairs(source.damageByUnitIdGroup) do
-        for _, damage in pairs(byTarget) do
-            total = total + computeTotal(damage)
-        end
-    end
+    -- Group damage (targetFilter only)
+    local filteredGroup = Arithmancer.FilterDamageTable(source.damageByUnitIdGroup, targetFilter, nil)
+    total = total + Arithmancer.ComputeNestedTotal(filteredGroup)
 
     self._cache.groupTotalDamage = total
     return total
 end
 
----Returns boss group total damage (personal + group, all bosses)
----@return number
-function ArithmancerInstance:bossGroupTotalDamage()
-    if self._cache.bossGroupTotalDamage ~= nil then
-        return self._cache.bossGroupTotalDamage
-    end
-
+---Returns per-boss group damage breakdown keyed by "bossTag:tagSeq"
+---Uses damageByUnitId (personal) + damageByUnitIdGroup (all observed group members)
+---Reads bossTagSeqByUnitId from the source data
+---@return table<string, number> perBossDamage Maps "bossTag:tagSeq" -> total damage
+function ArithmancerInstance:groupDamageByBoss()
     local source = self._source
+    local bossTagSeqByUnitId = source.bossTagSeqByUnitId
+    if not bossTagSeqByUnitId then return {} end
+
     local computeTotal = Arithmancer.ComputeDamageTotal
-
-    -- Build boss filter
-    local bossFilter = nil
-    if source.bossesUnits then
-        bossFilter = {}
-        for _, bossId in ipairs(source.bossesUnits) do
-            bossFilter[bossId] = true
-        end
-    elseif source.bossesByUnitId then
-        bossFilter = {}
-        for unitId in pairs(source.bossesByUnitId) do
-            bossFilter[unitId] = true
-        end
-    end
-
-    if not bossFilter then
-        self._cache.bossGroupTotalDamage = 0
-        return 0
-    end
-
-    local total = 0
+    ---@type table<string, number>
+    local result = {}
 
     -- Personal damage to bosses
-    for _, byTarget in pairs(source.damageByUnitId) do
-        for targetId, damage in pairs(byTarget) do
-            if bossFilter[targetId] then
-                total = total + computeTotal(damage)
+    if source.damageByUnitId then
+        for _, byTarget in pairs(source.damageByUnitId) do
+            for targetId, damage in pairs(byTarget) do
+                local key = bossTagSeqByUnitId[targetId]
+                if key then
+                    result[key] = (result[key] or 0) + computeTotal(damage)
+                end
             end
         end
     end
 
     -- Group damage to bosses
-    for _, byTarget in pairs(source.damageByUnitIdGroup) do
-        for targetId, damage in pairs(byTarget) do
-            if bossFilter[targetId] then
-                total = total + computeTotal(damage)
+    if source.damageByUnitIdGroup then
+        for _, byTarget in pairs(source.damageByUnitIdGroup) do
+            for targetId, damage in pairs(byTarget) do
+                local key = bossTagSeqByUnitId[targetId]
+                if key then
+                    result[key] = (result[key] or 0) + computeTotal(damage)
+                end
             end
         end
     end
 
-    self._cache.bossGroupTotalDamage = total
-    return total
+    return result
 end
 
----Returns total damage taken
+---Returns total damage taken (filtered by sourceFilter)
 ---@return number
 function ArithmancerInstance:damageTakenTotal()
     if self._cache.damageTakenTotal ~= nil then
         return self._cache.damageTakenTotal
     end
 
-    local source = self._source
-    local computeTotal = Arithmancer.ComputeDamageTotal
-    local total = 0
-
-    for _, byTarget in pairs(source.damageTakenByUnitId) do
-        for _, damage in pairs(byTarget) do
-            total = total + computeTotal(damage)
-        end
-    end
-
+    local total = Arithmancer.ComputeNestedTotal(self:filteredDamageTakenTable())
     self._cache.damageTakenTotal = total
     return total
 end
 
----Returns personal DTPS (damage taken per second)
----@return number
-function ArithmancerInstance:personalDTPS()
-    if self._cache.personalDTPS ~= nil then
-        return self._cache.personalDTPS
-    end
-
-    local durationS = self:getDurationS()
-    local total = self:damageTakenTotal()
-    local dtps = durationS >= 0.001 and (total / durationS) or 0
-    self._cache.personalDTPS = dtps
-    return dtps
-end
-
----Returns personal DPS (all targets)
+---Returns personal DPS (filtered by constructor filters)
 ---@return number
 function ArithmancerInstance:personalDPS()
     if self._cache.personalDPS ~= nil then
@@ -589,21 +628,7 @@ function ArithmancerInstance:personalDPS()
     return dps
 end
 
----Returns boss personal DPS
----@return number
-function ArithmancerInstance:bossPersonalDPS()
-    if self._cache.bossPersonalDPS ~= nil then
-        return self._cache.bossPersonalDPS
-    end
-
-    local durationS = self:getDurationS()
-    local total = self:bossPersonalTotalDamage()
-    local dps = durationS >= 0.001 and (total / durationS) or 0
-    self._cache.bossPersonalDPS = dps
-    return dps
-end
-
----Returns personal share of total damage (0-100)
+---Returns personal share of total damage (0-100, filtered by constructor filters)
 ---@return number
 function ArithmancerInstance:personalShare()
     if self._cache.personalShare ~= nil then
@@ -617,21 +642,7 @@ function ArithmancerInstance:personalShare()
     return share
 end
 
----Returns personal share of boss damage (0-100)
----@return number
-function ArithmancerInstance:bossPersonalShare()
-    if self._cache.bossPersonalShare ~= nil then
-        return self._cache.bossPersonalShare
-    end
-
-    local personal = self:bossPersonalTotalDamage()
-    local group = self:bossGroupTotalDamage()
-    local share = group > 0 and (personal / group * 100) or 0
-    self._cache.bossPersonalShare = share
-    return share
-end
-
----Returns total raw healing done by personal sources
+---Returns total raw healing done by personal sources (filtered)
 ---@return number
 function ArithmancerInstance:personalTotalRawHealingOut()
     if self._cache.personalTotalRawHealingOut ~= nil then
@@ -642,11 +653,16 @@ function ArithmancerInstance:personalTotalRawHealingOut()
     local total = 0
 
     if source.healingStats then
-        if source.healingStats.selfHealing then
+        -- Include self healing if not filtered out by targetFilter
+        local includeSelf = not self._targetFilter or self._targetFilter[-1]
+        if includeSelf and source.healingStats.selfHealing then
             total = total + (source.healingStats.selfHealing.total.raw or 0)
         end
-        for _, data in pairs(source.healingStats.healingOutToGroup or {}) do
-            total = total + (data.total.raw or 0)
+        local filteredHealingOut = self:filteredHealingOutTable()
+        if filteredHealingOut then
+            for _, data in pairs(filteredHealingOut) do
+                total = total + (data.total.raw or 0)
+            end
         end
     end
 
@@ -654,7 +670,7 @@ function ArithmancerInstance:personalTotalRawHealingOut()
     return total
 end
 
----Returns total effective healing done by personal sources
+---Returns total effective healing done by personal sources (filtered)
 ---@return number
 function ArithmancerInstance:personalTotalEffectiveHealingOut()
     if self._cache.personalTotalEffectiveHealingOut ~= nil then
@@ -665,11 +681,15 @@ function ArithmancerInstance:personalTotalEffectiveHealingOut()
     local total = 0
 
     if source.healingStats then
-        if source.healingStats.selfHealing then
+        local includeSelf = not self._targetFilter or self._targetFilter[-1]
+        if includeSelf and source.healingStats.selfHealing then
             total = total + (source.healingStats.selfHealing.total.real or 0)
         end
-        for _, data in pairs(source.healingStats.healingOutToGroup or {}) do
-            total = total + (data.total.real or 0)
+        local filteredHealingOut = self:filteredHealingOutTable()
+        if filteredHealingOut then
+            for _, data in pairs(filteredHealingOut) do
+                total = total + (data.total.real or 0)
+            end
         end
     end
 
@@ -709,111 +729,32 @@ end
 -- BREAKDOWN METHODS (Sync, On-Demand)
 -- =============================================================================
 
----Returns AOE vs single target breakdown for personal damage (all targets)
+---Returns AOE vs single target breakdown for personal damage (filtered)
 ---@return { aoe: number, singleTarget: number }
 function ArithmancerInstance:personalAoeVsSingleTarget()
     if self._cache.personalAoeVsSingleTarget ~= nil then
         return self._cache.personalAoeVsSingleTarget
     end
 
-    local result = Arithmancer.ComputeAoeVsSingleTarget(self._source.damageByUnitId)
+    local result = Arithmancer.ComputeAoeVsSingleTarget(self:filteredDamageTable())
     self._cache.personalAoeVsSingleTarget = result
     return result
 end
 
----Returns AOE vs single target breakdown for boss damage only
----@return { aoe: number, singleTarget: number }
-function ArithmancerInstance:bossAoeVsSingleTarget()
-    if self._cache.bossAoeVsSingleTarget ~= nil then
-        return self._cache.bossAoeVsSingleTarget
-    end
-
-    local source = self._source
-
-    -- Build boss filter
-    local bossFilter = nil
-    if source.bossesUnits then
-        bossFilter = {}
-        for _, bossId in ipairs(source.bossesUnits) do
-            bossFilter[bossId] = true
-        end
-    elseif source.bossesByUnitId then
-        bossFilter = {}
-        for unitId in pairs(source.bossesByUnitId) do
-            bossFilter[unitId] = true
-        end
-    end
-
-    if not bossFilter then
-        local result = { aoe = 0, singleTarget = 0 }
-        self._cache.bossAoeVsSingleTarget = result
-        return result
-    end
-
-    local filtered = Arithmancer.FilterDamageTable(source.damageByUnitId, bossFilter, nil)
-    local result = Arithmancer.ComputeAoeVsSingleTarget(filtered)
-    self._cache.bossAoeVsSingleTarget = result
-    return result
-end
-
----Returns DOT vs Direct breakdown for personal damage (all targets)
+---Returns DOT vs Direct breakdown for personal damage (filtered)
 ---@return { dot: number, direct: number }
 function ArithmancerInstance:personalDotVsDirect()
     if self._cache.personalDotVsDirect ~= nil then
         return self._cache.personalDotVsDirect
     end
 
-    local source = self._source
+    local damageTable = self:filteredDamageTable()
     local abilityInfo = self._abilityInfo
     local dot, direct = 0, 0
 
-    for _, byTarget in pairs(source.damageByUnitId) do
-        for _, damage in pairs(byTarget) do
-            local breakdown = Arithmancer.ComputeByDotOrDirect(damage, abilityInfo)
-            dot = dot + (breakdown.dot or 0)
-            direct = direct + (breakdown.direct or 0)
-        end
-    end
-
-    local result = { dot = dot, direct = direct }
-    self._cache.personalDotVsDirect = result
-    return result
-end
-
----Returns DOT vs Direct breakdown for boss damage only
----@return { dot: number, direct: number }
-function ArithmancerInstance:bossDotVsDirect()
-    if self._cache.bossDotVsDirect ~= nil then
-        return self._cache.bossDotVsDirect
-    end
-
-    local source = self._source
-    local abilityInfo = self._abilityInfo
-
-    -- Build boss filter
-    local bossFilter = nil
-    if source.bossesUnits then
-        bossFilter = {}
-        for _, bossId in ipairs(source.bossesUnits) do
-            bossFilter[bossId] = true
-        end
-    elseif source.bossesByUnitId then
-        bossFilter = {}
-        for unitId in pairs(source.bossesByUnitId) do
-            bossFilter[unitId] = true
-        end
-    end
-
-    if not bossFilter then
-        local result = { dot = 0, direct = 0 }
-        self._cache.bossDotVsDirect = result
-        return result
-    end
-
-    local dot, direct = 0, 0
-    for _, byTarget in pairs(source.damageByUnitId) do
-        for targetId, damage in pairs(byTarget) do
-            if bossFilter[targetId] then
+    if damageTable then
+        for _, byTarget in pairs(damageTable) do
+            for _, damage in pairs(byTarget) do
                 local breakdown = Arithmancer.ComputeByDotOrDirect(damage, abilityInfo)
                 dot = dot + (breakdown.dot or 0)
                 direct = direct + (breakdown.direct or 0)
@@ -822,70 +763,126 @@ function ArithmancerInstance:bossDotVsDirect()
     end
 
     local result = { dot = dot, direct = direct }
-    self._cache.bossDotVsDirect = result
+    self._cache.personalDotVsDirect = result
+    return result
+end
+
+---Returns damage by damage type aggregated across personal damage targets (filtered)
+---@return table<DamageType, number> byDamageType Map of damageType -> total damage
+function ArithmancerInstance:personalDamageByType()
+    if self._cache.personalDamageByType ~= nil then
+        return self._cache.personalDamageByType
+    end
+
+    local damageTable = self:filteredDamageTable()
+    local abilityInfo = self._abilityInfo
+    local result = {}
+
+    if damageTable then
+        for _, byTarget in pairs(damageTable) do
+            for _, damage in pairs(byTarget) do
+                local types = Arithmancer.ComputeByDamageType(damage, abilityInfo)
+                for damageType, amount in pairs(types) do
+                    result[damageType] = (result[damageType] or 0) + amount
+                end
+            end
+        end
+    end
+
+    self._cache.personalDamageByType = result
+    return result
+end
+
+---Returns DOT vs Direct breakdown for damage taken (filtered)
+---@return { dot: number, direct: number }
+function ArithmancerInstance:damageTakenDotVsDirect()
+    if self._cache.damageTakenDotVsDirect ~= nil then
+        return self._cache.damageTakenDotVsDirect
+    end
+
+    local damageTakenTable = self:filteredDamageTakenTable()
+    local abilityInfo = self._abilityInfo
+    local dot, direct = 0, 0
+
+    if damageTakenTable then
+        for _, byTarget in pairs(damageTakenTable) do
+            for _, damage in pairs(byTarget) do
+                local breakdown = Arithmancer.ComputeByDotOrDirect(damage, abilityInfo)
+                dot = dot + (breakdown.dot or 0)
+                direct = direct + (breakdown.direct or 0)
+            end
+        end
+    end
+
+    local result = { dot = dot, direct = direct }
+    self._cache.damageTakenDotVsDirect = result
+    return result
+end
+
+---Returns damage taken by damage type (filtered)
+---@return table<DamageType, number> byDamageType Map of damageType -> total damage
+function ArithmancerInstance:damageTakenByType()
+    if self._cache.damageTakenByType ~= nil then
+        return self._cache.damageTakenByType
+    end
+
+    local damageTakenTable = self:filteredDamageTakenTable()
+    local abilityInfo = self._abilityInfo
+    local result = {}
+
+    if damageTakenTable then
+        for _, byTarget in pairs(damageTakenTable) do
+            for _, damage in pairs(byTarget) do
+                local types = Arithmancer.ComputeByDamageType(damage, abilityInfo)
+                for damageType, amount in pairs(types) do
+                    result[damageType] = (result[damageType] or 0) + amount
+                end
+            end
+        end
+    end
+
+    self._cache.damageTakenByType = result
     return result
 end
 
 -- =============================================================================
 -- SUMMARY METHODS (Return data objects ready for rendering)
--- These methods support optional filters. Unfiltered results are cached.
+-- All methods are parameterless and cache unconditionally.
+-- Filters are applied via constructor (Make/ForBosses).
 -- =============================================================================
 
 ---@class DamageSummary
 ---@field dps number DPS (damage per second)
 ---@field groupDps number|nil Group DPS (nil if no group data)
 ---@field share number Personal damage share as percentage (0-100)
+---@field personalTotal number Total personal damage
+---@field groupTotal number|nil Total group damage (nil if no group data)
 
----Returns damage summary data for rendering: {dps, groupDps, share}
----@param targetFilter table<number, boolean>|nil Target unit IDs to include
----@param sourceFilter table<number, boolean>|nil Source unit IDs to include
----@param bossOnly boolean|nil If true, only include boss targets
+---Returns damage summary data for rendering
 ---@return DamageSummary
-function ArithmancerInstance:getDamageSummary(targetFilter, sourceFilter, bossOnly)
-    local hasFilters = targetFilter or sourceFilter or bossOnly
-
-    -- Check cache for unfiltered (return same table reference)
-    if not hasFilters and self._cache.damageSummary then
+function ArithmancerInstance:getDamageSummary()
+    if self._cache.damageSummary then
         return self._cache.damageSummary
     end
 
-    local source = self._source
     local durationS = self:getDurationS()
+    local personalDamage = self:personalTotalDamage()
+    local groupDamage = self:groupTotalDamage()
 
-    -- Build effective target filter for bossOnly
-    local effectiveTargetFilter = targetFilter
-    if bossOnly and not targetFilter then
-        effectiveTargetFilter = {}
-        for _, bossId in ipairs(source.bossesUnits or {}) do
-            effectiveTargetFilter[bossId] = true
-        end
-    end
-
-    -- Compute totals
-    local personalDamage, groupDamage
-    if hasFilters then
-        local filteredPersonal = Arithmancer.FilterDamageTable(source.damageByUnitId, effectiveTargetFilter, sourceFilter)
-        local filteredGroup = Arithmancer.FilterDamageTable(source.damageByUnitIdGroup, effectiveTargetFilter, nil)
-        personalDamage = Arithmancer.ComputeNestedTotal(filteredPersonal)
-        local groupOnlyDamage = Arithmancer.ComputeNestedTotal(filteredGroup)
-        groupDamage = personalDamage + groupOnlyDamage
-    else
-        personalDamage = self:personalTotalDamage()
-        groupDamage = self:groupTotalDamage()
-    end
-
-    -- Compute summary
     local dps = durationS > 0 and (personalDamage / durationS) or 0
-    local groupDps = groupDamage > personalDamage and (durationS > 0 and (groupDamage / durationS) or 0) or nil
+    local hasGroup = groupDamage > personalDamage
+    local groupDps = hasGroup and (durationS > 0 and (groupDamage / durationS) or 0) or nil
     local share = groupDamage > 0 and (personalDamage / groupDamage * 100) or 100
 
-    local result = { dps = dps, groupDps = groupDps, share = share }
+    local result = {
+        dps = dps,
+        groupDps = groupDps,
+        share = share,
+        personalTotal = personalDamage,
+        groupTotal = hasGroup and groupDamage or nil,
+    }
 
-    -- Cache unfiltered result
-    if not hasFilters then
-        self._cache.damageSummary = result
-    end
-
+    self._cache.damageSummary = result
     return result
 end
 
@@ -896,34 +893,19 @@ end
 ---@field stPercent number|nil Single-target damage percentage (nil if no data)
 
 ---Returns damage composition data: {dotPercent, directPercent, aoePercent, stPercent}
----@param targetFilter table<number, boolean>|nil Target unit IDs to include
----@param sourceFilter table<number, boolean>|nil Source unit IDs to include
----@param bossOnly boolean|nil If true, only include boss targets
 ---@return DamageComposition
-function ArithmancerInstance:getDamageComposition(targetFilter, sourceFilter, bossOnly)
-    local hasFilters = targetFilter or sourceFilter or bossOnly
-
-    -- Check cache for unfiltered (return same table reference)
-    if not hasFilters and self._cache.damageComposition then
+function ArithmancerInstance:getDamageComposition()
+    if self._cache.damageComposition then
         return self._cache.damageComposition
     end
 
-    local source = self._source
     local abilityInfo = self._abilityInfo
+    local damageTable = self:filteredDamageTable()
 
-    -- Build effective target filter for bossOnly
-    local effectiveTargetFilter = targetFilter
-    if bossOnly and not targetFilter then
-        effectiveTargetFilter = {}
-        for _, bossId in ipairs(source.bossesUnits or {}) do
-            effectiveTargetFilter[bossId] = true
-        end
-    end
-
-    -- Get filtered damage table
-    local damageTable = Arithmancer.FilterDamageTable(source.damageByUnitId, effectiveTargetFilter, sourceFilter)
     if not damageTable then
-        return { dotPercent = nil, directPercent = nil, aoePercent = nil, stPercent = nil }
+        local result = { dotPercent = nil, directPercent = nil, aoePercent = nil, stPercent = nil }
+        self._cache.damageComposition = result
+        return result
     end
 
     -- DOT vs Direct
@@ -952,12 +934,7 @@ function ArithmancerInstance:getDamageComposition(targetFilter, sourceFilter, bo
     end
 
     local result = { dotPercent = dotPercent, directPercent = directPercent, aoePercent = aoePercent, stPercent = stPercent }
-
-    -- Cache unfiltered result
-    if not hasFilters then
-        self._cache.damageComposition = result
-    end
-
+    self._cache.damageComposition = result
     return result
 end
 
@@ -966,31 +943,13 @@ end
 ---@field maxHit number Maximum single hit value
 
 ---Returns damage quality data: {critRate, maxHit}
----@param targetFilter table<number, boolean>|nil Target unit IDs to include
----@param sourceFilter table<number, boolean>|nil Source unit IDs to include
----@param bossOnly boolean|nil If true, only include boss targets
 ---@return DamageQuality
-function ArithmancerInstance:getDamageQuality(targetFilter, sourceFilter, bossOnly)
-    local hasFilters = targetFilter or sourceFilter or bossOnly
-
-    -- Check cache for unfiltered (return same table reference)
-    if not hasFilters and self._cache.damageQuality then
+function ArithmancerInstance:getDamageQuality()
+    if self._cache.damageQuality then
         return self._cache.damageQuality
     end
 
-    local source = self._source
-
-    -- Build effective target filter for bossOnly
-    local effectiveTargetFilter = targetFilter
-    if bossOnly and not targetFilter then
-        effectiveTargetFilter = {}
-        for _, bossId in ipairs(source.bossesUnits or {}) do
-            effectiveTargetFilter[bossId] = true
-        end
-    end
-
-    -- Get filtered damage table
-    local damageTable = Arithmancer.FilterDamageTable(source.damageByUnitId, effectiveTargetFilter, sourceFilter)
+    local damageTable = self:filteredDamageTable()
 
     local totalHits = 0
     local critHits = 0
@@ -1012,12 +971,7 @@ function ArithmancerInstance:getDamageQuality(targetFilter, sourceFilter, bossOn
 
     local critRate = totalHits > 0 and (critHits / totalHits * 100) or 0
     local result = { critRate = critRate, maxHit = maxHit }
-
-    -- Cache unfiltered result
-    if not hasFilters then
-        self._cache.damageQuality = result
-    end
-
+    self._cache.damageQuality = result
     return result
 end
 
@@ -1026,56 +980,34 @@ end
 ---@field total number Total damage taken
 
 ---Returns damage taken summary data: {dtps, total}
----@param sourceFilter table<number, boolean>|nil Source (attacker) unit IDs to include
 ---@return DamageTakenSummary
-function ArithmancerInstance:getDamageTakenSummary(sourceFilter)
-    local hasFilters = sourceFilter
-
-    -- Check cache for unfiltered (return same table reference)
-    if not hasFilters and self._cache.damageTakenSummary then
+function ArithmancerInstance:getDamageTakenSummary()
+    if self._cache.damageTakenSummary then
         return self._cache.damageTakenSummary
     end
 
-    local source = self._source
     local durationS = self:getDurationS()
-
-    local total
-    if hasFilters then
-        local filtered = Arithmancer.FilterDamageTakenTable(source.damageTakenByUnitId, sourceFilter)
-        total = Arithmancer.ComputeNestedTotal(filtered)
-    else
-        total = self:damageTakenTotal()
-    end
-
+    local total = self:damageTakenTotal()
     local dtps = durationS > 0 and (total / durationS) or 0
     local result = { dtps = dtps, total = total }
-
-    -- Cache unfiltered result
-    if not hasFilters then
-        self._cache.damageTakenSummary = result
-    end
-
+    self._cache.damageTakenSummary = result
     return result
 end
 
 ---Returns damage taken composition data: {dotPercent, directPercent, aoePercent, stPercent}
----@param sourceFilter table<number, boolean>|nil Source (attacker) unit IDs to include
 ---@return DamageComposition
-function ArithmancerInstance:getDamageTakenComposition(sourceFilter)
-    local hasFilters = sourceFilter
-
-    -- Check cache for unfiltered (return same table reference)
-    if not hasFilters and self._cache.damageTakenComposition then
+function ArithmancerInstance:getDamageTakenComposition()
+    if self._cache.damageTakenComposition then
         return self._cache.damageTakenComposition
     end
 
-    local source = self._source
     local abilityInfo = self._abilityInfo
+    local damageTakenTable = self:filteredDamageTakenTable()
 
-    -- Get filtered damage taken table
-    local damageTakenTable = Arithmancer.FilterDamageTakenTable(source.damageTakenByUnitId, sourceFilter)
     if not damageTakenTable then
-        return { dotPercent = nil, directPercent = nil, aoePercent = nil, stPercent = nil }
+        local result = { dotPercent = nil, directPercent = nil, aoePercent = nil, stPercent = nil }
+        self._cache.damageTakenComposition = result
+        return result
     end
 
     -- DOT vs Direct
@@ -1104,30 +1036,18 @@ function ArithmancerInstance:getDamageTakenComposition(sourceFilter)
     end
 
     local result = { dotPercent = dotPercent, directPercent = directPercent, aoePercent = aoePercent, stPercent = stPercent }
-
-    -- Cache unfiltered result
-    if not hasFilters then
-        self._cache.damageTakenComposition = result
-    end
-
+    self._cache.damageTakenComposition = result
     return result
 end
 
 ---Returns damage taken quality data: {critRate, maxHit}
----@param sourceFilter table<number, boolean>|nil Source (attacker) unit IDs to include
 ---@return DamageQuality
-function ArithmancerInstance:getDamageTakenQuality(sourceFilter)
-    local hasFilters = sourceFilter
-
-    -- Check cache for unfiltered (return same table reference)
-    if not hasFilters and self._cache.damageTakenQuality then
+function ArithmancerInstance:getDamageTakenQuality()
+    if self._cache.damageTakenQuality then
         return self._cache.damageTakenQuality
     end
 
-    local source = self._source
-
-    -- Get filtered damage taken table
-    local damageTakenTable = Arithmancer.FilterDamageTakenTable(source.damageTakenByUnitId, sourceFilter)
+    local damageTakenTable = self:filteredDamageTakenTable()
 
     local totalHits = 0
     local critHits = 0
@@ -1149,12 +1069,7 @@ function ArithmancerInstance:getDamageTakenQuality(sourceFilter)
 
     local critRate = totalHits > 0 and (critHits / totalHits * 100) or 0
     local result = { critRate = critRate, maxHit = maxHit }
-
-    -- Cache unfiltered result
-    if not hasFilters then
-        self._cache.damageTakenQuality = result
-    end
-
+    self._cache.damageTakenQuality = result
     return result
 end
 
@@ -1166,13 +1081,9 @@ end
 ---@field overhealPercent number Overheal percentage (0-100)
 
 ---Returns healing out summary data: {rawHps, effectiveHps, total, rawTotal, overhealPercent}
----@param targetFilter table<number, boolean>|nil Target unit IDs to include (use -1 for self)
 ---@return HealingSummary
-function ArithmancerInstance:getHealingOutSummary(targetFilter)
-    local hasFilters = targetFilter
-
-    -- Check cache for unfiltered (return same table reference)
-    if not hasFilters and self._cache.healingOutSummary then
+function ArithmancerInstance:getHealingOutSummary()
+    if self._cache.healingOutSummary then
         return self._cache.healingOutSummary
     end
 
@@ -1187,7 +1098,7 @@ function ArithmancerInstance:getHealingOutSummary(targetFilter)
     local rawTotal, effectiveTotal = 0, 0
 
     -- Filter healing out to group
-    local filteredHealingOut = Arithmancer.FilterHealingOutTable(healingStats.healingOutToGroup, targetFilter)
+    local filteredHealingOut = self:filteredHealingOutTable()
     if filteredHealingOut then
         for _, data in pairs(filteredHealingOut) do
             rawTotal = rawTotal + (data.total.raw or 0)
@@ -1196,7 +1107,7 @@ function ArithmancerInstance:getHealingOutSummary(targetFilter)
     end
 
     -- Include self healing if not filtered out
-    local includeSelf = not targetFilter or targetFilter[-1]
+    local includeSelf = not self._targetFilter or self._targetFilter[-1]
     if includeSelf and healingStats.selfHealing then
         rawTotal = rawTotal + (healingStats.selfHealing.total.raw or 0)
         effectiveTotal = effectiveTotal + (healingStats.selfHealing.total.real or 0)
@@ -1207,12 +1118,7 @@ function ArithmancerInstance:getHealingOutSummary(targetFilter)
     local overhealPercent = rawTotal > 0 and ((rawTotal - effectiveTotal) / rawTotal * 100) or 0
 
     local result = { rawHps = rawHps, effectiveHps = effectiveHps, total = effectiveTotal, rawTotal = rawTotal, overhealPercent = overhealPercent }
-
-    -- Cache unfiltered result
-    if not hasFilters then
-        self._cache.healingOutSummary = result
-    end
-
+    self._cache.healingOutSummary = result
     return result
 end
 
@@ -1245,13 +1151,9 @@ function ArithmancerInstance:getSelfHealingSummary()
 end
 
 ---Returns healing in summary data: {rawHps, effectiveHps, total, rawTotal, overhealPercent}
----@param sourceFilter table<number, boolean>|nil Source unit IDs to include
 ---@return HealingSummary
-function ArithmancerInstance:getHealingInSummary(sourceFilter)
-    local hasFilters = sourceFilter
-
-    -- Check cache for unfiltered (return same table reference)
-    if not hasFilters and self._cache.healingInSummary then
+function ArithmancerInstance:getHealingInSummary()
+    if self._cache.healingInSummary then
         return self._cache.healingInSummary
     end
 
@@ -1265,7 +1167,7 @@ function ArithmancerInstance:getHealingInSummary(sourceFilter)
 
     local rawTotal, effectiveTotal = 0, 0
 
-    local filteredHealingIn = Arithmancer.FilterHealingInTable(healingStats.healingInFromGroup, sourceFilter)
+    local filteredHealingIn = self:filteredHealingInTable()
     if filteredHealingIn then
         for _, data in pairs(filteredHealingIn) do
             rawTotal = rawTotal + (data.total.raw or 0)
@@ -1278,38 +1180,7 @@ function ArithmancerInstance:getHealingInSummary(sourceFilter)
     local overhealPercent = rawTotal > 0 and ((rawTotal - effectiveTotal) / rawTotal * 100) or 0
 
     local result = { rawHps = rawHps, effectiveHps = effectiveHps, total = effectiveTotal, rawTotal = rawTotal, overhealPercent = overhealPercent }
-
-    -- Cache unfiltered result
-    if not hasFilters then
-        self._cache.healingInSummary = result
-    end
-
-    return result
-end
-
----Returns damage by damage type aggregated across personal damage targets
----@return table<DamageType, number> byDamageType Map of damageType -> total damage
-function ArithmancerInstance:personalDamageByType()
-    if self._cache.personalDamageByType ~= nil then
-        return self._cache.personalDamageByType
-    end
-
-    local damageTable = self._source.damageByUnitId
-    local abilityInfo = self._abilityInfo
-    local result = {}
-
-    if damageTable then
-        for _, byTarget in pairs(damageTable) do
-            for _, damage in pairs(byTarget) do
-                local types = Arithmancer.ComputeByDamageType(damage, abilityInfo)
-                for damageType, amount in pairs(types) do
-                    result[damageType] = (result[damageType] or 0) + amount
-                end
-            end
-        end
-    end
-
-    self._cache.personalDamageByType = result
+    self._cache.healingInSummary = result
     return result
 end
 
@@ -1317,7 +1188,7 @@ end
 -- SHARED ENCOUNTER DATA
 -- =============================================================================
 
----Build a SharedEncounterData summary for network sharing.
+---Build a SharedEncounterData summary for network sharing or display.
 ---Uses aggregated stats from this arithmancer instance with per-boss breakdowns.
 ---Reads bossTagSeqByUnitId from the source data.
 ---@return SharedEncounterData
@@ -1521,4 +1392,144 @@ function ArithmancerInstance:buildSharedEncounterData()
         topDamageTakenAbilities = topDamageTakenAbilities,
         deaths = deaths,
     }
+end
+
+-- =============================================================================
+-- HEALING QUALITY METHODS
+-- =============================================================================
+
+---@class HealingQuality
+---@field critRate number Critical hit rate as percentage (0-100)
+---@field maxHeal number Maximum raw heal value
+
+---Returns healing out quality data: {critRate, maxHeal}
+---Aggregates across all healing out targets + self healing (filtered)
+---@return HealingQuality
+function ArithmancerInstance:getHealingOutQuality()
+    if self._cache.healingOutQuality then
+        return self._cache.healingOutQuality
+    end
+
+    local source = self._source
+    local healingStats = source.healingStats
+    local totalTicks, totalCritTicks, maxHeal = 0, 0, 0
+
+    if healingStats then
+        local filteredHealingOut = self:filteredHealingOutTable()
+        if filteredHealingOut then
+            for _, targetData in pairs(filteredHealingOut) do
+                if targetData.bySourceUnitIdByAbilityId then
+                    for _, byAbility in pairs(targetData.bySourceUnitIdByAbilityId) do
+                        for _, breakdown in pairs(byAbility) do
+                            totalTicks = totalTicks + (breakdown.ticks or 0)
+                            totalCritTicks = totalCritTicks + (breakdown.critTicks or 0)
+                            if breakdown.maxTick and breakdown.maxTick > maxHeal then
+                                maxHeal = breakdown.maxTick
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        -- Include self-healing if not filtered out
+        local includeSelf = not self._targetFilter or self._targetFilter[-1]
+        if includeSelf and healingStats.selfHealing and healingStats.selfHealing.bySourceUnitIdByAbilityId then
+            for _, byAbility in pairs(healingStats.selfHealing.bySourceUnitIdByAbilityId) do
+                for _, breakdown in pairs(byAbility) do
+                    totalTicks = totalTicks + (breakdown.ticks or 0)
+                    totalCritTicks = totalCritTicks + (breakdown.critTicks or 0)
+                    if breakdown.maxTick and breakdown.maxTick > maxHeal then
+                        maxHeal = breakdown.maxTick
+                    end
+                end
+            end
+        end
+    end
+
+    local critRate = totalTicks > 0 and (totalCritTicks / totalTicks * 100) or 0
+    local result = { critRate = critRate, maxHeal = maxHeal }
+    self._cache.healingOutQuality = result
+    return result
+end
+
+---Returns self healing quality data: {critRate, maxHeal}
+---@return HealingQuality
+function ArithmancerInstance:getSelfHealingQuality()
+    if self._cache.selfHealingQuality then
+        return self._cache.selfHealingQuality
+    end
+
+    local source = self._source
+    local healingStats = source.healingStats
+
+    if not healingStats or not healingStats.selfHealing or not healingStats.selfHealing.bySourceUnitIdByAbilityId then
+        local result = { critRate = 0, maxHeal = 0 }
+        self._cache.selfHealingQuality = result
+        return result
+    end
+
+    local totalTicks, totalCritTicks, maxHeal = 0, 0, 0
+    for _, byAbility in pairs(healingStats.selfHealing.bySourceUnitIdByAbilityId) do
+        for _, breakdown in pairs(byAbility) do
+            totalTicks = totalTicks + (breakdown.ticks or 0)
+            totalCritTicks = totalCritTicks + (breakdown.critTicks or 0)
+            if breakdown.maxTick and breakdown.maxTick > maxHeal then
+                maxHeal = breakdown.maxTick
+            end
+        end
+    end
+
+    local critRate = totalTicks > 0 and (totalCritTicks / totalTicks * 100) or 0
+    local result = { critRate = critRate, maxHeal = maxHeal }
+    self._cache.selfHealingQuality = result
+    return result
+end
+
+---Returns healing in quality data: {critRate, maxHeal}
+---Aggregates across all healing in sources + self healing (filtered)
+---@return HealingQuality
+function ArithmancerInstance:getHealingInQuality()
+    if self._cache.healingInQuality then
+        return self._cache.healingInQuality
+    end
+
+    local source = self._source
+    local healingStats = source.healingStats
+    local totalTicks, totalCritTicks, maxHeal = 0, 0, 0
+
+    if healingStats then
+        local filteredHealingIn = self:filteredHealingInTable()
+        if filteredHealingIn then
+            for _, sourceData in pairs(filteredHealingIn) do
+                if sourceData.byAbilityId then
+                    for _, breakdown in pairs(sourceData.byAbilityId) do
+                        totalTicks = totalTicks + (breakdown.ticks or 0)
+                        totalCritTicks = totalCritTicks + (breakdown.critTicks or 0)
+                        if breakdown.maxTick and breakdown.maxTick > maxHeal then
+                            maxHeal = breakdown.maxTick
+                        end
+                    end
+                end
+            end
+        end
+
+        -- Include self-healing if no sourceFilter is active
+        if not self._sourceFilter and healingStats.selfHealing and healingStats.selfHealing.bySourceUnitIdByAbilityId then
+            for _, byAbility in pairs(healingStats.selfHealing.bySourceUnitIdByAbilityId) do
+                for _, breakdown in pairs(byAbility) do
+                    totalTicks = totalTicks + (breakdown.ticks or 0)
+                    totalCritTicks = totalCritTicks + (breakdown.critTicks or 0)
+                    if breakdown.maxTick and breakdown.maxTick > maxHeal then
+                        maxHeal = breakdown.maxTick
+                    end
+                end
+            end
+        end
+    end
+
+    local critRate = totalTicks > 0 and (totalCritTicks / totalTicks * 100) or 0
+    local result = { critRate = critRate, maxHeal = maxHeal }
+    self._cache.healingInQuality = result
+    return result
 end

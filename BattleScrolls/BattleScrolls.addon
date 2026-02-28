@@ -5,8 +5,8 @@
 ## AddOnVersion: {{addon_version}}
 ## Version: {{version}}
 ## IsLibrary: False
-## DependsOn: LibAsync>=30100
-## OptionalDependsOn: LibHarvensAddonSettings LibGroupBroadcast
+## DependsOn: LibGroupBroadcast>=95 LibAsync>=30100
+## OptionalDependsOn: LibHarvensAddonSettings
 ## SavedVariables: BattleScrollsSavedVariables
 
 ; Localization - default (English) must load first
@@ -71,11 +71,15 @@ ui/meter/meter.xml
 ; UI - Journal (types and utils load first, then renderers, then controllers)
 ui/journal/types.lua
 ui/journal/utils.lua
+ui/journal/tooltips.lua
 ui/journal/renderers/damage.lua
 ui/journal/renderers/healing.lua
 ui/journal/renderers/effects.lua
+ui/journal/renderers/group.lua
 ui/journal/renderers/overview.lua
 ui/journal/renderers/settings.lua
+ui/journal/keybinds.lua
+ui/journal/settings_templates.lua
 ui/journal/controllers/stats_list.lua
 ui/journal/controllers/instance_list.lua
 ui/journal/controllers/encounter_list.lua
@@ -84,6 +88,7 @@ ui/journal/dialogs.lua
 ui/journal/filters.lua
 ui/journal/overview_panel.lua
 ui/journal/chronicler.lua
+ui/journal/group_table.lua
 ui/journal/journal.xml
 ui/journal/dialogs.xml
 

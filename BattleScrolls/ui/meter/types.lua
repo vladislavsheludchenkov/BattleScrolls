@@ -24,14 +24,12 @@
 ---Optional methods:
 ---@field GetBottomAnchor fun(self: PersonalDesignModule): Control|nil Control for group meter "below" positioning
 ---@field GetTopAnchor fun(self: PersonalDesignModule): Control|nil Control for group meter "above" positioning
----@field RenderPreview fun(self: PersonalDesignModule)|nil Render with sample data
 ---@field OnSettingChanged fun(self: PersonalDesignModule, settingId: string, value: string|number)|nil Called when setting changes
 
 ---@class GroupDesignModule
 ---@field id string Unique design identifier
 ---@field displayName string Human-readable name for settings UI
 ---@field order number|nil Sort order (lower = first, default 100)
----@field supportsHPS boolean|nil Whether to show HPS section for healers
 ---@field settings DesignSettingDefinition[]|nil Custom dropdown settings
 ---Required methods:
 ---@field Initialize fun(self: GroupDesignModule, dpsMeter: DPSMeter) Initialize the design
@@ -41,7 +39,6 @@
 ---@field Hide fun(self: GroupDesignModule) Hide the design container
 ---@field Release fun(self: GroupDesignModule) Release pooled resources (called when hiding)
 ---Optional methods:
----@field RenderPreview fun(self: GroupDesignModule, members: GroupMemberEntry[], ctx: GroupRenderContext)|nil Render with sample data
 ---@field OnSettingChanged fun(self: GroupDesignModule, settingId: string, value: string|number)|nil Called when setting changes
 
 ---@class PersonalRenderContext
@@ -65,6 +62,7 @@
 ---@field highlightFallbackName string|nil Suggested name to highlight when displaying preview (doesn't include actual player name)
 ---@field groupDPS number|nil Total group DPS (all targets)
 ---@field bossGroupDPS number|nil Total group DPS (boss only, nil if not boss fight)
+---@field durationStr string|nil Formatted fight duration "M:SS"
 ---@field dpsMeter DPSMeter Reference to main DPS meter
 
 ---@class GroupMemberBase

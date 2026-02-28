@@ -23,11 +23,19 @@ local utils = {}
 ---@param value string|number|nil Value to display as sublabel
 ---@param icon string|nil Optional icon path
 ---@param header string|nil Optional header for section grouping
-function utils.addStatEntry(list, label, value, icon, header)
+---@param tooltipTitle string|nil Optional tooltip title
+---@param tooltipText string|nil Optional tooltip body text
+function utils.addStatEntry(list, label, value, icon, header, tooltipTitle, tooltipText)
     local entryData = ZO_GamepadEntryData:New(label, icon)
     entryData:SetIconTintOnSelection(true)
     if value then
         entryData:AddSubLabel(tostring(value))
+    end
+    if tooltipTitle then
+        entryData.tooltipTitle = tooltipTitle
+    end
+    if tooltipText then
+        entryData.tooltipText = tooltipText
     end
 
     if header then
@@ -59,6 +67,19 @@ function utils.formatDuration(durationMs)
     local minutes = math.floor(seconds / 60)
     seconds = seconds % 60
     return string.format("%d:%02d", minutes, seconds)
+end
+
+---Formats duration in milliseconds with fractional seconds (M:SS.s or S.ss)
+---@param durationMs number
+---@return string
+function utils.formatPreciseDuration(durationMs)
+    local durationS = durationMs / 1000
+    local minutes = math.floor(durationS / 60)
+    local seconds = durationS % 60
+    if minutes > 0 then
+        return string.format("%d:%04.1f", minutes, seconds)
+    end
+    return string.format("%.1fs", seconds)
 end
 
 ---Formats value with rate and percentage
@@ -136,6 +157,19 @@ function utils.formatDPS(dps)
         return string.format("%.1f", dps)
     else
         return string.format("%.2f", dps)
+    end
+end
+
+---Formats a number compactly (e.g., 45200 -> "45.2K")
+---@param value number
+---@return string
+function utils.formatCompact(value)
+    if value >= 1000000 then
+        return string.format("%.1fM", value / 1000000)
+    elseif value >= 1000 then
+        return string.format("%.1fK", value / 1000)
+    else
+        return string.format("%.0f", value)
     end
 end
 
@@ -222,6 +256,74 @@ function utils.getAbilityDisplayName(abilityId)
         return string.format("%s %d", GetString(BATTLESCROLLS_TOOLTIP_ABILITY), abilityId)
     end
     return abilityName
+end
+
+-------------------------
+-- Ability Merging
+-------------------------
+
+---Merges ability stats by display name (grouping morphs/variants with the same name).
+---Works with both damage stats (table values with .total, .ticks, .critTicks, .maxHit)
+---and healing stats (plain number values). The icon abilityId is chosen from the
+---highest-total variant within each name group.
+---@param abilityStats table<number, CritStats|number> Ability ID -> stats (table) or total (number)
+---@param maxCount number|nil Maximum entries to return (nil = all)
+---@return { abilityId: number, name: string, total: number, ticks: number, critTicks: number, maxHit: number }[]
+function utils.mergeAbilitiesByName(abilityStats, maxCount)
+    local nameGroups = {}
+    local nameOrder = {}
+
+    for abilityId, stats in pairs(abilityStats) do
+        local abilityName = utils.getAbilityDisplayName(abilityId)
+
+        if not nameGroups[abilityName] then
+            nameGroups[abilityName] = {
+                abilityId = abilityId,
+                name = abilityName,
+                total = 0,
+                ticks = 0,
+                critTicks = 0,
+                maxHit = 0,
+            }
+            table.insert(nameOrder, abilityName)
+        end
+
+        local group = nameGroups[abilityName]
+        local isTable = type(stats) == "table"
+        local total = isTable and stats.total or stats
+        group.total = group.total + total
+        if isTable then
+            group.ticks = group.ticks + (stats.ticks or 0)
+            group.critTicks = group.critTicks + (stats.critTicks or 0)
+            if (stats.maxHit or 0) > group.maxHit then
+                group.maxHit = stats.maxHit
+            end
+        end
+        -- Track which abilityId has highest total for icon selection
+        local prevStats = abilityStats[group.abilityId]
+        local prevTotal = type(prevStats) == "table" and prevStats.total or (prevStats or 0)
+        if total > prevTotal then
+            group.abilityId = abilityId
+        end
+    end
+
+    -- Convert to sorted array
+    local abilities = {}
+    for _, name in ipairs(nameOrder) do
+        table.insert(abilities, nameGroups[name])
+    end
+    table.sort(abilities, function(a, b) return a.total > b.total end)
+
+    -- Return top N if maxCount specified
+    if maxCount and maxCount < #abilities then
+        local result = {}
+        for i = 1, maxCount do
+            table.insert(result, abilities[i])
+        end
+        return result
+    end
+
+    return abilities
 end
 
 -------------------------
@@ -374,124 +476,6 @@ function utils.findMatchingIndex(oldValue, newDataList, selectedIndex, getNewVal
 end
 
 -------------------------
--- Encounter Display Names
--------------------------
-
----Gets the top enemies for an encounter by damage taken
----@param encounter Encounter
----@param unitNames table<number, string>
----@param maxCount number
----@return string|nil result Formatted string like "Enemy1, Enemy2 (x2), Enemy3", or nil if no data
-function utils.getTopEnemies(encounter, unitNames, maxCount)
-    if not encounter.damageByUnitId then
-        return nil
-    end
-
-    local computeTotal = BattleScrolls.arithmancer.ComputeDamageTotal
-    -- Group damage by enemy name (formatted), iterating nested structure
-    local damageByName = {}
-    local countByName = {}
-    local uniqueTargetIds = {}
-    for _, byTarget in pairs(encounter.damageByUnitId) do
-        for targetUnitId, dmg in pairs(byTarget) do
-            local rawName = unitNames[targetUnitId] or "Unknown"
-            local name = zo_strformat(SI_UNIT_NAME, rawName)
-            damageByName[name] = (damageByName[name] or 0) + computeTotal(dmg)
-            if not uniqueTargetIds[targetUnitId] then
-                uniqueTargetIds[targetUnitId] = true
-                countByName[name] = (countByName[name] or 0) + 1
-            end
-        end
-    end
-
-    -- Convert to sortable array
-    local enemies = {}
-    for name, dmg in pairs(damageByName) do
-        table.insert(enemies, { name = name, damage = dmg, count = countByName[name] })
-    end
-
-    -- Sort by damage descending
-    table.sort(enemies, function(a, b)
-        return a.damage > b.damage
-    end)
-
-    -- Take top N, but only include if damage is at least half of top-1
-    -- Also limit total string length to ~50 characters
-    local MAX_LENGTH = 50
-    local result = {}
-    local charCount = 0
-    local topDamage = enemies[1] and enemies[1].damage or 0
-    for i = 1, math.min(maxCount, #enemies) do
-        local enemy = enemies[i]
-        -- Only include if at least half of top damage (top-1 always included)
-        if i == 1 or enemy.damage >= topDamage / 2 then
-            -- Estimate length this enemy would add
-            local nameLen = utf8.len(enemy.name) or #enemy.name
-            local addLen = nameLen
-            if enemy.count > 1 then
-                addLen = addLen + 5-- " (xN)"
-            end
-            if #result > 0 then
-                addLen = addLen + 2 -- ", " separator
-            end
-
-            -- Stop if adding this would exceed limit (always include at least one)
-            if charCount + addLen > MAX_LENGTH and #result > 0 then
-                break
-            end
-
-            charCount = charCount + addLen
-            if enemy.count > 1 then
-                table.insert(result, string.format("%s (x%d)", enemy.name, enemy.count))
-            else
-                table.insert(result, enemy.name)
-            end
-        end
-    end
-
-    return #result > 0 and ZO_GenerateCommaSeparatedListWithAnd(result) or nil
-end
-
----Gets display name for an encounter
----@param encounter Encounter
----@param unitNames table<number, string>
----@return string
-function utils.getEncounterDisplayName(encounter, unitNames)
-    -- Boss fights: just show boss name(s)
-    if encounter.bossesUnits and #encounter.bossesUnits > 0 then
-        local namesCount = {}
-        for _, bossId in ipairs(encounter.bossesUnits) do
-            local bossName = unitNames[bossId] or "Unknown"
-            namesCount[bossName] = (namesCount[bossName] or 0) + 1
-        end
-        local names = {}
-        for name, count in pairs(namesCount) do
-            if count > 1 then
-                table.insert(names, string.format("%s (x%d)", zo_strformat(SI_UNIT_NAME, name), count))
-            else
-                table.insert(names, zo_strformat(SI_UNIT_NAME, name))
-            end
-        end
-
-        return ZO_GenerateCommaSeparatedListWithAnd(names)
-    end
-
-    -- Non-boss fights: "Fight in {location} with {enemies}"
-    local enemies = utils.getTopEnemies(encounter, unitNames, 3)
-    local location = encounter.location
-
-    if location and enemies then
-        return zo_strformat(GetString(BATTLESCROLLS_ENCOUNTER_FIGHT_IN_WITH), location, enemies)
-    elseif enemies then
-        return zo_strformat(GetString(BATTLESCROLLS_ENCOUNTER_FIGHT_WITH), enemies)
-    elseif location then
-        return zo_strformat(GetString(BATTLESCROLLS_ENCOUNTER_FIGHT_IN), location)
-    else
-        return GetString(BATTLESCROLLS_ENCOUNTER_COMBAT)
-    end
-end
-
--------------------------
 -- Healing Data Helpers
 -------------------------
 
@@ -507,222 +491,6 @@ function utils.calculateHealingTotals(healingData)
         totalReal = totalReal + data.total.real
     end
     return totalRaw, totalReal
-end
-
--------------------------
--- Shared Q2 Section Renderers
--- Used by both overview panel and tab-specific panels
--------------------------
-
----Renders damage summary section (DPS, Group DPS, Share)
----@param panel BattleScrolls_Journal_OverviewPanel The overview panel
----@param sectionLabel string Section header label
----@param lastControl Control|nil Previous control for anchoring
----@param dps number Personal DPS
----@param groupDps number|nil Group DPS (nil if solo)
----@param share number Personal share percentage (0-100)
----@return Control lastControl The last rendered control
-function utils.renderDamageSummarySection(panel, sectionLabel, lastControl, dps, groupDps, share)
-    lastControl = panel:AddSection(sectionLabel, lastControl)
-    lastControl = panel:AddStatRow(GetString(BATTLESCROLLS_STAT_DPS), utils.formatNumber(dps), lastControl)
-    if groupDps then
-        lastControl = panel:AddStatRow(GetString(BATTLESCROLLS_STAT_GROUP_DPS), utils.formatNumber(groupDps), lastControl)
-    end
-    lastControl = panel:AddStatRow(GetString(BATTLESCROLLS_OVERVIEW_SHARE), utils.formatPercent(share), lastControl)
-    return lastControl
-end
-
----Renders damage composition section (DOT/Direct, AOE/ST)
----@param panel BattleScrolls_Journal_OverviewPanel The overview panel
----@param lastControl Control|nil Previous control for anchoring
----@param dotPercent number|nil DOT damage percentage (0-100)
----@param directPercent number|nil Direct damage percentage (0-100)
----@param aoePercent number|nil AOE damage percentage (0-100)
----@param stPercent number|nil Single target damage percentage (0-100)
----@return Control lastControl The last rendered control
-function utils.renderDamageCompositionSection(panel, lastControl, dotPercent, directPercent, aoePercent, stPercent)
-    lastControl = panel:AddSection(GetString(BATTLESCROLLS_OVERVIEW_COMPOSITION), lastControl)
-    if dotPercent and directPercent then
-        lastControl = panel:AddStatRow(GetString(BATTLESCROLLS_DELIVERY_DOT), utils.formatPercent(dotPercent), lastControl)
-        lastControl = panel:AddStatRow(GetString(BATTLESCROLLS_DELIVERY_DIRECT), utils.formatPercent(directPercent), lastControl)
-    end
-    if aoePercent and stPercent then
-        lastControl = panel:AddStatRow(GetString(BATTLESCROLLS_AOE), utils.formatPercent(aoePercent), lastControl)
-        lastControl = panel:AddStatRow(GetString(BATTLESCROLLS_SINGLE_TARGET), utils.formatPercent(stPercent), lastControl)
-    end
-    return lastControl
-end
-
----Renders damage quality section (Crit Rate, Max Hit)
----@param panel BattleScrolls_Journal_OverviewPanel The overview panel
----@param lastControl Control|nil Previous control for anchoring
----@param critRate number Crit rate percentage (0-100)
----@param maxHit number Maximum hit value
----@return Control lastControl The last rendered control
-function utils.renderDamageQualitySection(panel, lastControl, critRate, maxHit)
-    lastControl = panel:AddSection(GetString(BATTLESCROLLS_OVERVIEW_QUALITY), lastControl)
-    if critRate > 0 then
-        lastControl = panel:AddStatRow(GetString(BATTLESCROLLS_OVERVIEW_CRIT_RATE), utils.formatPercent(critRate), lastControl)
-    end
-    if maxHit > 0 then
-        lastControl = panel:AddStatRow(GetString(BATTLESCROLLS_OVERVIEW_MAX_HIT), utils.formatNumber(maxHit), lastControl)
-    end
-    return lastControl
-end
-
----Renders damage taken summary section (DTPS, Total)
----@param panel BattleScrolls_Journal_OverviewPanel The overview panel
----@param lastControl Control|nil Previous control for anchoring
----@param dtps number Damage taken per second
----@param total number Total damage taken
----@return Control lastControl The last rendered control
-function utils.renderDamageTakenSummarySection(panel, lastControl, dtps, total)
-    lastControl = panel:AddSection(GetString(BATTLESCROLLS_OVERVIEW_SUMMARY), lastControl)
-    lastControl = panel:AddStatRow(GetString(BATTLESCROLLS_STAT_DTPS), utils.formatNumber(dtps), lastControl)
-    lastControl = panel:AddStatRow(GetString(BATTLESCROLLS_OVERVIEW_TOTAL), utils.formatNumber(total), lastControl)
-    return lastControl
-end
-
----Renders healing summary section (Raw HPS, Effective HPS, Total)
----@param panel BattleScrolls_Journal_OverviewPanel The overview panel
----@param sectionLabel string|nil Section header label (defaults to "Summary")
----@param lastControl Control|nil Previous control for anchoring
----@param rawHps number Raw healing per second
----@param effectiveHps number Effective healing per second
----@param total number Total effective healing
----@return Control lastControl The last rendered control
-function utils.renderHealingSummarySection(panel, sectionLabel, lastControl, rawHps, effectiveHps, total)
-    lastControl = panel:AddSection(sectionLabel or GetString(BATTLESCROLLS_OVERVIEW_SUMMARY), lastControl)
-    lastControl = panel:AddStatRow(GetString(BATTLESCROLLS_HEALING_RAW_HPS), utils.formatNumber(rawHps), lastControl)
-    lastControl = panel:AddStatRow(GetString(BATTLESCROLLS_HEALING_EFFECTIVE_HPS), utils.formatNumber(effectiveHps), lastControl)
-    lastControl = panel:AddStatRow(GetString(BATTLESCROLLS_OVERVIEW_TOTAL), utils.formatNumber(total), lastControl)
-    return lastControl
-end
-
----Renders healing efficiency section (Overheal %)
----@param panel BattleScrolls_Journal_OverviewPanel The overview panel
----@param lastControl Control|nil Previous control for anchoring
----@param overhealPercent number Overheal percentage (0-100)
----@return Control lastControl The last rendered control
-function utils.renderHealingEfficiencySection(panel, lastControl, overhealPercent)
-    lastControl = panel:AddSection(GetString(BATTLESCROLLS_OVERVIEW_EFFICIENCY), lastControl)
-    lastControl = panel:AddStatRow(GetString(BATTLESCROLLS_HEALING_OVERHEAL), utils.formatPercent(overhealPercent), lastControl)
-    return lastControl
-end
-
----Renders healing composition section (HoT vs Direct)
----@param panel BattleScrolls_Journal_OverviewPanel The overview panel
----@param lastControl Control|nil Previous control for anchoring
----@param hotPercent number|nil HoT healing percentage (0-100)
----@param directPercent number|nil Direct healing percentage (0-100)
----@return Control lastControl The last rendered control
-function utils.renderHealingCompositionSection(panel, lastControl, hotPercent, directPercent)
-    lastControl = panel:AddSection(GetString(BATTLESCROLLS_OVERVIEW_COMPOSITION), lastControl)
-    if hotPercent and directPercent then
-        lastControl = panel:AddStatRow(GetString(BATTLESCROLLS_DELIVERY_HOT), utils.formatPercent(hotPercent), lastControl)
-        lastControl = panel:AddStatRow(GetString(BATTLESCROLLS_DELIVERY_DIRECT), utils.formatPercent(directPercent), lastControl)
-    end
-    return lastControl
-end
-
----Renders healing quality section (Crit Rate, Max Heal)
----@param panel BattleScrolls_Journal_OverviewPanel The overview panel
----@param lastControl Control|nil Previous control for anchoring
----@param critRate number Crit rate percentage (0-100)
----@param maxHeal number Maximum heal value
----@return Control lastControl The last rendered control
-function utils.renderHealingQualitySection(panel, lastControl, critRate, maxHeal)
-    lastControl = panel:AddSection(GetString(BATTLESCROLLS_OVERVIEW_QUALITY), lastControl)
-    if critRate > 0 then
-        lastControl = panel:AddStatRow(GetString(BATTLESCROLLS_OVERVIEW_CRIT_RATE), utils.formatPercent(critRate), lastControl)
-    end
-    if maxHeal > 0 then
-        lastControl = panel:AddStatRow(GetString(BATTLESCROLLS_OVERVIEW_MAX_HEAL), utils.formatNumber(maxHeal), lastControl)
-    end
-    return lastControl
-end
-
----Renders consolidated damage output section (DPS, Composition, Quality in one section)
----Used by Overview tab for a cleaner, more compact display
----@param panel BattleScrolls_Journal_OverviewPanel The overview panel
----@param lastControl Control|nil Previous control for anchoring
----@param bossDps number|nil Boss DPS (nil if not boss fight or no boss damage)
----@param totalDps number Total DPS
----@param groupDps number|nil Group DPS (nil if solo)
----@param share number Personal share percentage (0-100)
----@param critRate number Crit rate percentage (0-100)
----@param maxHit number Maximum hit value
----@param dotPercent number|nil DOT damage percentage
----@param aoePercent number|nil AOE damage percentage
----@return Control lastControl The last rendered control
-function utils.renderDamageOutputSection(panel, lastControl, bossDps, totalDps, groupDps, share, critRate, maxHit, dotPercent, aoePercent)
-    lastControl = panel:AddSection(GetString(BATTLESCROLLS_OVERVIEW_DAMAGE_OUTPUT), lastControl)
-
-    -- Boss DPS if applicable
-    if bossDps and bossDps > 0 then
-        lastControl = panel:AddStatRow(GetString(BATTLESCROLLS_BOSS_DAMAGE), utils.formatNumber(bossDps) .. " DPS", lastControl)
-    end
-
-    -- Total DPS
-    lastControl = panel:AddStatRow(GetString(BATTLESCROLLS_DAMAGE_DONE), utils.formatNumber(totalDps) .. " DPS", lastControl)
-
-    -- Share (only if group data exists)
-    if groupDps and groupDps > totalDps then
-        lastControl = panel:AddStatRow(GetString(BATTLESCROLLS_OVERVIEW_SHARE), utils.formatPercent(share), lastControl)
-    end
-
-    -- Quality metrics inline
-    if critRate > 0 then
-        lastControl = panel:AddStatRow(GetString(BATTLESCROLLS_OVERVIEW_CRIT_RATE), utils.formatPercent(critRate), lastControl)
-    end
-    if maxHit > 0 then
-        lastControl = panel:AddStatRow(GetString(BATTLESCROLLS_OVERVIEW_MAX_HIT), utils.formatNumber(maxHit), lastControl)
-    end
-
-    -- Composition inline (only show if there's a meaningful split)
-    if dotPercent and dotPercent > 5 and dotPercent < 95 then
-        lastControl = panel:AddStatRow(GetString(BATTLESCROLLS_DELIVERY_DOT), utils.formatPercent(dotPercent), lastControl)
-    end
-    if aoePercent and aoePercent > 5 and aoePercent < 95 then
-        lastControl = panel:AddStatRow(GetString(BATTLESCROLLS_AOE), utils.formatPercent(aoePercent), lastControl)
-    end
-
-    return lastControl
-end
-
----Renders healing section with overheal and HoT% inline (no separate sections)
----Used by Overview tab for a cleaner, more compact display
----@param panel BattleScrolls_Journal_OverviewPanel The overview panel
----@param sectionLabel string Section header label (e.g., "Healing Out", "Self Healing")
----@param lastControl Control|nil Previous control for anchoring
----@param rawHps number Raw healing per second
----@param effectiveHps number Effective healing per second
----@param overhealPercent number Overheal percentage (0-100)
----@param hotPercent number|nil HoT percentage (0-100), only shown if meaningful split
----@return Control lastControl The last rendered control
-function utils.renderHealingSectionCompact(panel, sectionLabel, lastControl, rawHps, effectiveHps, overhealPercent, hotPercent)
-    lastControl = panel:AddSection(sectionLabel, lastControl)
-    lastControl = panel:AddStatRow(GetString(BATTLESCROLLS_HEALING_RAW_HPS), utils.formatNumber(rawHps), lastControl)
-    lastControl = panel:AddStatRow(GetString(BATTLESCROLLS_HEALING_EFFECTIVE_HPS), utils.formatNumber(effectiveHps), lastControl)
-    lastControl = panel:AddStatRow(GetString(BATTLESCROLLS_HEALING_OVERHEAL), utils.formatPercent(overhealPercent), lastControl)
-    -- HoT% only shown if there's a meaningful split (>5% and <95%)
-    if hotPercent and hotPercent > 5 and hotPercent < 95 then
-        lastControl = panel:AddStatRow(GetString(BATTLESCROLLS_DELIVERY_HOT), utils.formatPercent(hotPercent), lastControl)
-    end
-    return lastControl
-end
-
----Renders damage taken section with proper header
----@param panel BattleScrolls_Journal_OverviewPanel The overview panel
----@param lastControl Control|nil Previous control for anchoring
----@param dtps number Damage taken per second
----@param total number Total damage taken
----@return Control lastControl The last rendered control
-function utils.renderDamageTakenSection(panel, lastControl, dtps, total)
-    lastControl = panel:AddSection(GetString(BATTLESCROLLS_OVERVIEW_DAMAGE_TAKEN), lastControl)
-    lastControl = panel:AddStatRow(GetString(BATTLESCROLLS_STAT_DTPS), utils.formatNumber(dtps), lastControl)
-    lastControl = panel:AddStatRow(GetString(BATTLESCROLLS_OVERVIEW_TOTAL), utils.formatNumber(total), lastControl)
-    return lastControl
 end
 
 -- Export to namespace

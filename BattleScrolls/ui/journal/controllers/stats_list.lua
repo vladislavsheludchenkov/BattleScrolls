@@ -52,6 +52,8 @@ function StatsListController.renderTab(ctx, selectedTab)
             renderers.healing.renderHealingIn(ctx):Await()
         elseif selectedTab == StatsTab.EFFECTS then
             renderers.effects.renderEffects(ctx):Await()
+        elseif selectedTab == StatsTab.GROUP then
+            renderers.group.renderGroup(ctx):Await()
         end
     end)
 end
@@ -98,6 +100,7 @@ function StatsListController.refresh(journalUI)
         local decodedEncounter = journalUI.decodedEncounter
         if needsEncounterDecode then
             decodedEncounter = BattleScrolls.storage.DecodeEncounterAsync(rawEncounter):Await()
+            journal.chronicler.computeTabVisibility(decodedEncounter)
             journalUI.decodedEncounter = decodedEncounter
         end
 
@@ -124,10 +127,10 @@ function StatsListController.refresh(journalUI)
             journalUI:RefreshHeader()
         end
 
-        -- Compute arithmancer if needed (arithmancer:New is cheap - just creates object with references)
+        -- Compute arithmancer if needed (arithmancer:Make is cheap - just creates object with references)
         if needsArithmancer then
             ---@cast decodedEncounter Encounter -- Guaranteed non-nil by control flow above
-            local calc = BattleScrolls.arithmancer:New(decodedEncounter, abilityInfo)
+            local calc = BattleScrolls.arithmancer:Make(decodedEncounter, abilityInfo)
             journalUI.arithmancer = calc
         end
 
@@ -158,8 +161,6 @@ function StatsListController.refresh(journalUI)
         local targetIndex = 1
         if restoreIndex and restoreIndex >= 1 and restoreIndex <= numItems then
             targetIndex = restoreIndex
-        elseif journalUI.selectedTab ~= StatsTab.OVERVIEW and numItems >= 2 then
-            targetIndex = 2
         end
         if list:GetSelectedIndex() ~= targetIndex then
             list:SetSelectedIndexWithoutAnimation(targetIndex)

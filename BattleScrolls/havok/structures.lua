@@ -29,30 +29,17 @@ hstructure BS_UnitAliveState
     isDead : boolean
 end
 
----Effect stats for uptime tracking (base structure)
+---Effect stats for uptime tracking with player attribution
 ---@class EffectStats
----@field abilityId number
----@field effectType number BUFF_EFFECT_TYPE_BUFF or BUFF_EFFECT_TYPE_DEBUFF
----@field totalActiveTimeMs number Total time effect was active
----@field timeAtMaxStacksMs number Time spent at max observed stacks
----@field applications number Number of times effect was applied
----@field maxStacks number Peak stack count observed
-hstructure BS_EffectStats
-    abilityId : number
-    effectType : number
-    totalActiveTimeMs : number
-    timeAtMaxStacksMs : number
-    applications : number
-    maxStacks : number
-end
-
----Effect stats with player attribution (for boss debuffs, group buffs, player effects)
----@class EffectStatsWithAttribution : EffectStats
 ---@field playerActiveTimeMs number Time YOU kept this effect up
 ---@field playerTimeAtMaxStacksMs number Time at max stacks applied by you
 ---@field playerApplications number Times YOU applied this effect
 ---@field peakConcurrentInstances number Peak number of concurrent instances of this effect (e.g., 2 Relequen)
-hstructure BS_EffectStatsWithAttribution
+---@field lastFinalizedMs number Latest endTimeMs when totalActiveTimeMs was accumulated (for retroactive correction)
+---@field lastFinalizedMaxStacksMs number Latest endTimeMs when timeAtMaxStacksMs was accumulated (for retroactive correction)
+---@field lastFinalizedPlayerMs number Latest endTimeMs when playerActiveTimeMs was accumulated (for retroactive correction)
+---@field lastFinalizedPlayerMaxStacksMs number Latest endTimeMs when playerTimeAtMaxStacksMs was accumulated (for retroactive correction)
+hstructure BS_EffectStats
     abilityId : number
     effectType : number
     totalActiveTimeMs : number
@@ -63,6 +50,10 @@ hstructure BS_EffectStatsWithAttribution
     playerTimeAtMaxStacksMs : number
     playerApplications : number
     peakConcurrentInstances : number
+    lastFinalizedMs : number
+    lastFinalizedMaxStacksMs : number
+    lastFinalizedPlayerMs : number
+    lastFinalizedPlayerMaxStacksMs : number
 end
 
 ---Active effect instance for tracking during combat
@@ -175,47 +166,6 @@ hstructure BS_HealingStats
     healingInFromGroup : table
 end
 
----Effect queue data payload (union of all message type fields)
----Used by: PLAYER_EFFECT, BOSS_EFFECT, GROUP_EFFECT, UNIT_DEATH, UNIT_ALIVE, *_FULL_REFRESH
----@class EffectQueueData
----@field changeType number|nil EFFECT_RESULT_GAINED, EFFECT_RESULT_FADED, etc.
----@field effectSlot number|nil Effect slot number
----@field effectType number|nil BUFF_EFFECT_TYPE_BUFF or BUFF_EFFECT_TYPE_DEBUFF
----@field stackCount number|nil Stack count
----@field abilityId number|nil Ability ID
----@field sourceType number|nil Source type (player, NPC, etc.)
----@field beginTime number|nil Effect begin time
----@field endTime number|nil Effect end time (GROUP_EFFECT only)
----@field unitTag string|nil Unit tag (boss/group)
----@field unitId number|nil Unit ID
-hstructure BS_EffectQueueData
-    changeType : number
-    effectSlot : number
-    effectType : number
-    stackCount : number
-    abilityId : number
-    sourceType : number
-    beginTime : number
-    endTime : number
-    unitTag : string
-    unitId : number
-end
-
----Effect queue message for async effect event processing
----@class EffectQueueMessage
----@field type EFFECT_QUEUE_MESSAGE_TYPE Message type (PLAYER_EFFECT, BOSS_EFFECT, etc.)
----@field timestampMs number Game time when event occurred
----@field generation number Generation counter at enqueue time
----@field storageKey string Storage key for generation tracking
----@field data EffectQueueData Event-specific data payload
-hstructure BS_EffectQueueMessage
-    type : string
-    timestampMs : number
-    generation : number
-    storageKey : string
-    data : BS_EffectQueueData
-end
-
 ---@diagnostic enable: undefined-global, lowercase-global
 
 -- ============================================================================
@@ -250,29 +200,18 @@ function structures.newEffectStats(abilityId, effectType)
         timeAtMaxStacksMs = 0,
         applications = 0,
         maxStacks = 0,
-    }
-end
-
----Creates a new EffectStatsWithAttribution (for boss/group/player effects)
----@param abilityId number
----@param effectType number
----@return EffectStatsWithAttribution
-function structures.newEffectStatsWithAttribution(abilityId, effectType)
-    return hmake BS_EffectStatsWithAttribution {
-        abilityId = abilityId,
-        effectType = effectType,
-        totalActiveTimeMs = 0,
-        timeAtMaxStacksMs = 0,
-        applications = 0,
-        maxStacks = 0,
         playerActiveTimeMs = 0,
         playerTimeAtMaxStacksMs = 0,
         playerApplications = 0,
         peakConcurrentInstances = 1,
+        lastFinalizedMs = 0,
+        lastFinalizedMaxStacksMs = 0,
+        lastFinalizedPlayerMs = 0,
+        lastFinalizedPlayerMaxStacksMs = 0,
     }
 end
 
----Creates an EffectStatsWithAttribution with all fields specified (for decoding)
+---Creates an EffectStats with all fields specified (for decoding)
 ---@param abilityId number
 ---@param effectType number
 ---@param totalActiveTimeMs number
@@ -283,9 +222,9 @@ end
 ---@param playerTimeAtMaxStacksMs number
 ---@param playerApplications number
 ---@param peakConcurrentInstances number
----@return EffectStatsWithAttribution
-function structures.makeEffectStatsWithAttribution(abilityId, effectType, totalActiveTimeMs, timeAtMaxStacksMs, applications, maxStacks, playerActiveTimeMs, playerTimeAtMaxStacksMs, playerApplications, peakConcurrentInstances)
-    return hmake BS_EffectStatsWithAttribution {
+---@return EffectStats
+function structures.makeEffectStats(abilityId, effectType, totalActiveTimeMs, timeAtMaxStacksMs, applications, maxStacks, playerActiveTimeMs, playerTimeAtMaxStacksMs, playerApplications, peakConcurrentInstances)
+    return hmake BS_EffectStats {
         abilityId = abilityId,
         effectType = effectType,
         totalActiveTimeMs = totalActiveTimeMs,
@@ -296,6 +235,10 @@ function structures.makeEffectStatsWithAttribution(abilityId, effectType, totalA
         playerTimeAtMaxStacksMs = playerTimeAtMaxStacksMs,
         playerApplications = playerApplications,
         peakConcurrentInstances = peakConcurrentInstances,
+        lastFinalizedMs = 0,
+        lastFinalizedMaxStacksMs = 0,
+        lastFinalizedPlayerMs = 0,
+        lastFinalizedPlayerMaxStacksMs = 0,
     }
 end
 
@@ -452,24 +395,3 @@ function structures.newHealingStats()
     }
 end
 
----Creates a new empty EffectQueueData
----@return EffectQueueData
-function structures.newEffectQueueData()
-    return hmake BS_EffectQueueData {}
-end
-
----Creates a new EffectQueueMessage
----@param messageType EFFECT_QUEUE_MESSAGE_TYPE
----@param storageKey string
----@param generation number
----@param data EffectQueueData|nil Optional data payload (defaults to new empty data)
----@return EffectQueueMessage
-function structures.newEffectQueueMessage(messageType, storageKey, generation, data)
-    return hmake BS_EffectQueueMessage {
-        type = messageType,
-        timestampMs = GetGameTimeMilliseconds(),
-        generation = generation,
-        storageKey = storageKey,
-        data = data or structures.newEffectQueueData(),
-    }
-end

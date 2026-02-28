@@ -42,6 +42,7 @@ journal.StatsTab = {
     SELF_HEALING = 6,
     HEALING_IN = 7,
     EFFECTS = 8,
+    GROUP = 9,
 }
 
 -------------------------
@@ -138,38 +139,13 @@ journal.StatIcons = {
     AOE = "EsoUI/Art/Icons/scribing_primary_multihit.dds",
     SINGLE_TARGET = "EsoUI/Art/Icons/scribing_tertiary_vulnerability.dds",
 
+    -- Deaths
+    DEATH = "EsoUI/Art/ZoneStories/completionTypeIcon_groupBoss.dds",
+
     -- Group/Target
     GROUP = "EsoUI/Art/LFG/Gamepad/LFG_menuIcon_currentGroup.dds",
     GROUP_DAMAGE = "EsoUI/Art/LFG/Gamepad/LFG_menuIcon_currentGroup.dds",
     GROUP_DPS = "EsoUI/Art/LFG/Gamepad/LFG_menuIcon_currentGroup.dds",
-    TARGET = "EsoUI/Art/ZoneStories/completionTypeIcon_groupBoss.dds",
-
-    -- Roles
-    TANK = "EsoUI/Art/LFG/Gamepad/LFG_roleIcon_tank.dds",
-    HEALER = "EsoUI/Art/LFG/Gamepad/LFG_roleIcon_healer.dds",
-}
-
--------------------------
--- Instance Icons
--------------------------
-journal.InstanceIcons = {
-    DUNGEON = "EsoUI/Art/LFG/Gamepad/LFG_menuIcon_groupDungeon.dds",
-    TRIAL = "EsoUI/Art/LFG/Gamepad/LFG_activityIcon_trial.dds",
-    ARENA = "EsoUI/Art/LFG/Gamepad/LFG_activityIcon_delve.dds",
-    OVERLAND = "EsoUI/Art/WorldMap/Gamepad/gp_maplocationhistory_mainquestzoneicon.dds",
-    HOUSE = "EsoUI/Art/Inventory/Gamepad/gp_inventory_icon_housing.dds",
-    PVP = "EsoUI/Art/TreeIcons/Gamepad/gp_tutorial_idexIcon_Alliance_War.dds",
-    UNKNOWN = "EsoUI/Art/TreeIcons/Gamepad/gp_tutorial_idexIcon_ESOPlus.dds",
-}
-
--------------------------
--- Encounter Icons
--------------------------
-journal.EncounterIcons = {
-    BOSS = "EsoUI/Art/UnitFrames/Gamepad/gp_targetUnitFrame_boss.dds",
-    TRASH = "EsoUI/Art/UnitFrames/Gamepad/gp_targetUnitFrame_elite.dds",
-    PLAYER = "EsoUI/Art/LFG/Gamepad/LFG_menuIcon_playerList.dds",
-    DUMMY = "EsoUI/Art/TreeIcons/Gamepad/gp_tutorial_idexIcon_dummies.dds",
 }
 
 -------------------------
@@ -197,7 +173,7 @@ journal.EncounterIcons = {
 
 ---@class JournalFilters
 ---@field targetFilter table<number, boolean>|nil Target unit filter (unitId -> true)
----@field sourceFilter table<string, boolean>|nil Source filter (sourceType -> true: "player", "pets", "companions")
+---@field sourceFilter table<number, boolean>|nil Source filter (unitId -> true)
 ---@field groupFilter table<string, boolean>|nil Group filter for effects (displayName -> true)
 
 ---@alias NavigationMode
@@ -215,6 +191,7 @@ journal.EncounterIcons = {
 ---| 6 # SELF_HEALING
 ---| 7 # HEALING_IN
 ---| 8 # EFFECTS
+---| 9 # GROUP
 
 ---@alias InstanceTab
 ---| 1 # ALL

@@ -79,13 +79,6 @@ function utils.FormatDuration(durationS)
     return (ZO_FormatTime(durationS, TIME_FORMAT_STYLE_COLONS, TIME_FORMAT_PRECISION_SECONDS))
 end
 
----Format duration with brackets for display
----@param durationS number Duration in seconds
----@return string Formatted as "[M:SS]"
-function utils.FormatDurationBracketed(durationS)
-    return "[" .. utils.FormatDuration(durationS) .. "]"
-end
-
 -- ==================== Mode Detection ====================
 
 ---Determine if healing mode should be shown based on settings and values
@@ -229,19 +222,8 @@ end
 
 -- ==================== Role Icons ====================
 
-utils.ROLE_ICONS = {
-    [LFG_ROLE_DPS] = "/esoui/art/lfg/gamepad/lfg_roleicon_dps.dds",
-    [LFG_ROLE_HEAL] = "/esoui/art/lfg/gamepad/lfg_roleicon_healer.dds",
-    [LFG_ROLE_TANK] = "/esoui/art/lfg/gamepad/lfg_roleicon_tank.dds",
-}
-utils.DEFAULT_ROLE_ICON = "/esoui/art/lfg/gamepad/lfg_roleicon_dps.dds"
-
----Get role icon texture path
----@param role number LFG_ROLE_* constant
----@return string texturePath
-function utils.GetRoleIcon(role)
-    return utils.ROLE_ICONS[role] or utils.DEFAULT_ROLE_ICON
-end
+utils.DEFAULT_ROLE_ICON = BattleScrolls.utils.DEFAULT_ROLE_ICON
+utils.GetRoleIcon = BattleScrolls.utils.GetRoleIcon
 
 -- ==================== Member Table Pooling ====================
 
@@ -290,30 +272,6 @@ function utils.SplitMembersByRole(members)
     return dpsMembers, hpsMembers
 end
 
--- ==================== Member Formatting ====================
-
----Format a member entry for text display
----@param member table Member entry with name, allDPS, bossDPS, rawHPS, effectiveHPS, showHealing
----@param isBossFight boolean Whether this is a boss fight
----@return string
-function utils.FormatMemberText(member, isBossFight)
-    if member.showHealing then
-        return string.format("%s: %s HPS (%s eff)",
-                member.name,
-                utils.FormatDPS(member.rawHPS),
-                utils.FormatDPS(member.effectiveHPS))
-    elseif isBossFight and member.bossDPS then
-        return string.format("%s: %s / %s",
-                member.name,
-                utils.FormatDPS(member.bossDPS),
-                utils.FormatDPS(member.allDPS))
-    else
-        return string.format("%s: %s",
-                member.name,
-                utils.FormatDPS(member.allDPS))
-    end
-end
-
 -- ==================== Constants ====================
 
 -- Text design fonts
@@ -321,6 +279,3 @@ utils.TEXT_FONT = "ZoFontGamepad27"
 utils.TEXT_HEADER_FONT = "ZoFontGamepad27"
 utils.TEXT_TOTAL_FONT = "ZoFontGamepad22"
 
--- Update intervals
-utils.UPDATE_INTERVAL_MS = 200
-utils.PREVIEW_DURATION_MS = 3000

@@ -35,9 +35,6 @@ BattleScrolls = BattleScrolls or {}
 ---@alias HealingStatsStorage HealingStats
 ---@alias AbilityInfoStorage AbilityInfo
 ---@alias EffectStatsStorage EffectStats
----@alias BossEffectStatsStorage BossEffectStats
----@alias GroupEffectStatsStorage GroupEffectStats
----@alias PlayerEffectStatsStorage PlayerEffectStats
 
 ---@class EnemyProcCount
 ---@field unitId number
@@ -61,6 +58,10 @@ BattleScrolls = BattleScrolls or {}
 ---@field bossesUnits number[]|nil Unit IDs of bosses involved in this encounter
 ---@field isPlayerFight boolean|nil True if this was a PvP fight
 ---@field isDummyFight boolean|nil True if this was a training dummy fight
+---@field sharedData SharedDataEntry[]|nil Shared stats from group members
+---@field bossSeqNames table<string, string>|nil Maps "tag:seq" to boss name for shared data display
+---@field deaths EncounterDeaths|nil Death recap data (nil if player never died)
+---@field bossTagSeqByUnitId table<number, string>|nil Maps boss unitId to "tag:seq" key for local player boss damage mapping
 
 ---@class Encounter
 ---@field displayName string|nil Pre-computed display name for encounter list UI (avoids decoding entire encounter)
@@ -73,13 +74,17 @@ BattleScrolls = BattleScrolls or {}
 ---@field damageTakenByUnitId table<number, table<number, DamageDoneStorage>> Damage taken, nested: sourceUnitId -> targetUnitId -> damage
 ---@field healingStats HealingStatsStorage All healing data for this encounter
 ---@field procs ProcData[]
----@field effectsOnPlayer table<number, PlayerEffectStatsStorage>|nil Effects on player with attribution, keyed by abilityId
----@field effectsOnBosses table<string, table<number, BossEffectStatsStorage>>|nil Effects on bosses, nested: unitTag ("boss1") -> abilityId -> stats
----@field effectsOnGroup table<string, table<number, GroupEffectStatsStorage>>|nil Effects on group members, nested: displayName ("@Player") -> abilityId -> stats
+---@field effectsOnPlayer table<number, EffectStatsStorage>|nil Effects on player with attribution, keyed by abilityId
+---@field effectsOnBosses table<string, table<number, EffectStatsStorage>>|nil Effects on bosses, nested: unitTag ("boss1") -> abilityId -> stats
+---@field effectsOnGroup table<string, table<number, EffectStatsStorage>>|nil Effects on group members, nested: displayName ("PlayerName") -> abilityId -> stats
 ---@field bossNames table<string, string>|nil Maps unitTag to boss name for UI display (e.g., "boss1" -> "Magma Incarnate")
 ---@field playerAliveTimeMs number|nil Player alive time in ms (for uptime calculations)
 ---@field unitAliveTimeMs table<string, number>|nil Per-unit alive time in ms (for uptime calculations), keyed by unitTag (bosses) or displayName (group)
 ---@field unitNames table<number, string>|nil Unit names lookup (v7+: stored per-encounter, v3-v6: at instance level)
+---@field sharedData SharedDataEntry[]|nil Shared stats from group members
+---@field bossSeqNames table<string, string>|nil Maps "tag:seq" to boss name for shared data display
+---@field deaths EncounterDeaths|nil Death recap data (nil if player never died)
+---@field bossTagSeqByUnitId table<number, string>|nil Maps boss unitId to "tag:seq" key for local player boss damage mapping
 
 -- Instance types distinguish between live state (during combat) and storage format.
 -- InstanceState: Live instance with uncompressed abilityInfo and unitNames
@@ -135,6 +140,7 @@ BattleScrolls = BattleScrolls or {}
 ---@field dpsMeterGroupDesignSettings table<string, table<string, any>>
 ---@field recordingEnabled boolean
 ---@field recordInZones table<RecordZoneType, boolean>
+---@field recordInAdventureZone boolean|nil
 ---@field recordInFights table<RecordFightType, boolean>
 ---@field effectTrackingEnabled boolean
 ---@field trackPlayerBuffs boolean
@@ -218,6 +224,7 @@ storage.defaults = {
         dpsMeterGroupDesignSettings = {},
         recordingEnabled = false, -- disabled by default until onboarding
         recordInZones = { instanced = true, overland = true, house = true, pvp = true }, -- set of zone types to record
+        recordInAdventureZone = false, -- record fights in adventure zones (overrides zone type when enabled)
         recordInFights = { boss = true, trash = true, player = true, dummy = true }, -- set of fight types to record
         effectTrackingEnabled = false, -- disabled by default until onboarding
         trackPlayerBuffs = true, -- track buffs on player
@@ -789,57 +796,7 @@ end
 ---@field hasSelfHealing boolean Player healed self
 ---@field hasHealingInFromGroup boolean Player received healing from group
 ---@field hasEffects boolean Encounter has any effect tracking data
-
----Computes tab visibility flags for a decoded encounter.
----These flags are cached on the encounter to avoid recomputation in GetEncounterTabBarEntries.
----@param decodedEncounter Encounter
----@return Encounter decodedEncounter The same encounter with _tabVisibility field added
-local function computeTabVisibility(decodedEncounter)
-    local computeTotal = BattleScrolls.arithmancer.ComputeDamageTotal
-    local dealtDamage = false
-    local dealtDamageToBosses = false
-    local bossesSet = nil
-
-    -- Build boss set for O(1) lookup
-    if decodedEncounter.bossesUnits then
-        bossesSet = {}
-        for _, bossUnitId in ipairs(decodedEncounter.bossesUnits) do
-            bossesSet[bossUnitId] = true
-        end
-    end
-
-    -- Check damage data
-    for _, byTarget in pairs(decodedEncounter.damageByUnitId) do
-        for targetUnitId, damage in pairs(byTarget) do
-            local total = computeTotal(damage)
-            if total > 0 then
-                dealtDamage = true
-                if bossesSet and bossesSet[targetUnitId] then
-                    dealtDamageToBosses = true
-                    break  -- Found both flags, can exit early
-                end
-            end
-        end
-        if dealtDamageToBosses then break end
-    end
-
-    -- Check effects
-    local hasEffects = (decodedEncounter.effectsOnPlayer and not ZO_IsTableEmpty(decodedEncounter.effectsOnPlayer))
-        or (decodedEncounter.effectsOnBosses and not ZO_IsTableEmpty(decodedEncounter.effectsOnBosses))
-        or (decodedEncounter.effectsOnGroup and not ZO_IsTableEmpty(decodedEncounter.effectsOnGroup))
-
-    decodedEncounter._tabVisibility = {
-        dealtDamage = dealtDamage,
-        dealtDamageToBosses = dealtDamageToBosses,
-        hasDamageTaken = not ZO_IsTableEmpty(decodedEncounter.damageTakenByUnitId),
-        hasHealingOutToGroup = not ZO_IsTableEmpty(decodedEncounter.healingStats.healingOutToGroup),
-        hasSelfHealing = decodedEncounter.healingStats.selfHealing.total.raw > 0,
-        hasHealingInFromGroup = not ZO_IsTableEmpty(decodedEncounter.healingStats.healingInFromGroup),
-        hasEffects = hasEffects,
-    }
-
-    return decodedEncounter
-end
+---@field hasGroupData boolean Encounter has shared group member data
 
 ---Decodes a binary encounter to verbose format asynchronously.
 ---Returns an Effect that resolves to the decoded encounter.
@@ -848,7 +805,7 @@ end
 ---@param encounter CompactEncounter The binary-encoded encounter
 ---@return Effect Effect that resolves to Encounter
 function storage.DecodeEncounterAsync(encounter)
-    return BattleScrolls.binaryStorage.decodeEncounterAsync(encounter):Map(computeTabVisibility)
+    return BattleScrolls.binaryStorage.decodeEncounterAsync(encounter)
 end
 
 -- =============================================================================

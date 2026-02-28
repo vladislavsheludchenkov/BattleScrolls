@@ -12,7 +12,6 @@ local design = {
     displayName = GetString(BATTLESCROLLS_DESIGN_GROUP_HODOR),
     description = GetString(BATTLESCROLLS_DESIGN_GROUP_HODOR_DESC),
     order = 20,
-    supportsHPS = true,
     settings = {},  -- No custom settings
 }
 
@@ -37,12 +36,6 @@ function design:Initialize(_meter)
     if not container then return end
 
     local rowsContainer = container:GetNamedChild("Rows")
-
-    -- Hide XML-created controls if they exist
-    local xmlHeader = container:GetNamedChild("Header")
-    local xmlSummary = container:GetNamedChild("Summary")
-    if xmlHeader then xmlHeader:SetHidden(true) end
-    if xmlSummary then xmlSummary:SetHidden(true) end
 
     -- Create header dynamically
     headerControl = factories.CreateHodorRow("BattleScrolls_DPSMeterGroupHodorHeaderLua", container)
@@ -99,27 +92,8 @@ function design:Release()
     end
 end
 
-function design:Destroy()
-    for _, row in ipairs(rows) do
-        row:SetHidden(true)
-        row:SetParent(nil)
-    end
-    rows = {}
-    -- Also destroy the header controls
-    if headerControl then
-        headerControl:SetHidden(true)
-        headerControl:SetParent(nil)
-        headerControl = nil
-    end
-    if summaryControl then
-        summaryControl:SetHidden(true)
-        summaryControl:SetParent(nil)
-        summaryControl = nil
-    end
-end
-
 ---Configure header control
-local function configureHeader(control, text)
+local function configureHeader(control, text, valueText)
     if not control then return end
     local nameLabel = control:GetNamedChild("Name")
     local valueLabel = control:GetNamedChild("Value")
@@ -131,7 +105,7 @@ local function configureHeader(control, text)
         nameLabel:SetAnchor(LEFT, control, LEFT, 4, 0)
         nameLabel:SetWidth(factories.HODOR_NAME_WIDTH)
     end
-    if valueLabel then valueLabel:SetText("") end
+    if valueLabel then valueLabel:SetText(valueText or "") end
     if icon then icon:SetHidden(true) end
 end
 
@@ -155,7 +129,7 @@ function design:Render(members, ctx)
     -- === DPS Section ===
     if #dpsMembers > 0 then
         local dpsHeader = ctx.isBossFight and GetString(BATTLESCROLLS_METER_BOSS_ALL_DAMAGE) or GetString(BATTLESCROLLS_METER_ALL_DAMAGE)
-        configureHeader(headerControl, dpsHeader)
+        configureHeader(headerControl, dpsHeader, ctx.durationStr)
         headerControl:SetWidth(factories.HODOR_ROW_WIDTH)
         headerControl:SetHidden(false)
         table.insert(allRows, { control = headerControl, isHeader = true, isNewSection = false })
@@ -234,7 +208,9 @@ function design:Render(members, ctx)
 
     -- === HPS Section ===
     if #hpsMembers > 0 then
-        configureHeader(summaryControl, GetString(BATTLESCROLLS_METER_EFFECTIVE_RAW_HEALING))
+        -- Show duration on HPS header if there's no DPS section
+        local hpsHeaderValue = #dpsMembers == 0 and ctx.durationStr or nil
+        configureHeader(summaryControl, GetString(BATTLESCROLLS_METER_EFFECTIVE_RAW_HEALING), hpsHeaderValue)
         summaryControl:SetWidth(factories.HODOR_ROW_WIDTH)
         summaryControl:SetHidden(false)
         table.insert(allRows, { control = summaryControl, isHeader = true, isNewSection = true })
@@ -282,10 +258,6 @@ function design:Render(members, ctx)
 
     -- Position all rows
     factories.PositionRows(allRows, container, ctx.growUpward, 4)
-end
-
-function design:RenderPreview(members, ctx)
-    self:Render(members, ctx)
 end
 
 -- Register with the registry

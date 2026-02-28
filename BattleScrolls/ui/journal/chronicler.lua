@@ -67,15 +67,14 @@ local function calculateUptime(activeTimeMs, durationMs)
 end
 
 ---Formats a member name for display in tooltips
----@param displayName string The raw display name
+---@param displayName string The undecorated display name
 ---@param isSelf boolean Whether this is the player
 ---@return string formattedName
 local function formatMemberName(displayName, isSelf)
     if isSelf then
         return GetString(BATTLESCROLLS_TOOLTIP_YOU)
     end
-    local cleanName = displayName:gsub("^@", "")
-    return zo_strformat(SI_UNIT_NAME, cleanName)
+    return zo_strformat(SI_UNIT_NAME, displayName)
 end
 
 ---Builds tooltip lines for an effect (player/boss)
@@ -170,19 +169,135 @@ local function buildGroupEffectTooltipLines(stats, durationMs, memberBreakdown)
     return lines
 end
 
+-- Style for AcquireCustomControl: reuses the BattleScrolls_DeathAttackRow XML template
+-- (same pattern as armory tooltips using AcquireCustomControl with ZO_GamepadInteractiveAttributeRow)
+local DEATH_ATTACK_ROW_STYLE = {
+    controlTemplate = "BattleScrolls_DeathAttackRow",
+    height = 42,
+    widthPercent = 100,
+}
+
+-- Reserve space for 36px killing blow skull + 4px gap on ALL rows so icons stay aligned (matches overview panel)
+local DEATH_TOOLTIP_ICON_OFFSET_X = 40
+
+---Builds and shows a custom tooltip for death recap entries.
+---Uses BattleScrolls_DeathAttackRow custom controls via AcquireCustomControl,
+---giving us proper icon frames, killing blow skulls, and right-aligned values
+---(same pattern as armorytooltips.lua LayoutArmoryBuildAttributes).
+---@param title string Death label (e.g. "First Death")
+---@param timing string Timing subtitle (e.g. "at 1:23")
+---@param attacks SharedDeathRecapAttack[]|nil Attack list
+local function showDeathRecapTooltip(title, timing, attacks)
+    local tooltip = GAMEPAD_TOOLTIPS:GetTooltip(GAMEPAD_LEFT_TOOLTIP)
+    GAMEPAD_TOOLTIPS:ClearTooltip(GAMEPAD_LEFT_TOOLTIP)
+
+    -- Title section
+    local headerSection = tooltip:AcquireSection(tooltip:GetStyle("bodyHeader"))
+    headerSection:AddLine(title, tooltip:GetStyle("title"))
+    tooltip:AddSection(headerSection)
+
+    -- Timing subtitle (reduced spacing to keep it close to the title)
+    local timingSection = tooltip:AcquireSection({ customSpacing = 5 }, tooltip:GetStyle("bodySection"))
+    timingSection:AddLine(timing, tooltip:GetStyle("bodyDescription"))
+    tooltip:AddSection(timingSection)
+
+    -- Attack rows using BattleScrolls_DeathAttackRow custom controls
+    if attacks and #attacks > 0 then
+        -- Horizontal divider
+        local dividerSection = tooltip:AcquireSection(tooltip:GetStyle("bodySection"))
+        dividerSection:AddTexture(ZO_GAMEPAD_HEADER_DIVIDER_TEXTURE, tooltip:GetStyle("dividerLine"))
+        tooltip:AddSection(dividerSection)
+
+        local attackSection = tooltip:AcquireSection(tooltip:GetStyle("bodySection"))
+        for i, attack in ipairs(attacks) do
+            local isKillingBlow = (i == #attacks)
+            -- Acquire from the tooltip object (persistent), not the section (pooled).
+            -- Section pools get wiped by ZO_TooltipSection:Initialize (customControlPools = {})
+            -- every time a section is re-acquired, causing duplicate name errors.
+            -- The tooltip object is never re-initialized, so its pools persist across resets.
+            -- This matches armorytooltips.lua which calls self:AcquireCustomControl on the tooltip.
+            local row = tooltip:AcquireCustomControl(DEATH_ATTACK_ROW_STYLE)
+            row:SetHidden(false)
+
+            -- Icon at consistent offset (reserves skull space on all rows for alignment)
+            local icon = row:GetNamedChild("Icon")
+            local abilityIcon = GetAbilityIcon(attack.abilityId)
+            icon:SetTexture(abilityIcon)
+            icon:ClearAnchors()
+            icon:SetAnchor(LEFT, row, LEFT, DEATH_TOOLTIP_ICON_OFFSET_X, 0)
+
+            -- Icon frame: square for active abilities, circle for passives
+            local isPassive = journal.utils.isPassiveIcon(abilityIcon)
+            row:GetNamedChild("EdgeFrame"):SetHidden(isPassive)
+            row:GetNamedChild("CircleFrame"):SetHidden(not isPassive)
+
+            -- Killing blow skull (anchored to icon's left in XML, hidden on non-killing rows)
+            local killingBlowIcon = row:GetNamedChild("KillingBlow")
+            if killingBlowIcon then
+                killingBlowIcon:SetHidden(not isKillingBlow)
+            end
+
+            -- Ability name and damage value
+            row:GetNamedChild("Name"):SetText(journal.utils.getAbilityDisplayName(attack.abilityId))
+            row:GetNamedChild("Value"):SetText(journal.utils.formatCompact(attack.damage))
+
+            attackSection:AddCustomControl(row)
+        end
+        tooltip:AddSection(attackSection)
+    end
+
+    -- Show tooltip + background fragments
+    SCENE_MANAGER:AddFragment(GAMEPAD_TOOLTIPS:GetTooltipFragment(GAMEPAD_LEFT_TOOLTIP))
+    if GAMEPAD_TOOLTIPS:DoesAutoShowTooltipBg(GAMEPAD_LEFT_TOOLTIP) then
+        SCENE_MANAGER:AddFragment(GAMEPAD_TOOLTIPS:GetTooltipBgFragment(GAMEPAD_LEFT_TOOLTIP))
+    end
+end
+
 ---Refreshes the tooltip for the selected entry
 ---@param journalUI BattleScrolls_Journal_Gamepad
 ---@param selectedData table|nil
 function chronicler.refreshTooltip(journalUI, selectedData)
     chronicler.resetTooltips()
 
-    -- Handle overview panel visibility based on selection
-    if journalUI.overviewPanel then
+    -- Handle group table visibility on GROUP tab
+    local groupTable = BattleScrolls.journal.groupTable
+    if journalUI.selectedTab == STATS_TAB.GROUP then
         if selectedData and selectedData.isOverviewEntry then
-            journalUI.overviewPanel:Refresh(journalUI)
-            journalUI.overviewPanel:Show()
+            -- Show group table for overview entry, hide overview panel
+            if groupTable then
+                groupTable:Show(journalUI)
+            end
+            if journalUI.overviewPanel then
+                journalUI.overviewPanel:Hide()
+            end
+        elseif selectedData and selectedData.groupPlayerData then
+            -- Show player detail panel, hide group table
+            if groupTable and groupTable:IsActive() then
+                groupTable:Leave()
+                journalUI:SetActiveKeybinds(journalUI.statsKeybindStripDescriptor)
+                journalUI:ActivateCurrentList()
+            end
+            if groupTable then
+                groupTable:Hide()
+            end
+            if journalUI.overviewPanel then
+                journalUI.overviewPanel:Refresh(journalUI, selectedData)
+                journalUI.overviewPanel:Show()
+            end
         else
-            journalUI.overviewPanel:Hide()
+            if groupTable then groupTable:Hide() end
+            if journalUI.overviewPanel then journalUI.overviewPanel:Hide() end
+        end
+    else
+        -- Non-GROUP tab: hide group table, handle overview panel normally
+        if groupTable then groupTable:Hide() end
+        if journalUI.overviewPanel then
+            if selectedData and (selectedData.isOverviewEntry or selectedData.groupPlayerData) then
+                journalUI.overviewPanel:Refresh(journalUI, selectedData)
+                journalUI.overviewPanel:Show()
+            else
+                journalUI.overviewPanel:Hide()
+            end
         end
     end
 
@@ -262,7 +377,7 @@ function chronicler.refreshTooltip(journalUI, selectedData)
 
         -- Build breakdown text
         local lines = {}
-        table.insert(lines, string.format("%s: %d %s", GetString(BATTLESCROLLS_TOOLTIP_TOTAL), procData.totalProcs, GetString(BATTLESCROLLS_STAT_TOTAL_PROCS)))
+        table.insert(lines, string.format("%s: %s", GetString(BATTLESCROLLS_TOOLTIP_TOTAL), zo_strformat(GetString(BATTLESCROLLS_STAT_TOTAL_PROCS), procData.totalProcs)))
 
         if procData.meanIntervalMs > 0 then
             table.insert(lines, string.format("%s: %.1fs", GetString(BATTLESCROLLS_TOOLTIP_MEAN_INTERVAL), procData.meanIntervalMs / 1000))
@@ -309,6 +424,16 @@ function chronicler.refreshTooltip(journalUI, selectedData)
         return
     end
 
+    -- Show death recap tooltip (from Damage Taken tab death entries)
+    if selectedData.deathRecapData then
+        local recap = selectedData.deathRecapData
+        local title = selectedData.text or GetString(BATTLESCROLLS_HEADER_DEATHS)
+        local timing = zo_strformat(GetString(BATTLESCROLLS_GROUP_DEATH_AT),
+            journal.utils.formatDuration(recap.timeOffsetMs))
+        showDeathRecapTooltip(title, timing, recap.attacks)
+        return
+    end
+
     -- Show settings tooltip
     if selectedData.tooltipText then
         local title = selectedData.tooltipTitle or selectedData.text or ""
@@ -336,6 +461,55 @@ end
 ---@return TabBarEntry[]
 function chronicler.getEncounterListTabBarEntries(journalUI)
     return journal.controllers.encounterList.getTabBarEntries(journalUI)
+end
+
+---Computes tab visibility flags for a decoded encounter.
+---These flags are cached on the encounter to avoid recomputation in getEncounterTabBarEntries.
+---@param decodedEncounter Encounter
+function chronicler.computeTabVisibility(decodedEncounter)
+    local computeTotal = BattleScrolls.arithmancer.ComputeDamageTotal
+    local dealtDamage = false
+    local dealtDamageToBosses = false
+    local bossesSet = nil
+
+    -- Build boss set for O(1) lookup
+    if decodedEncounter.bossesUnits then
+        bossesSet = {}
+        for _, bossUnitId in ipairs(decodedEncounter.bossesUnits) do
+            bossesSet[bossUnitId] = true
+        end
+    end
+
+    -- Check damage data
+    for _, byTarget in pairs(decodedEncounter.damageByUnitId) do
+        for targetUnitId, damage in pairs(byTarget) do
+            local total = computeTotal(damage)
+            if total > 0 then
+                dealtDamage = true
+                if bossesSet and bossesSet[targetUnitId] then
+                    dealtDamageToBosses = true
+                    break  -- Found both flags, can exit early
+                end
+            end
+        end
+        if dealtDamageToBosses then break end
+    end
+
+    -- Check effects
+    local hasEffects = (decodedEncounter.effectsOnPlayer and not ZO_IsTableEmpty(decodedEncounter.effectsOnPlayer))
+        or (decodedEncounter.effectsOnBosses and not ZO_IsTableEmpty(decodedEncounter.effectsOnBosses))
+        or (decodedEncounter.effectsOnGroup and not ZO_IsTableEmpty(decodedEncounter.effectsOnGroup))
+
+    decodedEncounter._tabVisibility = {
+        dealtDamage = dealtDamage,
+        dealtDamageToBosses = dealtDamageToBosses,
+        hasDamageTaken = not ZO_IsTableEmpty(decodedEncounter.damageTakenByUnitId),
+        hasHealingOutToGroup = not ZO_IsTableEmpty(decodedEncounter.healingStats.healingOutToGroup),
+        hasSelfHealing = decodedEncounter.healingStats.selfHealing.total.raw > 0,
+        hasHealingInFromGroup = not ZO_IsTableEmpty(decodedEncounter.healingStats.healingInFromGroup),
+        hasEffects = hasEffects,
+        hasGroupData = decodedEncounter.sharedData ~= nil and #decodedEncounter.sharedData >= 2,
+    }
 end
 
 ---Gets tab bar entries for an encounter stats view
@@ -450,6 +624,18 @@ function chronicler.getEncounterTabBarEntries(journalUI)
         })
     end
 
+    if tabVis.hasGroupData then
+        table.insert(entries, {
+            text = GetString(BATTLESCROLLS_TAB_GROUP),
+            callback = function()
+                if journalUI.selectedTab ~= STATS_TAB.GROUP then
+                    journalUI.selectedTab = STATS_TAB.GROUP
+                    chronicler.refreshList(journalUI, true)
+                end
+            end,
+        })
+    end
+
     return entries
 end
 
@@ -489,6 +675,14 @@ end
 ---@param journalUI BattleScrolls_Journal_Gamepad
 ---@param skipHeaderRefresh boolean|nil
 function chronicler.refreshList(journalUI, skipHeaderRefresh)
+    -- If group table is active during tab switch, deactivate it first
+    local groupTable = BattleScrolls.journal.groupTable
+    if groupTable and groupTable:IsActive() then
+        groupTable:Leave()
+        journalUI:SetActiveKeybinds(journalUI.statsKeybindStripDescriptor)
+        journalUI:ActivateCurrentList()
+    end
+
     if not skipHeaderRefresh then
         journalUI:RefreshHeader()
     end

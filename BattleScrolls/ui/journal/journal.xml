@@ -21,7 +21,8 @@
             </Controls>
         </Control>
 
-        <!-- Stat row template for overview panel - header/value pair -->
+        <!-- Label-value row template for overview panel (used in Q2 and Q4) -->
+        <!-- Label widths and row height are set dynamically in Lua -->
         <Control name="BattleScrolls_OverviewStatRow" virtual="true">
             <Dimensions y="36"/>
             <Controls>
@@ -29,13 +30,11 @@
                        color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL"
                        verticalAlignment="CENTER">
                     <Anchor point="LEFT"/>
-                    <Dimensions x="280"/>
                 </Label>
                 <Label name="$(parent)Value" font="ZoFontGamepad34" horizontalAlignment="RIGHT"
                        color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_SELECTED"
                        verticalAlignment="CENTER">
                     <Anchor point="RIGHT"/>
-                    <Dimensions x="200"/>
                 </Label>
             </Controls>
         </Control>
@@ -144,25 +143,6 @@
             </Controls>
         </Control>
 
-        <!-- Target row template for Q4 - Name + value -->
-        <Control name="BattleScrolls_OverviewTargetRow" virtual="true">
-            <Dimensions y="32"/>
-            <Controls>
-                <Label name="$(parent)Name" font="ZoFontGamepad22"
-                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL"
-                       verticalAlignment="CENTER">
-                    <Anchor point="TOPLEFT" offsetX="0" offsetY="0"/>
-                    <Dimensions x="160" y="32"/>
-                </Label>
-                <Label name="$(parent)Value" font="ZoFontGamepad22" horizontalAlignment="RIGHT"
-                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_SELECTED"
-                       verticalAlignment="CENTER">
-                    <Anchor point="TOPRIGHT" offsetX="0" offsetY="0"/>
-                    <Dimensions x="90" y="32"/>
-                </Label>
-            </Controls>
-        </Control>
-
         <!-- Effect bar template for effects tab (with icon) - matches ability bar style -->
         <Control name="BattleScrolls_OverviewEffectBar" virtual="true">
             <Dimensions y="54"/>
@@ -235,13 +215,55 @@
             </Controls>
         </Control>
 
+        <!-- Group member card template for group overview - compact full-width stacked cards -->
+        <Control name="BattleScrolls_GroupMemberCard" virtual="true">
+            <Dimensions y="56"/>
+            <Controls>
+                <!-- Row 1 (y=0, h=20): Name (left) + Primary metric (right) -->
+                <Label name="$(parent)Name" font="ZoFontGamepadBold22"
+                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_SELECTED"
+                       verticalAlignment="CENTER">
+                    <Anchor point="TOPLEFT" offsetX="0" offsetY="0"/>
+                    <Dimensions x="320" y="20"/>
+                </Label>
+                <Label name="$(parent)Metric" font="ZoFontGamepadBold22" horizontalAlignment="RIGHT"
+                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_SELECTED"
+                       verticalAlignment="CENTER">
+                    <Anchor point="TOPRIGHT" offsetX="0" offsetY="0"/>
+                    <Dimensions x="140" y="20"/>
+                </Label>
+
+                <!-- Row 2 (y=24, h=16): Relative bar + share label -->
+                <StatusBar name="$(parent)Bar" inherits="ZO_GamepadArrowStatusBarWithBGMedium">
+                    <Anchor point="TOPLEFT" offsetX="0" offsetY="24"/>
+                    <Anchor point="TOPRIGHT" offsetX="-115" offsetY="24"/>
+                    <Dimensions y="16"/>
+                </StatusBar>
+                <Label name="$(parent)Share" font="ZoFontGamepad18" horizontalAlignment="RIGHT"
+                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL"
+                       verticalAlignment="CENTER">
+                    <Anchor point="TOPRIGHT" offsetX="0" offsetY="24"/>
+                    <Dimensions x="110" y="16"/>
+                </Label>
+
+                <!-- Row 3 (y=40, h=16): Combined boss breakdown + stats -->
+                <Label name="$(parent)InfoLine" font="ZoFontGamepad18"
+                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL"
+                       wrapMode="ELLIPSIS">
+                    <Anchor point="TOPLEFT" offsetX="0" offsetY="40"/>
+                    <Anchor point="TOPRIGHT" offsetX="0" offsetY="40"/>
+                    <Dimensions y="16"/>
+                </Label>
+            </Controls>
+        </Control>
+
         <!-- Compact effect row template for narrow spaces (Q2/Q4) - no progress bar -->
         <Control name="BattleScrolls_OverviewEffectRow" virtual="true">
             <Dimensions y="54"/>
             <Controls>
-                <!-- Effect icon (same size as ability bars) -->
+                <!-- Effect icon (same size as ability bars, inset 4px for frame overflow) -->
                 <Texture name="$(parent)Icon" pixelRoundingEnabled="false" tier="HIGH">
-                    <Anchor point="TOPLEFT" offsetX="0" offsetY="4"/>
+                    <Anchor point="TOPLEFT" offsetX="4" offsetY="4"/>
                     <Dimensions x="46" y="46"/>
                 </Texture>
                 <!-- Favorite star overlay -->
@@ -269,7 +291,7 @@
                 <Label name="$(parent)Name" font="ZoFontGamepad22"
                        color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_SELECTED"
                        verticalAlignment="CENTER">
-                    <Anchor point="TOPLEFT" offsetX="56" offsetY="0"/>
+                    <Anchor point="TOPLEFT" offsetX="60" offsetY="0"/>
                     <Anchor point="TOPRIGHT" offsetX="-70" offsetY="0"/>
                     <Dimensions y="26"/>
                 </Label>
@@ -283,10 +305,193 @@
                 <!-- Row 2: Stats line (compact) -->
                 <Label name="$(parent)Stats" font="ZoFontGamepad18"
                        color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL">
-                    <Anchor point="TOPLEFT" offsetX="56" offsetY="28"/>
+                    <Anchor point="TOPLEFT" offsetX="60" offsetY="28"/>
                     <Anchor point="TOPRIGHT" offsetX="0" offsetY="28"/>
                     <Dimensions y="24"/>
                 </Label>
+            </Controls>
+        </Control>
+
+        <!-- Death attack row for group Q3 - icon + ability name + damage value.
+             Icon LEFT offset set in Lua to reserve space for killing blow skull. -->
+        <Control name="BattleScrolls_DeathAttackRow" virtual="true">
+            <Dimensions y="42"/>
+            <Controls>
+                <!-- Ability icon (LEFT offset set in Lua for consistent alignment) -->
+                <Texture name="$(parent)Icon" pixelRoundingEnabled="false" tier="HIGH">
+                    <Anchor point="LEFT" offsetX="0"/>
+                    <Dimensions x="36" y="36"/>
+                </Texture>
+                <!-- Square edge frame for active abilities (Backdrop) -->
+                <Backdrop name="$(parent)EdgeFrame" tier="HIGH"
+                          edgeColor="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL"
+                          centerColor="00000000" pixelRoundingEnabled="false" hidden="true">
+                    <Anchor point="TOPLEFT" relativeTo="$(parent)Icon" offsetX="-4" offsetY="-4"/>
+                    <Anchor point="BOTTOMRIGHT" relativeTo="$(parent)Icon" offsetX="4" offsetY="4"/>
+                    <Edge file="EsoUI/Art/Miscellaneous/Gamepad/edgeframeGamepadBorder.dds" edgeFileWidth="128" edgeFileHeight="16"/>
+                </Backdrop>
+                <!-- Circle frame for passive abilities (Texture) -->
+                <Texture name="$(parent)CircleFrame" tier="HIGH" pixelRoundingEnabled="false"
+                         textureFile="EsoUI/Art/Miscellaneous/Gamepad/gp_passiveFrame_64.dds"
+                         color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" hidden="true">
+                    <Anchor point="TOPLEFT" relativeTo="$(parent)Icon" offsetX="-4" offsetY="-4"/>
+                    <Anchor point="BOTTOMRIGHT" relativeTo="$(parent)Icon" offsetX="4" offsetY="4"/>
+                </Texture>
+                <!-- Killing blow skull to the left of icon (hidden by default, shown on final attack) -->
+                <Texture name="$(parent)KillingBlow"
+                         textureFile="EsoUI/Art/ZoneStories/completionTypeIcon_groupBoss.dds"
+                         hidden="true" tier="HIGH" level="4">
+                    <Dimensions x="36" y="36"/>
+                    <Anchor point="RIGHT" relativeTo="$(parent)Icon" relativePoint="LEFT" offsetX="-8"/>
+                </Texture>
+                <!-- Value defined before Name so Name's RIGHT anchor resolves -->
+                <Label name="$(parent)Value" font="ZoFontGamepadBold27" horizontalAlignment="RIGHT"
+                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_SELECTED"
+                       verticalAlignment="CENTER">
+                    <Anchor point="RIGHT"/>
+                    <Dimensions x="100" y="42"/>
+                </Label>
+                <Label name="$(parent)Name" font="ZoFontGamepadBold27"
+                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_SELECTED"
+                       verticalAlignment="CENTER">
+                    <Anchor point="LEFT" relativeTo="$(parent)Icon" relativePoint="RIGHT" offsetX="10"/>
+                    <Anchor point="RIGHT" relativeTo="$(parent)Value" relativePoint="LEFT" offsetX="-10"/>
+                    <Dimensions y="42"/>
+                </Label>
+            </Controls>
+        </Control>
+
+        <!-- Group table row template: 55px height for 12-member trials.
+             Static anchor chain (Rank→Name→DPS→Crit→DTPS→HPS→Alive) follows the native
+             ESO pattern with $(parent) relativeTo. Name width and DPS predecessor are
+             adjusted in Lua for dynamic boss columns (ConfigureRowColumns). -->
+        <Control name="BattleScrolls_GroupTableRow" inherits="ZO_GamepadInteractiveSortFilterListRow" virtual="true">
+            <Dimensions y="65"/>
+            <Controls>
+                <Label name="$(parent)Rank" font="ZoFontGamepad27" verticalAlignment="CENTER">
+                    <Dimensions x="40"/>
+                    <Anchor point="LEFT" offsetX="ZO_GAMEPAD_INTERACTIVE_FILTER_HIGHLIGHT_PADDING"/>
+                </Label>
+                <!-- Name: stretchy column. Width and anchor set in Lua (ConfigureRowColumns). -->
+                <Label name="$(parent)Name" font="ZoFontGamepadBold27" wrapMode="ELLIPSIS"
+                       maxLineCount="1" verticalAlignment="CENTER"/>
+                <!-- Right-aligned columns use wrapper Control (full width for anchor chain)
+                     + inner Label (inset by arrow padding to match header text alignment).
+                     This mirrors how ZO_GamepadInteractiveSortFilterHeader works. -->
+
+                <!-- Boss columns: hidden by default, shown/anchored in Lua when bosses present. -->
+                <Control name="$(parent)Boss1" hidden="true">
+                    <Dimensions x="110"/>
+                    <Controls>
+                        <Label name="$(parent)Label" font="ZoFontGamepad27"
+                               horizontalAlignment="RIGHT" verticalAlignment="CENTER">
+                            <Dimensions x="95"/>
+                            <Anchor point="LEFT"/>
+                        </Label>
+                    </Controls>
+                </Control>
+                <Control name="$(parent)Boss2" hidden="true">
+                    <Dimensions x="110"/>
+                    <Controls>
+                        <Label name="$(parent)Label" font="ZoFontGamepad27"
+                               horizontalAlignment="RIGHT" verticalAlignment="CENTER">
+                            <Dimensions x="95"/>
+                            <Anchor point="LEFT"/>
+                        </Label>
+                    </Controls>
+                </Control>
+                <Control name="$(parent)Boss3" hidden="true">
+                    <Dimensions x="110"/>
+                    <Controls>
+                        <Label name="$(parent)Label" font="ZoFontGamepad27"
+                               horizontalAlignment="RIGHT" verticalAlignment="CENTER">
+                            <Dimensions x="95"/>
+                            <Anchor point="LEFT"/>
+                        </Label>
+                    </Controls>
+                </Control>
+                <Control name="$(parent)Boss4" hidden="true">
+                    <Dimensions x="110"/>
+                    <Controls>
+                        <Label name="$(parent)Label" font="ZoFontGamepad27"
+                               horizontalAlignment="RIGHT" verticalAlignment="CENTER">
+                            <Dimensions x="95"/>
+                            <Anchor point="LEFT"/>
+                        </Label>
+                    </Controls>
+                </Control>
+                <!-- DPS: anchor set in Lua (predecessor depends on boss count). -->
+                <Control name="$(parent)DPS">
+                    <Dimensions x="90"/>
+                    <Controls>
+                        <Label name="$(parent)Label" font="ZoFontGamepad27"
+                               horizontalAlignment="RIGHT" verticalAlignment="CENTER">
+                            <Dimensions x="75"/>
+                            <Anchor point="LEFT"/>
+                        </Label>
+                    </Controls>
+                </Control>
+                <!-- Static tail: chained via XML $(parent) relativeTo (native ESO pattern). -->
+                <Control name="$(parent)Crit">
+                    <Dimensions x="60"/>
+                    <Anchor point="LEFT" relativePoint="RIGHT" relativeTo="$(parent)DPS"
+                            offsetX="ZO_GAMEPAD_INTERACTIVE_FILTER_LIST_HEADER_DOUBLE_PADDING_X"/>
+                    <Controls>
+                        <Label name="$(parent)Label" font="ZoFontGamepad27"
+                               horizontalAlignment="RIGHT" verticalAlignment="CENTER">
+                            <Dimensions x="45"/>
+                            <Anchor point="LEFT"/>
+                        </Label>
+                    </Controls>
+                </Control>
+                <Control name="$(parent)DTPS">
+                    <Dimensions x="80"/>
+                    <Anchor point="LEFT" relativePoint="RIGHT" relativeTo="$(parent)Crit"
+                            offsetX="ZO_GAMEPAD_INTERACTIVE_FILTER_LIST_HEADER_DOUBLE_PADDING_X"/>
+                    <Controls>
+                        <Label name="$(parent)Label" font="ZoFontGamepad27"
+                               horizontalAlignment="RIGHT" verticalAlignment="CENTER">
+                            <Dimensions x="65"/>
+                            <Anchor point="LEFT"/>
+                        </Label>
+                    </Controls>
+                </Control>
+                <Control name="$(parent)HPS">
+                    <Dimensions x="80"/>
+                    <Anchor point="LEFT" relativePoint="RIGHT" relativeTo="$(parent)DTPS"
+                            offsetX="ZO_GAMEPAD_INTERACTIVE_FILTER_LIST_HEADER_DOUBLE_PADDING_X"/>
+                    <Controls>
+                        <Label name="$(parent)Label" font="ZoFontGamepad27"
+                               horizontalAlignment="RIGHT" verticalAlignment="CENTER">
+                            <Dimensions x="65"/>
+                            <Anchor point="LEFT"/>
+                        </Label>
+                    </Controls>
+                </Control>
+                <Control name="$(parent)Alive">
+                    <Dimensions x="70"/>
+                    <Anchor point="LEFT" relativePoint="RIGHT" relativeTo="$(parent)HPS"
+                            offsetX="ZO_GAMEPAD_INTERACTIVE_FILTER_LIST_HEADER_DOUBLE_PADDING_X"/>
+                    <Controls>
+                        <Label name="$(parent)Label" font="ZoFontGamepad27"
+                               horizontalAlignment="RIGHT" verticalAlignment="CENTER">
+                            <Dimensions x="55"/>
+                            <Anchor point="LEFT"/>
+                        </Label>
+                    </Controls>
+                </Control>
+                <Control name="$(parent)Deaths">
+                    <Dimensions x="80"/>
+                    <Anchor point="LEFT" relativePoint="RIGHT" relativeTo="$(parent)Alive"
+                            offsetX="ZO_GAMEPAD_INTERACTIVE_FILTER_LIST_HEADER_DOUBLE_PADDING_X"/>
+                    <Controls>
+                        <Label name="$(parent)Label" font="ZoFontGamepad27"
+                               horizontalAlignment="RIGHT" verticalAlignment="CENTER">
+                            <Dimensions x="65"/>
+                            <Anchor point="LEFT"/>
+                        </Label>
+                    </Controls>
+                </Control>
             </Controls>
         </Control>
 
@@ -300,23 +505,42 @@
                     <Controls>
                         <!-- Background with left arrow pointing from Q1 list -->
                         <Control name="$(parent)NestedBg" inherits="ZO_SharedGamepadNavQuadrant_2_3_4_Background_Template"/>
-                        <!-- Q2 Container - Summary stats (left column, wider) -->
-                        <Control name="$(parent)Q2Container">
-                            <Dimensions x="290"/>
+                        <!-- Q2 Container - Summary stats (left column, wider, scrollable) -->
+                        <Control name="$(parent)Q2Container" inherits="ZO_ScrollContainer_Gamepad">
+                            <Dimensions x="300"/>
                             <Anchor point="TOPLEFT" offsetX="50" offsetY="90"/>
                             <Anchor point="BOTTOMLEFT" offsetX="50" offsetY="-10"/>
+                            <Controls>
+                                <Control name="$(parent)ScrollChild" override="true" resizeToFitConstrains="Y">
+                                    <Dimensions x="100%"/>
+                                </Control>
+                            </Controls>
                         </Control>
-                        <!-- Q4 Container - Targets/sources (right column, wider) -->
+                        <!-- Q4 Container - Targets/sources (right column, wider, scrollable) -->
                         <!-- NOTE: Must be defined before Q3 so Q3's anchor to Q4 resolves correctly -->
-                        <Control name="$(parent)Q4Container">
+                        <Control name="$(parent)Q4Container" inherits="ZO_ScrollContainer_Gamepad">
                             <Dimensions x="300"/>
                             <Anchor point="TOPRIGHT" offsetX="-40" offsetY="90"/>
                             <Anchor point="BOTTOMRIGHT" offsetX="-40" offsetY="-10"/>
+                            <Controls>
+                                <Control name="$(parent)ScrollChild" override="true" resizeToFitConstrains="Y">
+                                    <Dimensions x="100%"/>
+                                </Control>
+                            </Controls>
                         </Control>
-                        <!-- Q3 Container - Top abilities (middle, fills available space) -->
-                        <Control name="$(parent)Q3Container">
+                        <!-- Q3 Container - Top abilities (middle, fills available space, scrollable) -->
+                        <!-- Inherits ZO_ScrollContainer_Gamepad for proper scroll indicators, fade, and right stick input. -->
+                        <!-- ScrollChild override: resizeToFitConstrains="Y" + 100% width (Guild Info pattern). -->
+                        <!-- Q3 controls use direct anchoring (to ScrollChild, not to each other) to avoid -->
+                        <!-- "Too many anchors" when many ZO_GamepadArrowStatusBarWithBGMedium bars are chained. -->
+                        <Control name="$(parent)Q3Container" inherits="ZO_ScrollContainer_Gamepad">
                             <Anchor point="TOPLEFT" relativeTo="$(parent)Q2Container" relativePoint="TOPRIGHT" offsetX="50" offsetY="0"/>
                             <Anchor point="BOTTOMRIGHT" relativeTo="$(parent)Q4Container" relativePoint="BOTTOMLEFT" offsetX="-50" offsetY="0"/>
+                            <Controls>
+                                <Control name="$(parent)ScrollChild" override="true" resizeToFitConstrains="Y">
+                                    <Dimensions x="100%"/>
+                                </Control>
+                            </Controls>
                         </Control>
                         <!-- Legacy Container for compatibility (points to Q2) -->
                         <Control name="$(parent)Container">
@@ -327,6 +551,86 @@
                         <Label name="$(parent)LoadingLabel" font="ZoFontGamepadBold34" color="GAMEPAD_NAV_QUADRANT_TEXT_DISABLED" horizontalAlignment="CENTER" verticalAlignment="CENTER" hidden="true">
                             <Anchor point="CENTER"/>
                         </Label>
+                    </Controls>
+                </Control>
+                <!-- Group table: sortable comparison table for Group tab overview -->
+                <Control name="$(parent)GroupTable"
+                    inherits="ZO_GamepadGrid_NavQuadrant_2_3_4_Anchors ZO_GamepadInteractiveSortFilterListControl"
+                    hidden="true">
+                    <OnInitialized>BattleScrolls_GroupTable_OnInitialized(self)</OnInitialized>
+                    <Controls>
+                        <!-- Background (same as overview panel) -->
+                        <Control name="$(parent)NestedBg" inherits="ZO_SharedGamepadNavQuadrant_2_3_4_Background_Template"/>
+                        <Control name="$(parent)Container" override="true">
+                            <Controls>
+                                <Control name="$(parent)Headers" override="true">
+                                    <Controls>
+                                        <!-- Rank: display-only, not sortable -->
+                                        <Control name="$(parent)Rank" inherits="ZO_GamepadDisabledInteractiveFilterHeader">
+                                            <Dimensions x="40"/>
+                                            <Anchor point="TOPLEFT" offsetX="ZO_GAMEPAD_INTERACTIVE_FILTER_HIGHLIGHT_PADDING"/>
+                                        </Control>
+                                        <!-- Name: sortable, stretchy (width set in Lua) -->
+                                        <Control name="$(parent)Name" inherits="ZO_GamepadInteractiveFilterHeader">
+                                            <Anchor point="TOPLEFT" relativeTo="$(parent)Rank" relativePoint="TOPRIGHT"
+                                                    offsetX="ZO_GAMEPAD_INTERACTIVE_FILTER_LIST_HEADER_DOUBLE_PADDING_X"/>
+                                        </Control>
+                                        <!-- Boss slots: hidden by default, chained after Name -->
+                                        <Control name="$(parent)Boss1" inherits="ZO_GamepadInteractiveFilterHeader" hidden="true">
+                                            <Dimensions x="110"/>
+                                            <Anchor point="TOPLEFT" relativeTo="$(parent)Name" relativePoint="TOPRIGHT"
+                                                    offsetX="ZO_GAMEPAD_INTERACTIVE_FILTER_LIST_HEADER_DOUBLE_PADDING_X"/>
+                                        </Control>
+                                        <Control name="$(parent)Boss2" inherits="ZO_GamepadInteractiveFilterHeader" hidden="true">
+                                            <Dimensions x="110"/>
+                                            <Anchor point="TOPLEFT" relativeTo="$(parent)Boss1" relativePoint="TOPRIGHT"
+                                                    offsetX="ZO_GAMEPAD_INTERACTIVE_FILTER_LIST_HEADER_DOUBLE_PADDING_X"/>
+                                        </Control>
+                                        <Control name="$(parent)Boss3" inherits="ZO_GamepadInteractiveFilterHeader" hidden="true">
+                                            <Dimensions x="110"/>
+                                            <Anchor point="TOPLEFT" relativeTo="$(parent)Boss2" relativePoint="TOPRIGHT"
+                                                    offsetX="ZO_GAMEPAD_INTERACTIVE_FILTER_LIST_HEADER_DOUBLE_PADDING_X"/>
+                                        </Control>
+                                        <Control name="$(parent)Boss4" inherits="ZO_GamepadInteractiveFilterHeader" hidden="true">
+                                            <Dimensions x="110"/>
+                                            <Anchor point="TOPLEFT" relativeTo="$(parent)Boss3" relativePoint="TOPRIGHT"
+                                                    offsetX="ZO_GAMEPAD_INTERACTIVE_FILTER_LIST_HEADER_DOUBLE_PADDING_X"/>
+                                        </Control>
+                                        <!-- DPS default: after Name (no bosses). Re-anchored in Lua when bosses present. -->
+                                        <Control name="$(parent)DPS" inherits="ZO_GamepadInteractiveFilterHeader">
+                                            <Dimensions x="90"/>
+                                            <Anchor point="TOPLEFT" relativeTo="$(parent)Name" relativePoint="TOPRIGHT"
+                                                    offsetX="ZO_GAMEPAD_INTERACTIVE_FILTER_LIST_HEADER_DOUBLE_PADDING_X"/>
+                                        </Control>
+                                        <Control name="$(parent)Crit" inherits="ZO_GamepadInteractiveFilterHeader">
+                                            <Dimensions x="60"/>
+                                            <Anchor point="TOPLEFT" relativeTo="$(parent)DPS" relativePoint="TOPRIGHT"
+                                                    offsetX="ZO_GAMEPAD_INTERACTIVE_FILTER_LIST_HEADER_DOUBLE_PADDING_X"/>
+                                        </Control>
+                                        <Control name="$(parent)DTPS" inherits="ZO_GamepadInteractiveFilterHeader">
+                                            <Dimensions x="80"/>
+                                            <Anchor point="TOPLEFT" relativeTo="$(parent)Crit" relativePoint="TOPRIGHT"
+                                                    offsetX="ZO_GAMEPAD_INTERACTIVE_FILTER_LIST_HEADER_DOUBLE_PADDING_X"/>
+                                        </Control>
+                                        <Control name="$(parent)HPS" inherits="ZO_GamepadInteractiveFilterHeader">
+                                            <Dimensions x="80"/>
+                                            <Anchor point="TOPLEFT" relativeTo="$(parent)DTPS" relativePoint="TOPRIGHT"
+                                                    offsetX="ZO_GAMEPAD_INTERACTIVE_FILTER_LIST_HEADER_DOUBLE_PADDING_X"/>
+                                        </Control>
+                                        <Control name="$(parent)Alive" inherits="ZO_GamepadInteractiveFilterHeader">
+                                            <Dimensions x="70"/>
+                                            <Anchor point="TOPLEFT" relativeTo="$(parent)HPS" relativePoint="TOPRIGHT"
+                                                    offsetX="ZO_GAMEPAD_INTERACTIVE_FILTER_LIST_HEADER_DOUBLE_PADDING_X"/>
+                                        </Control>
+                                        <Control name="$(parent)Deaths" inherits="ZO_GamepadInteractiveFilterHeader">
+                                            <Dimensions x="80"/>
+                                            <Anchor point="TOPLEFT" relativeTo="$(parent)Alive" relativePoint="TOPRIGHT"
+                                                    offsetX="ZO_GAMEPAD_INTERACTIVE_FILTER_LIST_HEADER_DOUBLE_PADDING_X"/>
+                                        </Control>
+                                    </Controls>
+                                </Control>
+                            </Controls>
+                        </Control>
                     </Controls>
                 </Control>
             </Controls>

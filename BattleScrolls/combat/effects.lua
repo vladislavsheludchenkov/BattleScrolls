@@ -17,9 +17,9 @@ BattleScrolls = BattleScrolls or {}
 ---@class EffectContext
 ---@field initialized boolean
 ---@field fightStartTimeMs number When combat started (for alive time calculations)
----@field effectsOnPlayer table<number, PlayerEffectStats>
----@field effectsOnBosses table<string, table<number, BossEffectStats>> Keyed by unitTag ("boss1", etc.)
----@field effectsOnGroup table<string, table<number, GroupEffectStats>> Keyed by displayName ("@player")
+---@field effectsOnPlayer table<number, EffectStats>
+---@field effectsOnBosses table<string, table<number, EffectStats>> Keyed by unitTag ("boss1", etc.)
+---@field effectsOnGroup table<string, table<number, EffectStats>> Keyed by displayName ("PlayerName")
 ---@field activeEffects table<string, table<number, EffectInstance>> Nested: [storageKey][effectSlot] = instance
 ---@field lastDamageDoneMs number
 ---@field playerAliveState UnitAliveState|nil Tracks player alive/dead state
@@ -191,37 +191,45 @@ local function getUnitStorageKey(ctx, unitTag)
     end
 end
 
----Updates EffectStats when an effect duration ends
+---Finalizes effect stats when an effect duration ends (FADED, death, or combat end)
+---Updates total and player-attributed active time, max stacks time, and retroactive correction timestamps.
 ---@param stats EffectStats
 ---@param instance EffectInstance
 ---@param endTimeMs number
-local function finalizeStats(stats, instance, endTimeMs)
-    local duration = endTimeMs - instance.startTimeMs
-    stats.totalActiveTimeMs = stats.totalActiveTimeMs + duration
-
-    -- Finalize max stacks time if we were at max stacks
-    if instance.maxStacksStartMs and instance.currentMaxStacks > 1 and instance.currentMaxStacks >= stats.maxStacks then
-        local maxStacksDuration = endTimeMs - instance.maxStacksStartMs
-        stats.timeAtMaxStacksMs = stats.timeAtMaxStacksMs + maxStacksDuration
-    end
-end
-
----Updates stats with player attribution when an effect duration ends (used for all effect types)
----@param stats BossEffectStats|GroupEffectStats|PlayerEffectStats
----@param instance EffectInstance
----@param endTimeMs number
 local function finalizeStatsWithAttribution(stats, instance, endTimeMs)
-    -- First update total stats
-    finalizeStats(stats, instance, endTimeMs)
+    local duration = endTimeMs - instance.startTimeMs
+    if duration <= 0 then return end
 
-    -- Then update player-specific stats if this was applied by player
+    stats.totalActiveTimeMs = stats.totalActiveTimeMs + duration
+    if endTimeMs > stats.lastFinalizedMs then
+        stats.lastFinalizedMs = endTimeMs
+    end
+
+    local isAtMaxStacks = instance.maxStacksStartMs and instance.currentMaxStacks > 1 and instance.currentMaxStacks >= stats.maxStacks
+    if isAtMaxStacks then
+        local maxStacksDuration = endTimeMs - instance.maxStacksStartMs
+        if maxStacksDuration > 0 then
+            stats.timeAtMaxStacksMs = stats.timeAtMaxStacksMs + maxStacksDuration
+            if endTimeMs > stats.lastFinalizedMaxStacksMs then
+                stats.lastFinalizedMaxStacksMs = endTimeMs
+            end
+        end
+    end
+
     if instance.appliedByPlayer then
-        local duration = endTimeMs - instance.startTimeMs
         stats.playerActiveTimeMs = stats.playerActiveTimeMs + duration
+        if endTimeMs > stats.lastFinalizedPlayerMs then
+            stats.lastFinalizedPlayerMs = endTimeMs
+        end
 
-        if instance.maxStacksStartMs and instance.currentMaxStacks > 1 and instance.currentMaxStacks >= stats.maxStacks then
+        if isAtMaxStacks then
             local maxStacksDuration = endTimeMs - instance.maxStacksStartMs
-            stats.playerTimeAtMaxStacksMs = stats.playerTimeAtMaxStacksMs + maxStacksDuration
+            if maxStacksDuration > 0 then
+                stats.playerTimeAtMaxStacksMs = stats.playerTimeAtMaxStacksMs + maxStacksDuration
+                if endTimeMs > stats.lastFinalizedPlayerMaxStacksMs then
+                    stats.lastFinalizedPlayerMaxStacksMs = endTimeMs
+                end
+            end
         end
     end
 end
@@ -248,7 +256,7 @@ end
 ---Call AFTER adding the new instance to activeEffects
 ---When about to increase peak above 1, triggers a full reconciliation first to catch out-of-order events
 ---@param ctx EffectContext
----@param stats EffectStatsWithAttribution
+---@param stats EffectStats
 ---@param storageKey string
 ---@param abilityId number
 ---@param unitTag string Unit tag for reconciliation (e.g., "player", "boss1", "group3")
@@ -268,7 +276,7 @@ local function updatePeakConcurrentInstances(ctx, stats, storageKey, abilityId, 
 end
 
 ---Updates stats on GAINED: increments applications and updates maxStacks
----@param stats BossEffectStats|GroupEffectStats|PlayerEffectStats
+---@param stats EffectStats
 ---@param stackCount number
 ---@param appliedByPlayer boolean
 local function updateStatsOnGained(stats, stackCount, appliedByPlayer)
@@ -283,7 +291,7 @@ local function updateStatsOnGained(stats, stackCount, appliedByPlayer)
 end
 
 ---Handles reapplication detection and max stacks updates on UPDATED
----@param stats BossEffectStats|GroupEffectStats|PlayerEffectStats
+---@param stats EffectStats
 ---@param instance EffectInstance
 ---@param stackCount number
 ---@param appliedByPlayer boolean
@@ -313,8 +321,14 @@ local function updateStatsOnUpdated(stats, instance, stackCount, appliedByPlayer
         local maxStacksDuration = nowMs - instance.maxStacksStartMs
         if instance.currentMaxStacks >= stats.maxStacks then
             stats.timeAtMaxStacksMs = stats.timeAtMaxStacksMs + maxStacksDuration
+            if nowMs > stats.lastFinalizedMaxStacksMs then
+                stats.lastFinalizedMaxStacksMs = nowMs
+            end
             if instance.appliedByPlayer then
                 stats.playerTimeAtMaxStacksMs = stats.playerTimeAtMaxStacksMs + maxStacksDuration
+                if nowMs > stats.lastFinalizedPlayerMaxStacksMs then
+                    stats.lastFinalizedPlayerMaxStacksMs = nowMs
+                end
             end
         end
         instance.maxStacksStartMs = nil
@@ -341,7 +355,10 @@ end
 ---@param endTimeMs number
 local function finalizeUnitAliveTime(aliveState, endTimeMs)
     if aliveState.lastAliveStartMs then
-        aliveState.aliveTimeMs = aliveState.aliveTimeMs + (endTimeMs - aliveState.lastAliveStartMs)
+        local elapsed = endTimeMs - aliveState.lastAliveStartMs
+        if elapsed > 0 then
+            aliveState.aliveTimeMs = aliveState.aliveTimeMs + elapsed
+        end
         aliveState.lastAliveStartMs = nil
     end
 end
@@ -349,7 +366,7 @@ end
 ---Finalizes all active effects for a specific unit (used when unit dies)
 ---@param ctx EffectContext
 ---@param storageKey string The key in storage (unitTag for bosses, displayName for group)
----@param storage table<string, table<number, EffectStatsWithAttribution|BossEffectStats|GroupEffectStats>> The storage table (effectsOnBosses or effectsOnGroup)
+---@param storage table<string, table<number, EffectStats>> The storage table (effectsOnBosses or effectsOnGroup)
 ---@param endTimeMs number
 local function finalizeEffectsForUnit(ctx, storageKey, storage, endTimeMs)
     local slots = ctx.activeEffects[storageKey]
@@ -367,7 +384,7 @@ end
 ---Backfills effects for a unit tag (used when unit becomes alive or combat starts)
 ---@param ctx EffectContext
 ---@param unitTag string
----@param storage table<number, EffectStatsWithAttribution|BossEffectStats|GroupEffectStats|PlayerEffectStats> Storage table for stats (effectsOnPlayer or storage[storageKey])
+---@param storage table<number, EffectStats> Storage table for stats (effectsOnPlayer or storage[storageKey])
 ---@param effectTypeFilter number|nil Filter by effect type (nil = track all)
 ---@param storageKey string|nil Storage key for instance (unitTag for bosses, displayName for group, nil for player)
 local function backfillEffectsForUnitTag(ctx, unitTag, storage, effectTypeFilter, storageKey)
@@ -381,7 +398,7 @@ local function backfillEffectsForUnitTag(ctx, unitTag, storage, effectTypeFilter
         if abilityId and abilityId > 0 and (not effectTypeFilter or effectType == effectTypeFilter) then
             -- Initialize stats if first time seeing this effect
             if not storage[abilityId] then
-                storage[abilityId] = BattleScrolls.structures.newEffectStatsWithAttribution(abilityId, effectType)
+                storage[abilityId] = BattleScrolls.structures.newEffectStats(abilityId, effectType)
             end
 
             local stats = storage[abilityId]
@@ -410,7 +427,7 @@ end
 
 ---Handles GAINED/FADED/UPDATED for unit effects (boss or group)
 ---@param ctx EffectContext
----@param storage table<string, table<number, EffectStatsWithAttribution|BossEffectStats|GroupEffectStats>> The storage table (effectsOnBosses or effectsOnGroup)
+---@param storage table<string, table<number, EffectStats>> The storage table (effectsOnBosses or effectsOnGroup)
 ---@param storageKey string Key in storage (unitTag for bosses, displayName for group)
 ---@param effectSlot number The effect slot number
 ---@param unitTag string
@@ -431,7 +448,7 @@ local function handleUnitEffectChange(ctx, storage, storageKey, effectSlot, unit
 
         -- Initialize stats if first time seeing this effect
         if not storage[storageKey][abilityId] then
-            storage[storageKey][abilityId] = BattleScrolls.structures.newEffectStatsWithAttribution(abilityId, effectType)
+            storage[storageKey][abilityId] = BattleScrolls.structures.newEffectStats(abilityId, effectType)
         end
 
         -- Finalize old instance if exists (rapid reapplication case)
@@ -624,7 +641,7 @@ function effects.handlePlayerEffect(ctx, changeType, effectSlot, effectType, sta
     if changeType == EFFECT_RESULT_GAINED then
         -- Initialize stats if first time seeing this effect
         if not ctx.effectsOnPlayer[abilityId] then
-            ctx.effectsOnPlayer[abilityId] = BattleScrolls.structures.newEffectStatsWithAttribution(abilityId, effectType)
+            ctx.effectsOnPlayer[abilityId] = BattleScrolls.structures.newEffectStats(abilityId, effectType)
         end
 
         local stats = ctx.effectsOnPlayer[abilityId]
@@ -768,7 +785,7 @@ function effects.handleGroupEffect(ctx, changeType, effectSlot, unitTag, effectT
     -- Use displayName as storageKey to ensure stability across unitTag changes
     local appliedByPlayer = (sourceType == COMBAT_UNIT_TYPE_PLAYER)
 
-    -- Store by displayName (e.g., "@PlayerName")
+    -- Store by displayName (e.g., "PlayerName")
     -- If FADED without tracked instance, periodic reconciliation will catch sync issues
     handleUnitEffectChange(ctx, ctx.effectsOnGroup, displayName, effectSlot, unitTag, changeType, abilityId, effectType, stackCount, appliedByPlayer, beginTime)
 end
@@ -928,20 +945,6 @@ function effects.getPlayerAliveTime(ctx, fightDurationMs)
     return ctx.playerAliveState.aliveTimeMs
 end
 
----Gets the total alive time for a unit in milliseconds
----Returns fight duration if unit was never tracked (e.g., player)
----@param ctx EffectContext
----@param unitId number
----@param fightDurationMs number Fallback if unit not tracked
----@return number aliveTimeMs
-function effects.getUnitAliveTime(ctx, unitId, fightDurationMs)
-    local aliveState = ctx.unitAliveState[unitId]
-    if not aliveState then
-        return fightDurationMs
-    end
-    return aliveState.aliveTimeMs
-end
-
 ---Gets the final alive times for all tracked units (for export to encounter)
 ---@param ctx EffectContext|BattleScrollsState
 ---@return table<string, number> storageKey -> aliveTimeMs (unitTag for bosses, displayName for group)
@@ -1040,7 +1043,7 @@ end
 ---(e.g., two players applying Relequen to the same boss get different slots)
 ---@param ctx EffectContext
 ---@param unitTag string The unit tag to read effects from
----@param storage table<number, EffectStatsWithAttribution|BossEffectStats|GroupEffectStats|PlayerEffectStats> The storage table for stats (effectsOnPlayer or effectsOnBosses[key] or effectsOnGroup[key])
+---@param storage table<number, EffectStats> The storage table for stats (effectsOnPlayer or effectsOnBosses[key] or effectsOnGroup[key])
 ---@param storageKey string|nil The storage key for new instances (nil for player)
 ---@param effectTypeFilter number|nil Filter by effect type (nil = all)
 local function reconcileEffects(ctx, unitTag, storage, storageKey, effectTypeFilter)
@@ -1101,7 +1104,7 @@ local function reconcileEffects(ctx, unitTag, storage, storageKey, effectTypeFil
             -- Track new effect in this slot
             local newAbilityId = current.abilityId
             if not storage[newAbilityId] then
-                storage[newAbilityId] = BattleScrolls.structures.newEffectStatsWithAttribution(newAbilityId, current.effectType)
+                storage[newAbilityId] = BattleScrolls.structures.newEffectStats(newAbilityId, current.effectType)
             end
             updateStatsOnGained(storage[newAbilityId], current.stackCount, current.appliedByPlayer)
 
@@ -1124,7 +1127,7 @@ local function reconcileEffects(ctx, unitTag, storage, storageKey, effectTypeFil
 
             local abilityId = current.abilityId
             if not storage[abilityId] then
-                storage[abilityId] = BattleScrolls.structures.newEffectStatsWithAttribution(abilityId, current.effectType)
+                storage[abilityId] = BattleScrolls.structures.newEffectStats(abilityId, current.effectType)
             end
             updateStatsOnGained(storage[abilityId], current.stackCount, current.appliedByPlayer)
 
@@ -1149,7 +1152,7 @@ local function reconcileEffects(ctx, unitTag, storage, storageKey, effectTypeFil
         if not reconTrackedKeys[effectSlot] then
             local abilityId = current.abilityId
             if not storage[abilityId] then
-                storage[abilityId] = BattleScrolls.structures.newEffectStatsWithAttribution(abilityId, current.effectType)
+                storage[abilityId] = BattleScrolls.structures.newEffectStats(abilityId, current.effectType)
             end
             updateStatsOnGained(storage[abilityId], current.stackCount, current.appliedByPlayer)
 
@@ -1300,8 +1303,9 @@ end
 ---Finalizes all active effects before state reset (closes any still-active effects)
 ---Also finalizes alive times for all tracked units
 ---@param ctx EffectContext|BattleScrollsState
-function effects.finalize(ctx)
-    local nowMs = GetGameTimeMilliseconds()
+---@param endTimeMs number|nil End time for finalization (defaults to GetGameTimeMilliseconds()). Pass lastDamageDoneMs to keep effect uptimes consistent with fight duration.
+function effects.finalize(ctx, endTimeMs)
+    local nowMs = endTimeMs or GetGameTimeMilliseconds()
 
     -- Finalize player alive time if still being tracked
     if ctx.playerAliveState and not ctx.playerAliveState.isDead then
@@ -1341,6 +1345,46 @@ function effects.finalize(ctx)
     end
 
     ctx.activeEffects = {}
+
+    -- Retroactive correction: if any stat was finalized mid-combat with a timestamp
+    -- after endTimeMs (e.g., an effect faded after the last damage event), subtract
+    -- the excess. This is an approximation — if an effect was both gained and faded
+    -- entirely after endTimeMs, we may slightly over-correct.
+    if endTimeMs then
+        ---@param stats EffectStats
+        local function correctExcess(stats)
+            local excess = stats.lastFinalizedMs - nowMs
+            if excess > 0 then
+                stats.totalActiveTimeMs = math.max(0, stats.totalActiveTimeMs - excess)
+            end
+            local playerExcess = stats.lastFinalizedPlayerMs - nowMs
+            if playerExcess > 0 then
+                stats.playerActiveTimeMs = math.max(0, stats.playerActiveTimeMs - playerExcess)
+            end
+            local maxStacksExcess = stats.lastFinalizedMaxStacksMs - nowMs
+            if maxStacksExcess > 0 then
+                stats.timeAtMaxStacksMs = math.max(0, stats.timeAtMaxStacksMs - maxStacksExcess)
+            end
+            local playerMaxStacksExcess = stats.lastFinalizedPlayerMaxStacksMs - nowMs
+            if playerMaxStacksExcess > 0 then
+                stats.playerTimeAtMaxStacksMs = math.max(0, stats.playerTimeAtMaxStacksMs - playerMaxStacksExcess)
+            end
+        end
+
+        for _, stats in pairs(ctx.effectsOnPlayer) do
+            correctExcess(stats)
+        end
+        for _, bossEffects in pairs(ctx.effectsOnBosses) do
+            for _, stats in pairs(bossEffects) do
+                correctExcess(stats)
+            end
+        end
+        for _, memberEffects in pairs(ctx.effectsOnGroup) do
+            for _, stats in pairs(memberEffects) do
+                correctExcess(stats)
+            end
+        end
+    end
 
     -- Request GC after finalizing effects (lots of data potentially freed)
     BattleScrolls.gc:RequestGC()

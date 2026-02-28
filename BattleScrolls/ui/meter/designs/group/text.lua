@@ -15,7 +15,6 @@ local design = {
     id = "text",
     displayName = GetString(BATTLESCROLLS_DESIGN_GROUP_TEXT),
     order = 10,
-    supportsHPS = true,
     settings = {
         { id = "columns", displayName = GetString(BATTLESCROLLS_DESIGN_TEXT_COLUMNS), options = {1, 2}, default = 2,
           tooltipTitle = GetString(BATTLESCROLLS_DESIGN_TEXT_COLUMNS_TITLE),
@@ -69,14 +68,6 @@ function design:Release()
         label:SetHidden(true)
         label:ClearAnchors()
     end
-end
-
-function design:Destroy()
-    for _, label in ipairs(labels) do
-        label:SetHidden(true)
-        label:SetParent(nil)
-    end
-    labels = {}
 end
 
 ---@param members GroupMemberEntry[]
@@ -264,10 +255,6 @@ function design:Render(members, ctx)
 
         label:SetHidden(false)
     end
-end
-
-function design:RenderPreview(members, ctx)
-    self:Render(members, ctx)
 end
 
 function design:OnSettingChanged(_settingId, _value)

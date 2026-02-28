@@ -1,37 +1,7 @@
 <GuiXml xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sir.insidi.at/or/schema/esoui.xsd">
 	<Controls>
-		<!-- Virtual template for Hodor-style rows (simple dark background) -->
-		<Control name="BattleScrolls_DPSMeter_HodorRow" virtual="true">
-			<Dimensions x="200" y="22"/>
-			<Controls>
-				<!-- Dark semi-transparent background (color set in Lua) -->
-				<Texture name="$(parent)Background" textureFile="EsoUI/Art/Miscellaneous/centerscreen_left.dds" alpha="0.8">
-					<Anchor point="TOPLEFT"/>
-					<Anchor point="BOTTOMRIGHT"/>
-					<TextureCoords left="0" right="0.1" top="0" bottom="1"/>
-				</Texture>
-				<!-- Player name (left-aligned) -->
-				<Label name="$(parent)Name" font="ZoFontGamepad22"
-					color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" horizontalAlignment="LEFT">
-					<Anchor point="TOPLEFT" offsetX="4" offsetY="1"/>
-					<Anchor point="BOTTOMLEFT" offsetX="4" offsetY="-1"/>
-				</Label>
-				<!-- DPS value (right-aligned) -->
-				<Label name="$(parent)Value" font="ZoFontGamepad22"
-					color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_SELECTED" horizontalAlignment="RIGHT">
-					<Anchor point="TOPRIGHT" offsetX="-4" offsetY="1"/>
-					<Anchor point="BOTTOMRIGHT" offsetX="-4" offsetY="-1"/>
-				</Label>
-			</Controls>
-		</Control>
-
-		<!-- Virtual template for Bars-style rows (not used - created in Lua for dynamic coloring) -->
-		<Control name="BattleScrolls_DPSMeter_BarsRow" virtual="true">
-			<Dimensions x="200" y="22"/>
-		</Control>
-
 		<!-- Personal DPS Meter (main control) -->
-		<TopLevelControl name="BattleScrolls_DPSMeterPersonal" hidden="true" mouseEnabled="false" movable="false" tier="MEDIUM">
+		<TopLevelControl name="BattleScrolls_DPSMeterPersonal" hidden="true" mouseEnabled="false" movable="false">
 			<Anchor point="BOTTOMLEFT" relativeTo="GuiRoot" relativePoint="BOTTOMLEFT" offsetX="70" offsetY="-15"/>
 			<Dimensions x="230" y="80"/>
 
@@ -248,7 +218,7 @@
 		</TopLevelControl>
 
 		<!-- Group DPS Meter -->
-		<TopLevelControl name="BattleScrolls_DPSMeterGroup" hidden="true" mouseEnabled="false" movable="false" tier="MEDIUM">
+		<TopLevelControl name="BattleScrolls_DPSMeterGroup" hidden="true" mouseEnabled="false" movable="false">
 			<!-- Default anchor: below personal meter Line2 -->
 			<Anchor point="TOPLEFT" relativeTo="BattleScrolls_DPSMeterPersonalDefaultLine2" relativePoint="BOTTOMLEFT" offsetY="4"/>
 			<Dimensions x="400" y="200"/>
@@ -260,70 +230,6 @@
 					<Anchor point="BOTTOMRIGHT"/>
 
 					<Controls>
-						<!-- Row 1: width set dynamically in Lua -->
-						<Label name="$(parent)Group1" font="ZoFontGamepad27" hidden="true"
-							color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" horizontalAlignment="LEFT">
-							<Anchor point="TOPLEFT"/>
-						</Label>
-						<Label name="$(parent)Group2" font="ZoFontGamepad27" hidden="true"
-							color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" horizontalAlignment="LEFT">
-							<Anchor point="TOPLEFT" relativeTo="$(parent)Group1" relativePoint="TOPRIGHT" offsetX="10"/>
-						</Label>
-						<!-- Row 2 -->
-						<Label name="$(parent)Group3" font="ZoFontGamepad27" hidden="true"
-							color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" horizontalAlignment="LEFT">
-							<Anchor point="TOPLEFT" relativeTo="$(parent)Group1" relativePoint="BOTTOMLEFT" offsetY="2"/>
-							<Anchor point="TOPRIGHT" relativeTo="$(parent)Group1" relativePoint="BOTTOMRIGHT" offsetY="2"/>
-						</Label>
-						<Label name="$(parent)Group4" font="ZoFontGamepad27" hidden="true"
-							color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" horizontalAlignment="LEFT">
-							<Anchor point="TOPLEFT" relativeTo="$(parent)Group2" relativePoint="BOTTOMLEFT" offsetY="2"/>
-							<Anchor point="TOPRIGHT" relativeTo="$(parent)Group2" relativePoint="BOTTOMRIGHT" offsetY="2"/>
-						</Label>
-						<!-- Row 3 -->
-						<Label name="$(parent)Group5" font="ZoFontGamepad27" hidden="true"
-							color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" horizontalAlignment="LEFT">
-							<Anchor point="TOPLEFT" relativeTo="$(parent)Group3" relativePoint="BOTTOMLEFT" offsetY="2"/>
-							<Anchor point="TOPRIGHT" relativeTo="$(parent)Group3" relativePoint="BOTTOMRIGHT" offsetY="2"/>
-						</Label>
-						<Label name="$(parent)Group6" font="ZoFontGamepad27" hidden="true"
-							color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" horizontalAlignment="LEFT">
-							<Anchor point="TOPLEFT" relativeTo="$(parent)Group4" relativePoint="BOTTOMLEFT" offsetY="2"/>
-							<Anchor point="TOPRIGHT" relativeTo="$(parent)Group4" relativePoint="BOTTOMRIGHT" offsetY="2"/>
-						</Label>
-						<!-- Row 4 -->
-						<Label name="$(parent)Group7" font="ZoFontGamepad27" hidden="true"
-							color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" horizontalAlignment="LEFT">
-							<Anchor point="TOPLEFT" relativeTo="$(parent)Group5" relativePoint="BOTTOMLEFT" offsetY="2"/>
-							<Anchor point="TOPRIGHT" relativeTo="$(parent)Group5" relativePoint="BOTTOMRIGHT" offsetY="2"/>
-						</Label>
-						<Label name="$(parent)Group8" font="ZoFontGamepad27" hidden="true"
-							color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" horizontalAlignment="LEFT">
-							<Anchor point="TOPLEFT" relativeTo="$(parent)Group6" relativePoint="BOTTOMLEFT" offsetY="2"/>
-							<Anchor point="TOPRIGHT" relativeTo="$(parent)Group6" relativePoint="BOTTOMRIGHT" offsetY="2"/>
-						</Label>
-						<!-- Row 5 -->
-						<Label name="$(parent)Group9" font="ZoFontGamepad27" hidden="true"
-							color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" horizontalAlignment="LEFT">
-							<Anchor point="TOPLEFT" relativeTo="$(parent)Group7" relativePoint="BOTTOMLEFT" offsetY="2"/>
-							<Anchor point="TOPRIGHT" relativeTo="$(parent)Group7" relativePoint="BOTTOMRIGHT" offsetY="2"/>
-						</Label>
-						<Label name="$(parent)Group10" font="ZoFontGamepad27" hidden="true"
-							color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" horizontalAlignment="LEFT">
-							<Anchor point="TOPLEFT" relativeTo="$(parent)Group8" relativePoint="BOTTOMLEFT" offsetY="2"/>
-							<Anchor point="TOPRIGHT" relativeTo="$(parent)Group8" relativePoint="BOTTOMRIGHT" offsetY="2"/>
-						</Label>
-						<!-- Row 6 -->
-						<Label name="$(parent)Group11" font="ZoFontGamepad27" hidden="true"
-							color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" horizontalAlignment="LEFT">
-							<Anchor point="TOPLEFT" relativeTo="$(parent)Group9" relativePoint="BOTTOMLEFT" offsetY="2"/>
-							<Anchor point="TOPRIGHT" relativeTo="$(parent)Group9" relativePoint="BOTTOMRIGHT" offsetY="2"/>
-						</Label>
-						<Label name="$(parent)Group12" font="ZoFontGamepad27" hidden="true"
-							color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" horizontalAlignment="LEFT">
-							<Anchor point="TOPLEFT" relativeTo="$(parent)Group10" relativePoint="BOTTOMLEFT" offsetY="2"/>
-							<Anchor point="TOPRIGHT" relativeTo="$(parent)Group10" relativePoint="BOTTOMRIGHT" offsetY="2"/>
-						</Label>
 					</Controls>
 				</Control>
 
@@ -333,18 +239,10 @@
 					<Anchor point="BOTTOMRIGHT"/>
 
 					<Controls>
-						<!-- Header row -->
-						<Control name="$(parent)Header" inherits="BattleScrolls_DPSMeter_HodorRow">
-							<Anchor point="TOPLEFT"/>
-						</Control>
 						<!-- Rows container (rows added dynamically in Lua) -->
 						<Control name="$(parent)Rows">
-							<Anchor point="TOPLEFT" relativeTo="$(parent)Header" relativePoint="BOTTOMLEFT"/>
+							<Anchor point="TOPLEFT"/>
 							<Anchor point="BOTTOMRIGHT"/>
-						</Control>
-						<!-- Summary row -->
-						<Control name="$(parent)Summary" inherits="BattleScrolls_DPSMeter_HodorRow" hidden="true">
-							<!-- Anchored dynamically after last row -->
 						</Control>
 					</Controls>
 				</Control>

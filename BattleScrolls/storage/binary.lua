@@ -12,7 +12,7 @@ BattleScrolls = BattleScrolls or {}
 local binaryStorage = {}
 BattleScrolls.binaryStorage = binaryStorage
 
-local CURRENT_VERSION = 7
+local CURRENT_VERSION = 8
 
 -- Import BitEncoder/BitDecoder from bitcodec module
 local BitEncoder = BattleScrolls.bitcodec.BitEncoder
@@ -70,6 +70,9 @@ local BITS = {
 
     -- Map/array count (16 bits = up to 65535 entries)
     MAP_COUNT = 16,
+
+    -- Death attack count (3 bits = up to 6 attacks per recap)
+    DEATH_ATTACK_COUNT = 3,
 }
 
 -- Number of encoded items (breakdowns, healing breakdowns, effect stats, etc.)
@@ -182,7 +185,7 @@ end
 
 ---Writes an EffectStats to encoder
 ---@param encoder BitEncoder
----@param stats EffectStats|BossEffectStats|GroupEffectStats
+---@param stats EffectStats
 local function writeEffectStats(encoder, stats)
     encoder:writeUInt(stats.abilityId or 0, BITS.ABILITY_ID)
     encoder:writeUInt(stats.effectType or 0, BITS.EFFECT_TYPE)
@@ -199,9 +202,9 @@ end
 
 ---Reads an EffectStats from decoder
 ---@param decoder BitDecoder
----@return BossEffectStats
+---@return EffectStats
 local function readEffectStats(decoder)
-    return BattleScrolls.structures.makeEffectStatsWithAttribution(
+    return BattleScrolls.structures.makeEffectStats(
         decoder:readUInt(BITS.ABILITY_ID),
         decoder:readUInt(BITS.EFFECT_TYPE),
         decoder:readUInt(BITS.TIME_MS),
@@ -488,7 +491,7 @@ end
 
 ---Writes effectsOnPlayer to encoder
 ---@param encoder BitEncoder
----@param effectsOnPlayer table<number, PlayerEffectStats>|nil
+---@param effectsOnPlayer table<number, EffectStats>|nil
 ---@param progress EncodeProgress
 local function writeEffectsOnPlayer(encoder, effectsOnPlayer, progress)
     local count = 0
@@ -504,7 +507,7 @@ end
 
 ---Reads effectsOnPlayer from decoder
 ---@param decoder BitDecoder
----@return table<number, PlayerEffectStats>|nil
+---@return table<number, EffectStats>|nil
 local function readEffectsOnPlayer(decoder)
     local count = decoder:readUInt(BITS.MAP_COUNT)
     if count == 0 then return nil end
@@ -520,7 +523,7 @@ end
 
 ---Writes effectsOnBosses to encoder
 ---@param encoder BitEncoder
----@param effectsOnBosses table<string, table<number, BossEffectStats>>|nil
+---@param effectsOnBosses table<string, table<number, EffectStats>>|nil
 ---@param progress EncodeProgress
 local function writeEffectsOnBosses(encoder, effectsOnBosses, progress)
     local unitCount = 0
@@ -544,7 +547,7 @@ end
 
 ---Reads effectsOnBosses from decoder
 ---@param decoder BitDecoder
----@return table<string, table<number, BossEffectStats>>|nil
+---@return table<string, table<number, EffectStats>>|nil
 local function readEffectsOnBosses(decoder)
     local unitCount = decoder:readUInt(BITS.MAP_COUNT)
     if unitCount == 0 then return nil end
@@ -566,7 +569,7 @@ end
 
 ---Writes effectsOnGroup to encoder
 ---@param encoder BitEncoder
----@param effectsOnGroup table<string, table<number, GroupEffectStats>>|nil
+---@param effectsOnGroup table<string, table<number, EffectStats>>|nil
 ---@param progress EncodeProgress
 local function writeEffectsOnGroup(encoder, effectsOnGroup, progress)
     local memberCount = 0
@@ -590,7 +593,7 @@ end
 
 ---Reads effectsOnGroup from decoder
 ---@param decoder BitDecoder
----@return table<string, table<number, GroupEffectStats>>|nil
+---@return table<string, table<number, EffectStats>>|nil
 local function readEffectsOnGroup(decoder)
     local memberCount = decoder:readUInt(BITS.MAP_COUNT)
     if memberCount == 0 then return nil end
@@ -708,6 +711,72 @@ local function readUnitNames(decoder)
 end
 
 -- =============================================================================
+-- DEATH RECAP ENCODING (v8+)
+-- =============================================================================
+
+---Writes a single death recap to encoder
+---@param encoder BitEncoder
+---@param recap SharedDeathRecap
+local function writeDeathRecap(encoder, recap)
+    encoder:writeUInt(recap.timeOffsetMs or 0, BITS.TIME_MS)
+    local attacks = recap.attacks or {}
+    encoder:writeUInt(#attacks, BITS.DEATH_ATTACK_COUNT)
+    for _, attack in ipairs(attacks) do
+        encoder:writeUInt(attack.abilityId, BITS.ABILITY_ID)
+        encoder:writeUInt(attack.damage, BITS.TICK_VALUE)
+    end
+end
+
+---Reads a single death recap from decoder
+---@param decoder BitDecoder
+---@return SharedDeathRecap
+local function readDeathRecap(decoder)
+    local timeOffsetMs = decoder:readUInt(BITS.TIME_MS)
+    local attackCount = decoder:readUInt(BITS.DEATH_ATTACK_COUNT)
+    local attacks = {}
+    for _ = 1, attackCount do
+        attacks[#attacks + 1] = {
+            abilityId = decoder:readUInt(BITS.ABILITY_ID),
+            damage = decoder:readUInt(BITS.TICK_VALUE),
+        }
+    end
+    return { timeOffsetMs = timeOffsetMs, attacks = attacks }
+end
+
+---Writes EncounterDeaths to encoder (1-bit flag prefix)
+---@param encoder BitEncoder
+---@param deaths EncounterDeaths|nil
+local function writeDeaths(encoder, deaths)
+    if not deaths then
+        encoder:writeBit(false)
+        return
+    end
+    encoder:writeBit(true)
+    encoder:writeUInt(deaths.deathCount, BITS.MAP_COUNT)
+    local recaps = deaths.recaps or {}
+    encoder:writeUInt(#recaps, BITS.MAP_COUNT)
+    for _, recap in ipairs(recaps) do
+        writeDeathRecap(encoder, recap)
+    end
+end
+
+---Reads EncounterDeaths from decoder (1-bit flag prefix)
+---@param decoder BitDecoder
+---@return EncounterDeaths|nil
+local function readDeaths(decoder)
+    if not decoder:readBit() then
+        return nil
+    end
+    local deathCount = decoder:readUInt(BITS.MAP_COUNT)
+    local recapCount = decoder:readUInt(BITS.MAP_COUNT)
+    local recaps = {}
+    for _ = 1, recapCount do
+        recaps[#recaps + 1] = readDeathRecap(decoder)
+    end
+    return { deathCount = deathCount, recaps = recaps }
+end
+
+-- =============================================================================
 -- MAIN ENCODE/DECODE FUNCTIONS
 -- =============================================================================
 
@@ -746,6 +815,7 @@ function binaryStorage.encodeEncounterAsync(encounter)
         end
         writeUnitAliveTimes(encoder, encounter.unitAliveTimeMs)
         writeUnitNames(encoder, encounter.unitNames, progress)
+        writeDeaths(encoder, encounter.deaths)
         flushProgress(progress)
 
         local chunks = encoder:finish()
@@ -760,6 +830,9 @@ function binaryStorage.encodeEncounterAsync(encounter)
             bossesUnits = encounter.bossesUnits,
             isPlayerFight = encounter.isPlayerFight,
             isDummyFight = encounter.isDummyFight,
+            sharedData = encounter.sharedData,
+            bossSeqNames = encounter.bossSeqNames,
+            bossTagSeqByUnitId = encounter.bossTagSeqByUnitId,
         }
     end)
 end
@@ -771,8 +844,9 @@ end
 ---@return Effect Effect that resolves to Encounter
 function binaryStorage.decodeEncounterAsync(binaryEncounter)
     return LibEffect.Async(function()
-        if binaryEncounter._v ~= 7 then
-            error("Invalid binary encounter version: " .. tostring(binaryEncounter._v) .. " (expected 7)")
+        local _v = binaryEncounter._v
+        if _v ~= 7 and _v ~= 8 then
+            error("Invalid binary encounter version: " .. tostring(_v) .. " (expected 7 or 8)")
         end
 
         local decoder = BitDecoder.new(binaryEncounter._data)
@@ -786,6 +860,9 @@ function binaryStorage.decodeEncounterAsync(binaryEncounter)
             bossesUnits = binaryEncounter.bossesUnits,
             isPlayerFight = binaryEncounter.isPlayerFight,
             isDummyFight = binaryEncounter.isDummyFight,
+            sharedData = binaryEncounter.sharedData,
+            bossSeqNames = binaryEncounter.bossSeqNames,
+            bossTagSeqByUnitId = binaryEncounter.bossTagSeqByUnitId,
         }
 
         result.damageByUnitId = readDamageMap(decoder)
@@ -818,15 +895,13 @@ function binaryStorage.decodeEncounterAsync(binaryEncounter)
 
         result.unitNames = readUnitNames(decoder)
 
+        -- v8+: death recap data
+        if _v >= 8 then
+            result.deaths = readDeaths(decoder)
+        end
+
         return result
     end)
-end
-
----Checks if an encounter is in binary format
----@param encounter Encounter|CompactEncounter
----@return boolean
-function binaryStorage.isBinaryEncounter(encounter)
-    return encounter._v >= 3 and encounter._data ~= nil
 end
 
 -- =============================================================================
@@ -931,9 +1006,3 @@ function binaryStorage.decodeInstanceFieldsAsync(instance)
     end)
 end
 
----Checks if an instance has encoded fields
----@param instance Instance
----@return boolean
-function binaryStorage.hasEncodedInstanceFields(instance)
-    return instance._instanceData ~= nil
-end

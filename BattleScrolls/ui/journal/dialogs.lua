@@ -77,7 +77,7 @@ end
 function BasicDialog:OnShown()
     -- Add our keybinds to the new state
     KEYBIND_STRIP:AddKeybindButtonGroup(self.keybindStripDescriptor, self.keybindState)
-    PlaySound(SOUNDS.GAMEPAD_MENU_FORWARD)
+    PlaySound(SOUNDS.GAMEPAD_OPEN_WINDOW)
 end
 
 -- Required for DIRECTIONAL_INPUT
@@ -112,7 +112,7 @@ function BasicDialog:SetupKeybinds()
                 name = GetString(SI_GAMEPAD_BACK_OPTION),
                 callback = function()
                     self:Hide()
-                    PlaySound(SOUNDS.GAMEPAD_MENU_BACK)
+                    PlaySound(SOUNDS.GAMEPAD_CLOSE_WINDOW)
                 end,
             },
         }
@@ -284,7 +284,7 @@ function ParametricDialog:OnShown()
         KEYBIND_STRIP:UpdateKeybindButtonGroup(self.keybindStripDescriptor, self.keybindState)
     end)
 
-    PlaySound(SOUNDS.GAMEPAD_MENU_FORWARD)
+    PlaySound(SOUNDS.GAMEPAD_OPEN_WINDOW)
 end
 
 function ParametricDialog:OnHiding()
@@ -522,42 +522,12 @@ function dialogs.showBasicDialog(data)
     end
 end
 
----Hides the basic dialog if showing
-function dialogs.hideBasicDialog()
-    if BattleScrolls.dialogs.basic then
-        BattleScrolls.dialogs.basic:Hide()
-    end
-end
-
 ---Shows a parametric list dialog
 ---@param data {title: string, parametricList: table[], onConfirm: function|nil, onCancel: function|nil, onReset: function|nil, resetText: string|nil}
 function dialogs.showParametricDialog(data)
     if BattleScrolls.dialogs.parametric then
         BattleScrolls.dialogs.parametric:Show(data)
     end
-end
-
----Hides the parametric dialog if showing
-function dialogs.hideParametricDialog()
-    if BattleScrolls.dialogs.parametric then
-        BattleScrolls.dialogs.parametric:Hide()
-    end
-end
-
----Rebuilds the parametric dialog list (for external refresh)
-function dialogs.rebuildParametricList()
-    if BattleScrolls.dialogs.parametric then
-        BattleScrolls.dialogs.parametric:RebuildList()
-    end
-end
-
----Gets the parametric dialog's entry list
----@return ZO_ParametricScrollList|nil
-function dialogs.getParametricEntryList()
-    if BattleScrolls.dialogs.parametric then
-        return BattleScrolls.dialogs.parametric:GetEntryList()
-    end
-    return nil
 end
 
 -- Initialize namespace

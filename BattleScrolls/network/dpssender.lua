@@ -22,10 +22,11 @@ end
 
 ---TickListener callback: called every 200ms during combat with a shared calculator
 ---@param calc ArithmancerInstance
-function dpsSender:OnCombatTick(calc)
+---@param bossCalc ArithmancerInstance|nil
+function dpsSender:OnCombatTick(calc, bossCalc)
     BattleScrolls.dpsShare:SendData(
         calc:personalDPS(),
-        calc:bossPersonalDPS(),
+        bossCalc and bossCalc:personalDPS() or 0,
         calc:personalRawHPSOut(),
         calc:personalEffectiveHPSOut()
     )

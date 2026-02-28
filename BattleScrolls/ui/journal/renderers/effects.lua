@@ -40,7 +40,7 @@ end
 ---Formats effect entry value string (brief, for list display)
 ---Works for player, boss, and group effects (all use same attribution fields)
 ---When multiple concurrent instances exist, shows average uptime per instance
----@param stats PlayerEffectStatsStorage|BossEffectStatsStorage
+---@param stats EffectStatsStorage
 ---@param durationMs number
 ---@return string
 local function formatEffectValueBrief(stats, durationMs)
@@ -78,10 +78,12 @@ end
 ---@param playerUptimePercent number
 ---@return string
 local function formatGroupEffectValueBrief(avgUptimePercent, memberCount, playerUptimePercent)
+    local membersStr = zo_strformat(GetString(BATTLESCROLLS_EFFECT_MEMBERS), memberCount)
     if playerUptimePercent > 0 then
-        return string.format("%.1f%% %s (%.1f%% %s, %d %s)", avgUptimePercent, GetString(BATTLESCROLLS_EFFECT_AVG), playerUptimePercent, GetString(BATTLESCROLLS_EFFECT_YOURS), memberCount, GetString(BATTLESCROLLS_EFFECT_MEMBERS))
+        local yoursStr = zo_strformat(GetString(BATTLESCROLLS_EFFECT_YOURS_PERCENT), string.format("%.1f", playerUptimePercent))
+        return string.format("%.1f%% %s (%s, %s)", avgUptimePercent, GetString(BATTLESCROLLS_EFFECT_AVG), yoursStr, membersStr)
     end
-    return string.format("%.1f%% %s (%d %s)", avgUptimePercent, GetString(BATTLESCROLLS_EFFECT_AVG), memberCount, GetString(BATTLESCROLLS_EFFECT_MEMBERS))
+    return string.format("%.1f%% %s (%s)", avgUptimePercent, GetString(BATTLESCROLLS_EFFECT_AVG), membersStr)
 end
 
 ---Gets the favorites table from settings
@@ -92,9 +94,9 @@ local function getFavorites()
 end
 
 ---Sorts effects by uptime descending (async with yields), favorites first
----@param effects table<number, EffectStatsStorage|BossEffectStatsStorage|GroupEffectStatsStorage>
+---@param effects table<number, EffectStatsStorage>
 ---@param durationMs number Reference duration for uptime calculation
----@return Effect<{ abilityId: number, stats: EffectStatsStorage|BossEffectStatsStorage|GroupEffectStatsStorage }[]>
+---@return Effect<{ abilityId: number, stats: EffectStatsStorage }[]>
 local function sortEffectsByUptimeAsync(effects, durationMs)
     return LibEffect.Async(function()
         local favorites = getFavorites()
@@ -165,7 +167,7 @@ local function displayEffectEntriesAsync(list, sortedEffects, durationMs, header
 end
 
 ---Separates effects into buffs and debuffs, sorted by uptime descending (async with yields)
----@param effects table<number, PlayerEffectStatsStorage>
+---@param effects table<number, EffectStatsStorage>
 ---@param durationMs number Reference duration for uptime calculation
 ---@return Effect<{ buffs: table[], debuffs: table[] }>
 local function separateBuffsAndDebuffsAsync(effects, durationMs)

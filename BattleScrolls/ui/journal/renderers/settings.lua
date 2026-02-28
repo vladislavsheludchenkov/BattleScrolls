@@ -16,30 +16,16 @@ local journal = BattleScrolls.journal
 local SettingsRenderer = {}
 
 -------------------------
--- Public API
+-- Section Helpers
 -------------------------
 
----Renders the Settings list
----@param list any The parametric list
----@param onRefresh function Callback to refresh the list when settings change
-function SettingsRenderer.renderSettings(list, onRefresh)
-    list:Clear()
-
-    local settings = BattleScrolls.storage and BattleScrolls.storage.savedVariables and BattleScrolls.storage.savedVariables.settings
-    local defaults = BattleScrolls.storage.defaults.settings
-
+---Renders DPS Meter personal settings (linger, enabled, mode, design, offsets, scale)
+---@return boolean personalEnabled
+local function renderDpsMeterPersonalSettings(list, settings, defaults, onRefresh)
     -- Callback to show personal DPS meter preview when offset changes
     local function onPersonalOffsetChanged()
         if BattleScrolls.dpsMeter then
             BattleScrolls.dpsMeter:ApplyPersonalOffsets()
-            BattleScrolls.dpsMeter:ApplyGroupPosition()
-            BattleScrolls.dpsMeter:ShowPreview()
-        end
-    end
-
-    -- Callback to show group DPS meter preview when offset changes
-    local function onGroupOffsetChanged()
-        if BattleScrolls.dpsMeter then
             BattleScrolls.dpsMeter:ApplyGroupPosition()
             BattleScrolls.dpsMeter:ShowPreview()
         end
@@ -259,7 +245,19 @@ function SettingsRenderer.renderSettings(list, onRefresh)
         list:AddEntry("ZO_GamepadOptionsLabelRow", resetPersonalPositionData)
     end
 
-    -- Group Meter section
+    return personalEnabled
+end
+
+---Renders DPS Meter group settings (enabled, show solo, design, position, offsets, scale)
+local function renderDpsMeterGroupSettings(list, settings, defaults, onRefresh, personalEnabled)
+    -- Callback to show group DPS meter preview when offset changes
+    local function onGroupOffsetChanged()
+        if BattleScrolls.dpsMeter then
+            BattleScrolls.dpsMeter:ApplyGroupPosition()
+            BattleScrolls.dpsMeter:ShowPreview()
+        end
+    end
+
     local groupEnabledData = {
         text = GetString(BATTLESCROLLS_SETTINGS_ENABLED),
         header = GetString(BATTLESCROLLS_SETTINGS_GROUP_METER),
@@ -295,207 +293,208 @@ function SettingsRenderer.renderSettings(list, onRefresh)
 
     -- Only show group meter settings when enabled
     local groupEnabled = settings and settings.dpsMeterGroupEnabled ~= false
-    if groupEnabled then
-        -- Show Without Group Data toggle (show group meter when only you have data)
-        local groupShowSoloData = {
-            text = GetString(BATTLESCROLLS_SETTINGS_SHOW_WITHOUT_GROUP_DATA),
-            tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_SHOW_WITHOUT_GROUP_DATA),
-            tooltipText = GetString(BATTLESCROLLS_SETTINGS_SHOW_WITHOUT_GROUP_DATA_TEXT),
-            getFunction = function()
-                return settings and settings.dpsMeterGroupShowSolo == true
-            end,
-            setFunction = function(value)
-                if settings then
-                    settings.dpsMeterGroupShowSolo = value
-                    if BattleScrolls.dpsMeter then
-                        BattleScrolls.dpsMeter:ShowPreview()
-                    end
-                end
-            end,
-            toggleFunction = function()
-                if settings then
-                    settings.dpsMeterGroupShowSolo = not (settings.dpsMeterGroupShowSolo == true)
-                    if BattleScrolls.dpsMeter then
-                        BattleScrolls.dpsMeter:ShowPreview()
-                    end
-                end
-            end,
-        }
-        list:AddEntry("ZO_GamepadOptionsCheckboxRow", groupShowSoloData)
+    if not groupEnabled then return end
 
-        -- Get group designs from registry
-        local groupDesignIds = BattleScrolls.dpsMeterDesigns.GetGroupDesignIds()
-        local groupDesignNames = {}
-        for _, id in ipairs(groupDesignIds) do
-            local design = BattleScrolls.dpsMeterDesigns.GetGroupDesign(id)
-            table.insert(groupDesignNames, design and design.displayName or id)
+    -- Show Without Group Data toggle (show group meter when only you have data)
+    local groupShowSoloData = {
+        text = GetString(BATTLESCROLLS_SETTINGS_SHOW_WITHOUT_GROUP_DATA),
+        tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_SHOW_WITHOUT_GROUP_DATA),
+        tooltipText = GetString(BATTLESCROLLS_SETTINGS_SHOW_WITHOUT_GROUP_DATA_TEXT),
+        getFunction = function()
+            return settings and settings.dpsMeterGroupShowSolo == true
+        end,
+        setFunction = function(value)
+            if settings then
+                settings.dpsMeterGroupShowSolo = value
+                if BattleScrolls.dpsMeter then
+                    BattleScrolls.dpsMeter:ShowPreview()
+                end
+            end
+        end,
+        toggleFunction = function()
+            if settings then
+                settings.dpsMeterGroupShowSolo = not (settings.dpsMeterGroupShowSolo == true)
+                if BattleScrolls.dpsMeter then
+                    BattleScrolls.dpsMeter:ShowPreview()
+                end
+            end
+        end,
+    }
+    list:AddEntry("ZO_GamepadOptionsCheckboxRow", groupShowSoloData)
+
+    -- Get group designs from registry
+    local groupDesignIds = BattleScrolls.dpsMeterDesigns.GetGroupDesignIds()
+    local groupDesignNames = {}
+    for _, id in ipairs(groupDesignIds) do
+        local design = BattleScrolls.dpsMeterDesigns.GetGroupDesign(id)
+        table.insert(groupDesignNames, design and design.displayName or id)
+    end
+
+    -- Get description for current design
+    local currentGroupDesignId = settings and settings.dpsMeterGroupDesign or defaults.dpsMeterGroupDesign
+    local currentGroupDesign = BattleScrolls.dpsMeterDesigns.GetGroupDesign(currentGroupDesignId)
+
+    local groupDesignData = {
+        text = GetString(BATTLESCROLLS_SETTINGS_DESIGN),
+        valid = groupDesignIds,
+        valueStrings = groupDesignNames,
+        tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_GROUP_TRACKER_DESIGN),
+        tooltipText = currentGroupDesign and currentGroupDesign.description or nil,
+        getFunction = function()
+            return settings and settings.dpsMeterGroupDesign or defaults.dpsMeterGroupDesign
+        end,
+        setFunction = function(value)
+            if settings and settings.dpsMeterGroupDesign ~= value then
+                settings.dpsMeterGroupDesign = value
+                if BattleScrolls.dpsMeter then
+                    BattleScrolls.dpsMeter:ApplyGroupDesign()
+                    BattleScrolls.dpsMeter:ShowPreview()
+                end
+                -- Refresh list to show/hide design-specific settings
+                onRefresh()
+            end
+        end,
+    }
+    list:AddEntry("ZO_GamepadHorizontalListRow", groupDesignData)
+
+    -- Add design-specific settings for current group design
+    if currentGroupDesign and currentGroupDesign.settings then
+        for _, settingDef in ipairs(currentGroupDesign.settings) do
+            local settingData = {
+                text = settingDef.displayName,
+                valid = settingDef.options,
+                valueStrings = settingDef.optionLabels or settingDef.options,
+                tooltipTitle = settingDef.tooltipTitle,
+                tooltipText = settingDef.tooltipText,
+                getFunction = function()
+                    return BattleScrolls.dpsMeterDesigns.GetGroupDesignSetting(currentGroupDesignId, settingDef.id)
+                end,
+                setFunction = function(value)
+                    local currentValue = BattleScrolls.dpsMeterDesigns.GetGroupDesignSetting(currentGroupDesignId, settingDef.id)
+                    if currentValue ~= value then
+                        BattleScrolls.dpsMeterDesigns.SetGroupDesignSetting(currentGroupDesignId, settingDef.id, value)
+                        if currentGroupDesign.OnSettingChanged then
+                            currentGroupDesign:OnSettingChanged(settingDef.id, value)
+                        end
+                        if BattleScrolls.dpsMeter then
+                            BattleScrolls.dpsMeter:ShowPreview()
+                        end
+                    end
+                end,
+            }
+            list:AddEntry("ZO_GamepadHorizontalListRow", settingData)
         end
+    end
 
-        -- Get description for current design
-        local currentGroupDesign = BattleScrolls.dpsMeterDesigns.GetGroupDesign(
-            settings and settings.dpsMeterGroupDesign or defaults.dpsMeterGroupDesign
-        )
-
-        local groupDesignData = {
-            text = GetString(BATTLESCROLLS_SETTINGS_DESIGN),
-            valid = groupDesignIds,
-            valueStrings = groupDesignNames,
-            tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_GROUP_TRACKER_DESIGN),
-            tooltipText = currentGroupDesign and currentGroupDesign.description or nil,
+    -- Group position dropdown (only shown when personal is also enabled)
+    if personalEnabled then
+        local groupPositionData = {
+            text = GetString(BATTLESCROLLS_SETTINGS_POSITION),
+            valid = { "below", "above", "separate" },
+            valueStrings = { GetString(BATTLESCROLLS_SETTINGS_POSITION_BELOW), GetString(BATTLESCROLLS_SETTINGS_POSITION_ABOVE), GetString(BATTLESCROLLS_SETTINGS_POSITION_SEPARATE) },
+            tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_GROUP_TRACKER_POSITION),
+            tooltipText = GetString(BATTLESCROLLS_SETTINGS_GROUP_TRACKER_POSITION_TEXT),
             getFunction = function()
-                return settings and settings.dpsMeterGroupDesign or defaults.dpsMeterGroupDesign
+                return settings and settings.dpsMeterGroupPosition or defaults.dpsMeterGroupPosition
             end,
             setFunction = function(value)
-                if settings and settings.dpsMeterGroupDesign ~= value then
-                    settings.dpsMeterGroupDesign = value
+                if settings and settings.dpsMeterGroupPosition ~= value then
+                    settings.dpsMeterGroupPosition = value
                     if BattleScrolls.dpsMeter then
-                        BattleScrolls.dpsMeter:ApplyGroupDesign()
+                        BattleScrolls.dpsMeter:ApplyGroupPosition()
                         BattleScrolls.dpsMeter:ShowPreview()
                     end
-                    -- Refresh list to show/hide design-specific settings
+                    -- Refresh list to show/hide separate offset controls
                     onRefresh()
                 end
             end,
         }
-        list:AddEntry("ZO_GamepadHorizontalListRow", groupDesignData)
+        list:AddEntry("ZO_GamepadHorizontalListRow", groupPositionData)
+    end
 
-        -- Add design-specific settings for current group design
-        local currentGroupDesignId = settings and settings.dpsMeterGroupDesign or defaults.dpsMeterGroupDesign
-        if currentGroupDesign and currentGroupDesign.settings then
-            for _, settingDef in ipairs(currentGroupDesign.settings) do
-                local settingData = {
-                    text = settingDef.displayName,
-                    valid = settingDef.options,
-                    valueStrings = settingDef.optionLabels or settingDef.options,
-                    tooltipTitle = settingDef.tooltipTitle,
-                    tooltipText = settingDef.tooltipText,
-                    getFunction = function()
-                        return BattleScrolls.dpsMeterDesigns.GetGroupDesignSetting(currentGroupDesignId, settingDef.id)
-                    end,
-                    setFunction = function(value)
-                        local currentValue = BattleScrolls.dpsMeterDesigns.GetGroupDesignSetting(currentGroupDesignId, settingDef.id)
-                        if currentValue ~= value then
-                            BattleScrolls.dpsMeterDesigns.SetGroupDesignSetting(currentGroupDesignId, settingDef.id, value)
-                            if currentGroupDesign.OnSettingChanged then
-                                currentGroupDesign:OnSettingChanged(settingDef.id, value)
-                            end
-                            if BattleScrolls.dpsMeter then
-                                BattleScrolls.dpsMeter:ShowPreview()
-                            end
-                        end
-                    end,
-                }
-                list:AddEntry("ZO_GamepadHorizontalListRow", settingData)
-            end
-        end
-
-        -- Group position dropdown (only shown when personal is also enabled)
-        if personalEnabled then
-            local groupPositionData = {
-                text = GetString(BATTLESCROLLS_SETTINGS_POSITION),
-                valid = { "below", "above", "separate" },
-                valueStrings = { GetString(BATTLESCROLLS_SETTINGS_POSITION_BELOW), GetString(BATTLESCROLLS_SETTINGS_POSITION_ABOVE), GetString(BATTLESCROLLS_SETTINGS_POSITION_SEPARATE) },
-                tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_GROUP_TRACKER_POSITION),
-                tooltipText = GetString(BATTLESCROLLS_SETTINGS_GROUP_TRACKER_POSITION_TEXT),
-                getFunction = function()
-                    return settings and settings.dpsMeterGroupPosition or defaults.dpsMeterGroupPosition
-                end,
-                setFunction = function(value)
-                    if settings and settings.dpsMeterGroupPosition ~= value then
-                        settings.dpsMeterGroupPosition = value
-                        if BattleScrolls.dpsMeter then
-                            BattleScrolls.dpsMeter:ApplyGroupPosition()
-                            BattleScrolls.dpsMeter:ShowPreview()
-                        end
-                        -- Refresh list to show/hide separate offset controls
-                        onRefresh()
-                    end
-                end,
-            }
-            list:AddEntry("ZO_GamepadHorizontalListRow", groupPositionData)
-        end
-
-        -- Group offset controls (shown when personal is disabled OR position is "separate")
-        local groupPosition = settings and settings.dpsMeterGroupPosition or defaults.dpsMeterGroupPosition
-        local showGroupOffsets = not personalEnabled or groupPosition == "separate"
-        if showGroupOffsets then
-            -- Group offset X slider
-            local groupOffsetXData = {
-                text = GetString(BATTLESCROLLS_SETTINGS_OFFSET_FROM_LEFT),
-                minValue = -400,
-                maxValue = 2000,
-                showValue = true,
-                gamepadValueStepPercent = 0.1,        -- Precision mode (hold button)
-                gamepadValueStepPercentFast = 3,      -- Fast mode (default)
-                getFunction = function()
-                    return settings and settings.dpsMeterGroupOffsetX or defaults.dpsMeterGroupOffsetX
-                end,
-                setFunction = function(value)
-                    if settings then
-                        settings.dpsMeterGroupOffsetX = value
-                    end
-                end,
-                onChangeFunction = onGroupOffsetChanged,
-            }
-            list:AddEntry("ZO_GamepadOptionsSliderRow", groupOffsetXData)
-
-            -- Group offset Y slider
-            local groupOffsetYData = {
-                text = GetString(BATTLESCROLLS_SETTINGS_OFFSET_FROM_TOP),
-                minValue = -120,
-                maxValue = 1250,
-                showValue = true,
-                gamepadValueStepPercent = 0.1,        -- Precision mode (hold button)
-                gamepadValueStepPercentFast = 5,      -- Fast mode (default)
-                getFunction = function()
-                    return settings and settings.dpsMeterGroupOffsetY or defaults.dpsMeterGroupOffsetY
-                end,
-                setFunction = function(value)
-                    if settings then
-                        settings.dpsMeterGroupOffsetY = value
-                    end
-                end,
-                onChangeFunction = onGroupOffsetChanged,
-            }
-            list:AddEntry("ZO_GamepadOptionsSliderRow", groupOffsetYData)
-
-            -- Reset group position button
-            local resetGroupPositionData = {
-                text = GetString(BATTLESCROLLS_SETTINGS_RESET_POSITION),
-                callback = function()
-                    if settings then
-                        settings.dpsMeterGroupOffsetX = defaults.dpsMeterGroupOffsetX
-                        settings.dpsMeterGroupOffsetY = defaults.dpsMeterGroupOffsetY
-                        onGroupOffsetChanged()
-                        onRefresh()
-                    end
-                end,
-            }
-            list:AddEntry("ZO_GamepadOptionsLabelRow", resetGroupPositionData)
-        end
-
-        -- Group scale dropdown
-        local groupScaleData = {
-            text = GetString(BATTLESCROLLS_SETTINGS_SIZE),
-            valid = { 0.5, 0.75, 1.0, 1.25, 1.5 },
-            valueStrings = { GetString(BATTLESCROLLS_SETTINGS_SIZE_EXTRA_SMALL), GetString(BATTLESCROLLS_SETTINGS_SIZE_SMALL), GetString(BATTLESCROLLS_SETTINGS_SIZE_MEDIUM), GetString(BATTLESCROLLS_SETTINGS_SIZE_LARGE), GetString(BATTLESCROLLS_SETTINGS_SIZE_EXTRA_LARGE) },
+    -- Group offset controls (shown when personal is disabled OR position is "separate")
+    local groupPosition = settings and settings.dpsMeterGroupPosition or defaults.dpsMeterGroupPosition
+    local showGroupOffsets = not personalEnabled or groupPosition == "separate"
+    if showGroupOffsets then
+        -- Group offset X slider
+        local groupOffsetXData = {
+            text = GetString(BATTLESCROLLS_SETTINGS_OFFSET_FROM_LEFT),
+            minValue = -400,
+            maxValue = 2000,
+            showValue = true,
+            gamepadValueStepPercent = 0.1,        -- Precision mode (hold button)
+            gamepadValueStepPercentFast = 3,      -- Fast mode (default)
             getFunction = function()
-                return settings and settings.dpsMeterGroupScale or defaults.dpsMeterGroupScale
+                return settings and settings.dpsMeterGroupOffsetX or defaults.dpsMeterGroupOffsetX
             end,
             setFunction = function(value)
-                if settings and settings.dpsMeterGroupScale ~= value then
-                    settings.dpsMeterGroupScale = value
-                    if BattleScrolls.dpsMeter then
-                        BattleScrolls.dpsMeter:ApplyGroupScale()
-                        BattleScrolls.dpsMeter:ShowPreview()
-                    end
+                if settings then
+                    settings.dpsMeterGroupOffsetX = value
+                end
+            end,
+            onChangeFunction = onGroupOffsetChanged,
+        }
+        list:AddEntry("ZO_GamepadOptionsSliderRow", groupOffsetXData)
+
+        -- Group offset Y slider
+        local groupOffsetYData = {
+            text = GetString(BATTLESCROLLS_SETTINGS_OFFSET_FROM_TOP),
+            minValue = -120,
+            maxValue = 1250,
+            showValue = true,
+            gamepadValueStepPercent = 0.1,        -- Precision mode (hold button)
+            gamepadValueStepPercentFast = 5,      -- Fast mode (default)
+            getFunction = function()
+                return settings and settings.dpsMeterGroupOffsetY or defaults.dpsMeterGroupOffsetY
+            end,
+            setFunction = function(value)
+                if settings then
+                    settings.dpsMeterGroupOffsetY = value
+                end
+            end,
+            onChangeFunction = onGroupOffsetChanged,
+        }
+        list:AddEntry("ZO_GamepadOptionsSliderRow", groupOffsetYData)
+
+        -- Reset group position button
+        local resetGroupPositionData = {
+            text = GetString(BATTLESCROLLS_SETTINGS_RESET_POSITION),
+            callback = function()
+                if settings then
+                    settings.dpsMeterGroupOffsetX = defaults.dpsMeterGroupOffsetX
+                    settings.dpsMeterGroupOffsetY = defaults.dpsMeterGroupOffsetY
+                    onGroupOffsetChanged()
+                    onRefresh()
                 end
             end,
         }
-        list:AddEntry("ZO_GamepadHorizontalListRow", groupScaleData)
+        list:AddEntry("ZO_GamepadOptionsLabelRow", resetGroupPositionData)
     end
 
-    -- Recording section
+    -- Group scale dropdown
+    local groupScaleData = {
+        text = GetString(BATTLESCROLLS_SETTINGS_SIZE),
+        valid = { 0.5, 0.75, 1.0, 1.25, 1.5 },
+        valueStrings = { GetString(BATTLESCROLLS_SETTINGS_SIZE_EXTRA_SMALL), GetString(BATTLESCROLLS_SETTINGS_SIZE_SMALL), GetString(BATTLESCROLLS_SETTINGS_SIZE_MEDIUM), GetString(BATTLESCROLLS_SETTINGS_SIZE_LARGE), GetString(BATTLESCROLLS_SETTINGS_SIZE_EXTRA_LARGE) },
+        getFunction = function()
+            return settings and settings.dpsMeterGroupScale or defaults.dpsMeterGroupScale
+        end,
+        setFunction = function(value)
+            if settings and settings.dpsMeterGroupScale ~= value then
+                settings.dpsMeterGroupScale = value
+                if BattleScrolls.dpsMeter then
+                    BattleScrolls.dpsMeter:ApplyGroupScale()
+                    BattleScrolls.dpsMeter:ShowPreview()
+                end
+            end
+        end,
+    }
+    list:AddEntry("ZO_GamepadHorizontalListRow", groupScaleData)
+end
+
+---Renders recording settings (enabled, zone filters, fight type filters)
+---@return boolean recordingEnabled
+local function renderRecordingSettings(list, settings, defaults, onRefresh)
     local recordingEnabledData = {
         text = GetString(BATTLESCROLLS_SETTINGS_ENABLED),
         header = GetString(BATTLESCROLLS_SETTINGS_RECORDING),
@@ -519,223 +518,247 @@ function SettingsRenderer.renderSettings(list, onRefresh)
 
     -- Only show granular recording settings when recording is enabled
     local recordingEnabled = settings and settings.recordingEnabled ~= false
-    if recordingEnabled then
+    if not recordingEnabled then return false end
 
-        local function getZonesSet()
-            return settings and settings.recordInZones or defaults.recordInZones
-        end
+    local function getZonesSet()
+        return settings and settings.recordInZones or defaults.recordInZones
+    end
 
-        local function getFightsSet()
-            return settings and settings.recordInFights or defaults.recordInFights
-        end
+    local function getFightsSet()
+        return settings and settings.recordInFights or defaults.recordInFights
+    end
 
-        local recordInstancedData = {
-            text = GetString(BATTLESCROLLS_SETTINGS_RECORD_IN_INSTANCED),
-            tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_RECORD_IN_INSTANCED),
-            tooltipText = GetString(BATTLESCROLLS_SETTINGS_RECORD_IN_INSTANCED_TEXT) .. "\n\n" .. GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT),
-            getFunction = function()
-                return getZonesSet().instanced == true
-            end,
-            toggleFunction = function()
-                if settings then
-                    local zones = getZonesSet()
-                    zones.instanced = not zones.instanced
-                    settings.recordInZones = zones
-                end
-            end,
-        }
-        list:AddEntry("ZO_GamepadOptionsCheckboxRow", recordInstancedData)
-
-        local recordOverlandData = {
-            text = GetString(BATTLESCROLLS_SETTINGS_RECORD_IN_OVERLAND),
-            tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TITLE),
-            tooltipText = GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT),
-            getFunction = function()
-                return getZonesSet().overland == true
-            end,
-            toggleFunction = function()
-                if settings then
-                    local zones = getZonesSet()
-                    zones.overland = not zones.overland
-                    settings.recordInZones = zones
-                end
-            end,
-        }
-        list:AddEntry("ZO_GamepadOptionsCheckboxRow", recordOverlandData)
-
-        local recordHouseData = {
-            text = GetString(BATTLESCROLLS_SETTINGS_RECORD_IN_HOUSES),
-            tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TITLE),
-            tooltipText = GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT),
-            getFunction = function()
-                return getZonesSet().house == true
-            end,
-            toggleFunction = function()
-                if settings then
-                    local zones = getZonesSet()
-                    zones.house = not zones.house
-                    settings.recordInZones = zones
-                end
-            end,
-        }
-        list:AddEntry("ZO_GamepadOptionsCheckboxRow", recordHouseData)
-
-        local recordPvPData = {
-            text = GetString(BATTLESCROLLS_SETTINGS_RECORD_IN_PVP),
-            tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TITLE),
-            tooltipText = GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT),
-            getFunction = function()
-                return getZonesSet().pvp == true
-            end,
-            toggleFunction = function()
-                if settings then
-                    local zones = getZonesSet()
-                    zones.pvp = not zones.pvp
-                    settings.recordInZones = zones
-                end
-            end,
-        }
-        list:AddEntry("ZO_GamepadOptionsCheckboxRow", recordPvPData)
-
-        local recordBossData = {
-            text = GetString(BATTLESCROLLS_SETTINGS_RECORD_BOSS_FIGHTS),
-            tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TITLE),
-            tooltipText = GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT),
-            getFunction = function()
-                return getFightsSet().boss == true
-            end,
-            toggleFunction = function()
-                if settings then
-                    local fights = getFightsSet()
-                    fights.boss = not fights.boss
-                    settings.recordInFights = fights
-                end
-            end,
-        }
-        list:AddEntry("ZO_GamepadOptionsCheckboxRow", recordBossData)
-
-        local recordTrashData = {
-            text = GetString(BATTLESCROLLS_SETTINGS_RECORD_TRASH_FIGHTS),
-            tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_RECORD_TRASH_FIGHTS),
-            tooltipText = GetString(BATTLESCROLLS_SETTINGS_RECORD_TRASH_FIGHTS_TEXT) .. "\n\n" .. GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT),
-            getFunction = function()
-                return getFightsSet().trash == true
-            end,
-            toggleFunction = function()
-                if settings then
-                    local fights = getFightsSet()
-                    fights.trash = not fights.trash
-                    settings.recordInFights = fights
-                end
-            end,
-        }
-        list:AddEntry("ZO_GamepadOptionsCheckboxRow", recordTrashData)
-
-        local recordPlayerData = {
-            text = GetString(BATTLESCROLLS_SETTINGS_RECORD_PLAYER_FIGHTS),
-            tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_RECORD_PLAYER_FIGHTS),
-            tooltipText = GetString(BATTLESCROLLS_SETTINGS_RECORD_PLAYER_FIGHTS_TEXT) .. "\n\n" .. GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT),
-            getFunction = function()
-                return getFightsSet().player == true
-            end,
-            toggleFunction = function()
-                if settings then
-                    local fights = getFightsSet()
-                    fights.player = not fights.player
-                    settings.recordInFights = fights
-                end
-            end,
-        }
-        list:AddEntry("ZO_GamepadOptionsCheckboxRow", recordPlayerData)
-
-        local recordDummyData = {
-            text = GetString(BATTLESCROLLS_SETTINGS_RECORD_DUMMY_FIGHTS),
-            tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TITLE),
-            tooltipText = GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT),
-            getFunction = function()
-                return getFightsSet().dummy == true
-            end,
-            toggleFunction = function()
-                if settings then
-                    local fights = getFightsSet()
-                    fights.dummy = not fights.dummy
-                    settings.recordInFights = fights
-                end
-            end,
-        }
-        list:AddEntry("ZO_GamepadOptionsCheckboxRow", recordDummyData)
-
-        -- Storage section (moved here from separate section, only shown when recording enabled)
-        -- Build valid keys and labels from presets
-        local storageSizePresetKeys = {}
-        local storageSizePresetLabels = {}
-        for _, key in ipairs(BattleScrolls.storage.sizePresetOrder) do
-            local preset = BattleScrolls.storage.sizePresets[key]
-            table.insert(storageSizePresetKeys, key)
-            table.insert(storageSizePresetLabels, GetString(_G[preset.labelStringId]))
-        end
-
-        local bytes, _, _ = BattleScrolls.storage:EstimateHistorySize()
-
-        local storageSizeData = {}
-        storageSizeData.text = GetString(BATTLESCROLLS_SETTINGS_HISTORY_SIZE_LIMIT)
-        storageSizeData.valid = storageSizePresetKeys
-        storageSizeData.valueStrings = storageSizePresetLabels
-        storageSizeData.tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_HISTORY_SIZE_LIMIT_TITLE)
-        storageSizeData.refreshTooltipText = function()
-            -- Calculate current usage for tooltip
-            local currentPreset = BattleScrolls.storage:GetCurrentSizePreset()
-            local usagePercent = currentPreset.memoryMB > 0 and (bytes / currentPreset.memoryMB / 1000000 * 100) or 0
-            local memoryMB = bytes / 1000000  -- Approximate memory in MB
-
-            storageSizeData.tooltipText = table.concat({
-                GetString(BATTLESCROLLS_SETTINGS_STORAGE_TT_DESC),
-                "",
-                GetString(BATTLESCROLLS_SETTINGS_STORAGE_TT_NOTE),
-                "",
-                zo_strformat(GetString(BATTLESCROLLS_SETTINGS_STORAGE_TT_CURRENT), string.format("%.1f", memoryMB), currentPreset.memoryMB, string.format("%.0f", usagePercent)),
-                "",
-                GetString(BATTLESCROLLS_SETTINGS_STORAGE_TT_PRESETS),
-                GetString(BATTLESCROLLS_SETTINGS_STORAGE_TT_XS),
-                GetString(BATTLESCROLLS_SETTINGS_STORAGE_TT_SMALL),
-                GetString(BATTLESCROLLS_SETTINGS_STORAGE_TT_MEDIUM),
-                GetString(BATTLESCROLLS_SETTINGS_STORAGE_TT_LARGE),
-                GetString(BATTLESCROLLS_SETTINGS_STORAGE_TT_XL),
-                GetString(BATTLESCROLLS_SETTINGS_STORAGE_TT_CAUTION),
-                GetString(BATTLESCROLLS_SETTINGS_STORAGE_TT_YOLO),
-                "",
-                GetString(BATTLESCROLLS_SETTINGS_STORAGE_TT_WARNING),
-            }, "\n")
-        end
-        storageSizeData.refreshTooltipText()
-
-        storageSizeData.getFunction = function()
-            return settings and settings.storageSizePreset or defaults.storageSizePreset
-        end
-        storageSizeData.setFunction = function(value)
+    local recordInstancedData = {
+        text = GetString(BATTLESCROLLS_SETTINGS_RECORD_IN_INSTANCED),
+        tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_RECORD_IN_INSTANCED),
+        tooltipText = GetString(BATTLESCROLLS_SETTINGS_RECORD_IN_INSTANCED_TEXT) .. "\n\n" .. GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT),
+        getFunction = function()
+            return getZonesSet().instanced == true
+        end,
+        toggleFunction = function()
             if settings then
-                local oldValue = settings.storageSizePreset
-                settings.storageSizePreset = value
-                if oldValue ~= value then
-                    storageSizeData.refreshTooltipText()
-                    local selectedData = list:GetSelectedData()
-                    if selectedData and BattleScrolls.journalUI then
-                        BattleScrolls.journalUI:RefreshTargetTooltip(list:GetSelectedData())
-                    end
+                local zones = getZonesSet()
+                zones.instanced = not zones.instanced
+                settings.recordInZones = zones
+            end
+        end,
+    }
+    list:AddEntry("ZO_GamepadOptionsCheckboxRow", recordInstancedData)
+
+    local recordOverlandData = {
+        text = GetString(BATTLESCROLLS_SETTINGS_RECORD_IN_OVERLAND),
+        tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TITLE),
+        tooltipText = GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT),
+        getFunction = function()
+            return getZonesSet().overland == true
+        end,
+        toggleFunction = function()
+            if settings then
+                local zones = getZonesSet()
+                zones.overland = not zones.overland
+                settings.recordInZones = zones
+            end
+        end,
+    }
+    list:AddEntry("ZO_GamepadOptionsCheckboxRow", recordOverlandData)
+
+    local recordHouseData = {
+        text = GetString(BATTLESCROLLS_SETTINGS_RECORD_IN_HOUSES),
+        tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TITLE),
+        tooltipText = GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT),
+        getFunction = function()
+            return getZonesSet().house == true
+        end,
+        toggleFunction = function()
+            if settings then
+                local zones = getZonesSet()
+                zones.house = not zones.house
+                settings.recordInZones = zones
+            end
+        end,
+    }
+    list:AddEntry("ZO_GamepadOptionsCheckboxRow", recordHouseData)
+
+    local recordPvPData = {
+        text = GetString(BATTLESCROLLS_SETTINGS_RECORD_IN_PVP),
+        tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TITLE),
+        tooltipText = GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT),
+        getFunction = function()
+            return getZonesSet().pvp == true
+        end,
+        toggleFunction = function()
+            if settings then
+                local zones = getZonesSet()
+                zones.pvp = not zones.pvp
+                settings.recordInZones = zones
+            end
+        end,
+    }
+    list:AddEntry("ZO_GamepadOptionsCheckboxRow", recordPvPData)
+
+    if IsAdventureZoneActive and IsAdventureZoneActive() then
+        local adventureZoneName = GetAdventureZoneDisplayName and GetAdventureZoneDisplayName() or ""
+        local formattedName = zo_strformat("<<1>>", adventureZoneName)
+        local recordAdventureZoneData = {
+            text = formattedName,
+            tooltipTitle = formattedName,
+            tooltipText = zo_strformat(GetString(BATTLESCROLLS_SETTINGS_RECORD_IN_ADVENTURE_ZONE_TEXT), adventureZoneName),
+            getFunction = function()
+                if not settings or settings.recordInAdventureZone == nil then
+                    return defaults.recordInAdventureZone
+                end
+                return settings.recordInAdventureZone == true
+            end,
+            toggleFunction = function()
+                if settings then
+                    local current = settings.recordInAdventureZone
+                    if current == nil then current = defaults.recordInAdventureZone end
+                    settings.recordInAdventureZone = not current
+                end
+            end,
+        }
+        list:AddEntry("ZO_GamepadOptionsCheckboxRow", recordAdventureZoneData)
+    end
+
+    local recordBossData = {
+        text = GetString(BATTLESCROLLS_SETTINGS_RECORD_BOSS_FIGHTS),
+        tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TITLE),
+        tooltipText = GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT),
+        getFunction = function()
+            return getFightsSet().boss == true
+        end,
+        toggleFunction = function()
+            if settings then
+                local fights = getFightsSet()
+                fights.boss = not fights.boss
+                settings.recordInFights = fights
+            end
+        end,
+    }
+    list:AddEntry("ZO_GamepadOptionsCheckboxRow", recordBossData)
+
+    local recordTrashData = {
+        text = GetString(BATTLESCROLLS_SETTINGS_RECORD_TRASH_FIGHTS),
+        tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_RECORD_TRASH_FIGHTS),
+        tooltipText = GetString(BATTLESCROLLS_SETTINGS_RECORD_TRASH_FIGHTS_TEXT) .. "\n\n" .. GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT),
+        getFunction = function()
+            return getFightsSet().trash == true
+        end,
+        toggleFunction = function()
+            if settings then
+                local fights = getFightsSet()
+                fights.trash = not fights.trash
+                settings.recordInFights = fights
+            end
+        end,
+    }
+    list:AddEntry("ZO_GamepadOptionsCheckboxRow", recordTrashData)
+
+    local recordPlayerData = {
+        text = GetString(BATTLESCROLLS_SETTINGS_RECORD_PLAYER_FIGHTS),
+        tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_RECORD_PLAYER_FIGHTS),
+        tooltipText = GetString(BATTLESCROLLS_SETTINGS_RECORD_PLAYER_FIGHTS_TEXT) .. "\n\n" .. GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT),
+        getFunction = function()
+            return getFightsSet().player == true
+        end,
+        toggleFunction = function()
+            if settings then
+                local fights = getFightsSet()
+                fights.player = not fights.player
+                settings.recordInFights = fights
+            end
+        end,
+    }
+    list:AddEntry("ZO_GamepadOptionsCheckboxRow", recordPlayerData)
+
+    local recordDummyData = {
+        text = GetString(BATTLESCROLLS_SETTINGS_RECORD_DUMMY_FIGHTS),
+        tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TITLE),
+        tooltipText = GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT),
+        getFunction = function()
+            return getFightsSet().dummy == true
+        end,
+        toggleFunction = function()
+            if settings then
+                local fights = getFightsSet()
+                fights.dummy = not fights.dummy
+                settings.recordInFights = fights
+            end
+        end,
+    }
+    list:AddEntry("ZO_GamepadOptionsCheckboxRow", recordDummyData)
+
+    return true
+end
+
+---Renders storage size settings
+local function renderStorageSettings(list, settings, defaults)
+    -- Build valid keys and labels from presets
+    local storageSizePresetKeys = {}
+    local storageSizePresetLabels = {}
+    for _, key in ipairs(BattleScrolls.storage.sizePresetOrder) do
+        local preset = BattleScrolls.storage.sizePresets[key]
+        table.insert(storageSizePresetKeys, key)
+        table.insert(storageSizePresetLabels, GetString(_G[preset.labelStringId]))
+    end
+
+    local bytes, _, _ = BattleScrolls.storage:EstimateHistorySize()
+
+    local storageSizeData = {}
+    storageSizeData.text = GetString(BATTLESCROLLS_SETTINGS_HISTORY_SIZE_LIMIT)
+    storageSizeData.valid = storageSizePresetKeys
+    storageSizeData.valueStrings = storageSizePresetLabels
+    storageSizeData.tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_HISTORY_SIZE_LIMIT_TITLE)
+    storageSizeData.refreshTooltipText = function()
+        -- Calculate current usage for tooltip
+        local currentPreset = BattleScrolls.storage:GetCurrentSizePreset()
+        local usagePercent = currentPreset.memoryMB > 0 and (bytes / currentPreset.memoryMB / 1000000 * 100) or 0
+        local memoryMB = bytes / 1000000  -- Approximate memory in MB
+
+        storageSizeData.tooltipText = table.concat({
+            GetString(BATTLESCROLLS_SETTINGS_STORAGE_TT_DESC),
+            "",
+            GetString(BATTLESCROLLS_SETTINGS_STORAGE_TT_NOTE),
+            "",
+            zo_strformat(GetString(BATTLESCROLLS_SETTINGS_STORAGE_TT_CURRENT), string.format("%.1f", memoryMB), currentPreset.memoryMB, string.format("%.0f", usagePercent)),
+            "",
+            GetString(BATTLESCROLLS_SETTINGS_STORAGE_TT_PRESETS),
+            GetString(BATTLESCROLLS_SETTINGS_STORAGE_TT_XS),
+            GetString(BATTLESCROLLS_SETTINGS_STORAGE_TT_SMALL),
+            GetString(BATTLESCROLLS_SETTINGS_STORAGE_TT_MEDIUM),
+            GetString(BATTLESCROLLS_SETTINGS_STORAGE_TT_LARGE),
+            GetString(BATTLESCROLLS_SETTINGS_STORAGE_TT_XL),
+            GetString(BATTLESCROLLS_SETTINGS_STORAGE_TT_CAUTION),
+            GetString(BATTLESCROLLS_SETTINGS_STORAGE_TT_YOLO),
+            "",
+            GetString(BATTLESCROLLS_SETTINGS_STORAGE_TT_WARNING),
+        }, "\n")
+    end
+    storageSizeData.refreshTooltipText()
+
+    storageSizeData.getFunction = function()
+        return settings and settings.storageSizePreset or defaults.storageSizePreset
+    end
+    storageSizeData.setFunction = function(value)
+        if settings then
+            local oldValue = settings.storageSizePreset
+            settings.storageSizePreset = value
+            if oldValue ~= value then
+                storageSizeData.refreshTooltipText()
+                local selectedData = list:GetSelectedData()
+                if selectedData and BattleScrolls.journalUI then
+                    BattleScrolls.journalUI:RefreshTargetTooltip(list:GetSelectedData())
                 end
             end
         end
-
-        list:AddEntry("ZO_GamepadHorizontalListRow", storageSizeData)
-
-    end -- if recordingEnabled
-
-    -- Effect Tracking section (only shown when recording is enabled)
-    if not recordingEnabled then
-        list:Commit()
-        return
     end
 
+    list:AddEntry("ZO_GamepadHorizontalListRow", storageSizeData)
+end
+
+---Renders effect tracking settings (enabled, granular toggles, clear favorites)
+---@return boolean effectTrackingEnabled
+local function renderEffectTrackingSettings(list, settings, _defaults, onRefresh)
     local effectTrackingEnabledData = {
         text = GetString(BATTLESCROLLS_SETTINGS_ENABLED),
         header = GetString(BATTLESCROLLS_SETTINGS_EFFECT_TRACKING),
@@ -862,9 +885,11 @@ function SettingsRenderer.renderSettings(list, onRefresh)
         list:AddEntry("ZO_GamepadOptionsLabelRow", clearFavoritesData)
     end
 
-    -- =====================
-    -- Performance Section
-    -- =====================
+    return effectTrackingEnabled
+end
+
+---Renders performance settings (async speed, effect reconciliation precision)
+local function renderPerformanceSettings(list, settings, defaults, onRefresh, effectTrackingEnabled)
     -- Build valid values and labels for async speed presets
     local asyncSpeedValues = {}
     local asyncSpeedLabels = {}
@@ -938,6 +963,33 @@ function SettingsRenderer.renderSettings(list, onRefresh)
         }
         list:AddEntry("ZO_GamepadHorizontalListRow", reconPresetData)
     end
+end
+
+-------------------------
+-- Public API
+-------------------------
+
+---Renders the Settings list
+---@param list any The parametric list
+---@param onRefresh function Callback to refresh the list when settings change
+function SettingsRenderer.renderSettings(list, onRefresh)
+    list:Clear()
+
+    local settings = BattleScrolls.storage and BattleScrolls.storage.savedVariables and BattleScrolls.storage.savedVariables.settings
+    local defaults = BattleScrolls.storage.defaults.settings
+
+    local personalEnabled = renderDpsMeterPersonalSettings(list, settings, defaults, onRefresh)
+    renderDpsMeterGroupSettings(list, settings, defaults, onRefresh, personalEnabled)
+
+    local recordingEnabled = renderRecordingSettings(list, settings, defaults, onRefresh)
+    if not recordingEnabled then
+        list:Commit()
+        return
+    end
+
+    renderStorageSettings(list, settings, defaults)
+    local effectTrackingEnabled = renderEffectTrackingSettings(list, settings, defaults, onRefresh)
+    renderPerformanceSettings(list, settings, defaults, onRefresh, effectTrackingEnabled)
 
     list:Commit()
 end

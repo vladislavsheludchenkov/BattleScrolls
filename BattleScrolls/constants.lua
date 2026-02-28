@@ -28,7 +28,6 @@ end
 ---@class BattleScrollsConstants
 ---@field BOSS_TAGS table<number, string> Pre-computed boss tag strings ("boss1" to "boss12")
 ---@field SingleTargetDamageProcAbilityIds table<number, boolean> A set of ability IDs that damage one target, regardless of if it's targeted specifically or hit by an AOE.
----@field historyEncountersLimit number Number of past encounters in history that triggers cleanup
 
 ---@type BattleScrollsConstants
 local constants = {}
@@ -47,8 +46,6 @@ constants.SingleTargetDamageProcAbilityIds = {
     [80170] = true, -- Burning Light
     [220863] = true  -- Sliver Assault
 }
-
-constants.historyEncountersLimit = 1000
 
 -- Combat unit type filter sets (for Lua-side O(1) lookup)
 constants.personalTypesSet = {

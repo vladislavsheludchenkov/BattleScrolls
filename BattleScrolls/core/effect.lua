@@ -292,7 +292,7 @@ end
 
 ---Create an Effect from a synchronous function
 ---@generic T
----@param fn fun(): T
+---@param fn (fun(): T) | (fun())
 ---@return Effect<T>
 function Effect.Sync(fn)
     return setmetatable({ _tag = "sync", _isEffect = true, _fn = fn }, Effect)

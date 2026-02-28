@@ -164,6 +164,12 @@ function dpsMeter:Initialize()
         self.personalControl = BattleScrolls_DPSMeterPersonal
         self.groupControl = BattleScrolls_DPSMeterGroup
 
+        -- Draw behind loot history (which is at DT_LOW / DL_CONTROLS by default)
+        self.personalControl:SetDrawTier(DT_LOW)
+        self.personalControl:SetDrawLayer(DL_BACKGROUND)
+        self.groupControl:SetDrawTier(DT_LOW)
+        self.groupControl:SetDrawLayer(DL_BACKGROUND)
+
         if not self.personalControl then
             -- BattleScrolls.log.Error("DPSMeter: Could not find control BattleScrolls_DPSMeterPersonal")
             return
@@ -480,12 +486,6 @@ local PREVIEW_CALC = {
     personalDPS = function() return 78200 end,
     personalShare = function() return 28 end,
 
-    -- Boss damage
-    bossPersonalTotalDamage = function() return 6987000 end,  -- 68.5K DPS * 102s
-    bossPersonalDPS = function() return 68500 end,
-    bossPersonalShare = function() return 25 end,
-    bossGroupTotalDamage = function() return 27948000 end,  -- 4x personal boss damage
-
     -- Group damage
     groupTotalDamage = function() return 28487143 end,  -- personal / 0.28
 
@@ -500,11 +500,21 @@ local PREVIEW_CALC = {
 
     -- Breakdowns (on-demand, return mock data)
     personalAoeVsSingleTarget = function() return { aoe = 4786000, singleTarget = 3190400 } end,  -- 60/40 split
-    bossAoeVsSingleTarget = function() return { aoe = 3493500, singleTarget = 3493500 } end,  -- 50/50 split
     personalDotVsDirect = function() return { dot = 3190560, direct = 4785840 } end,  -- 40/60 split
-    bossDotVsDirect = function() return { dot = 2794800, direct = 4192200 } end,  -- 40/60 split
 
     -- Boss fight flag
+    isBossFight = function() return true end,
+}
+
+-- Mock boss calculator for preview (same interface, returns boss-specific values)
+local PREVIEW_BOSS_CALC = {
+    getDurationS = function() return 102 end,
+    personalTotalDamage = function() return 6987000 end,  -- 68.5K DPS * 102s
+    personalDPS = function() return 68500 end,
+    personalShare = function() return 25 end,
+    groupTotalDamage = function() return 27948000 end,  -- 4x personal boss damage
+    personalAoeVsSingleTarget = function() return { aoe = 3493500, singleTarget = 3493500 } end,  -- 50/50 split
+    personalDotVsDirect = function() return { dot = 2794800, direct = 4192200 } end,  -- 40/60 split
     isBossFight = function() return true end,
 }
 
@@ -548,8 +558,8 @@ function dpsMeter:ShowPreview()
             rawHPS = PREVIEW_CALC:personalRawHPSOut(),
             totalRawHealingOut = PREVIEW_CALC:personalTotalRawHealingOut(),
             totalEffectiveHealingOut = PREVIEW_CALC:personalTotalEffectiveHealingOut(),
-            bossDPS = PREVIEW_CALC:bossPersonalDPS(),
-            bossShare = PREVIEW_CALC:bossPersonalShare(),
+            bossDPS = PREVIEW_BOSS_CALC:personalDPS(),
+            bossShare = PREVIEW_BOSS_CALC:personalShare(),
         }
         self:UpdatePersonalDisplay(true)
     else
@@ -716,16 +726,6 @@ function dpsMeter:ReleaseGroupDesign()
     end
 end
 
----Destroy current group design pool objects to free memory
-function dpsMeter:DestroyGroupDesign()
-    if self.currentGroupDesign and self.currentGroupDesign.Destroy then
-        self.currentGroupDesign:Destroy()
-    elseif self.currentGroupDesign and self.currentGroupDesign.Release then
-        -- Fallback to release if design doesn't implement Destroy
-        self.currentGroupDesign:Release()
-    end
-end
-
 ---Called when HUD visibility changes
 function dpsMeter:OnHUDStateChange(newState)
     if newState == SCENE_HIDDEN then
@@ -808,21 +808,6 @@ function dpsMeter:Hide()
     self:ReleaseGroupDesign()
 end
 
----Format DPS number for display (delegate to utils)
-function dpsMeter:FormatDPS(dps)
-    return utils.FormatDPS(dps)
-end
-
----Format DPS and share for display (delegate to utils)
-function dpsMeter:FormatDPSAndShare(dps, share)
-    return utils.FormatDPSAndShare(dps, share)
-end
-
----Format DPS with share for minimal design (delegate to utils)
-function dpsMeter:FormatDPSWithShare(dps, share)
-    return utils.FormatDPSWithShare(dps, share)
-end
-
 ---Update the group display based on current design
 ---@param forceRender boolean|nil If true, skip state checks (for preview mode)
 function dpsMeter:UpdateGroupDisplay(forceRender)
@@ -881,10 +866,7 @@ function dpsMeter:UpdateGroupDisplay(forceRender)
     local growUpward = (position == "above")
 
     -- Get player display name for highlighting
-    local playerDisplayName = GetUnitDisplayName("player")
-    if playerDisplayName then
-        playerDisplayName = zo_strformat("<<1>>", playerDisplayName)
-    end
+    local playerDisplayName = BattleScrolls.utils.GetUndecoratedDisplayName("player")
 
     -- Check if player's name is in the members list
     local playerFoundInMembers = false
@@ -911,6 +893,7 @@ function dpsMeter:UpdateGroupDisplay(forceRender)
     local groupDPS, bossGroupDPS = self:GetGroupDPS()
 
     -- Build context for design
+    local durationStr = self.calculator and utils.FormatDuration(self.calculator:getDurationS()) or nil
     local ctx = {
         isBossFight = self.isBossFight,
         growUpward = growUpward,
@@ -918,6 +901,7 @@ function dpsMeter:UpdateGroupDisplay(forceRender)
         highlightFallbackName = highlightFallbackName,
         groupDPS = groupDPS,
         bossGroupDPS = bossGroupDPS,
+        durationStr = durationStr,
         dpsMeter = self,
     }
 
@@ -929,11 +913,11 @@ end
 
 ---TickListener callback: called every 200ms during combat with a shared calculator
 ---@param calc ArithmancerInstance
-function dpsMeter:OnCombatTick(calc)
+---@param bossCalc ArithmancerInstance|nil
+function dpsMeter:OnCombatTick(calc, bossCalc)
     if self.isPreviewActive then return end
     if self.state ~= "ACTIVE" then return end
 
-    local isBossFight = calc:isBossFight()
     local durationS = calc:getDurationS()
 
     -- Compute all values needed by personal designs
@@ -945,16 +929,16 @@ function dpsMeter:OnCombatTick(calc)
 
     local bossPersonalDPS = 0
     local bossPersonalShare = 0
-    if isBossFight then
-        bossPersonalDPS = calc:bossPersonalDPS()
-        bossPersonalShare = calc:bossPersonalShare()
+    if bossCalc then
+        bossPersonalDPS = bossCalc:personalDPS()
+        bossPersonalShare = bossCalc:personalShare()
     end
 
     -- Compute group values
     local groupTotalDamage = calc:groupTotalDamage()
     local bossGroupTotalDamage = 0
-    if isBossFight then
-        bossGroupTotalDamage = calc:bossGroupTotalDamage()
+    if bossCalc then
+        bossGroupTotalDamage = bossCalc:groupTotalDamage()
     end
 
     local groupDPS = durationS > 0 and groupTotalDamage / durationS or nil
@@ -1027,15 +1011,10 @@ end
 ---@param unitTag string Unit tag (e.g., "group1")
 ---@param typedData DPSShareTypedData Typed damage or healing data
 function dpsMeter:OnGroupDataArrived(unitTag, typedData)
-    local displayName = GetUnitDisplayName(unitTag)
+    local displayName = BattleScrolls.utils.GetUndecoratedDisplayName(unitTag)
     if not displayName then return end
 
-    displayName = zo_strformat("<<1>>", displayName)
-
-    local role = LFG_ROLE_DPS
-    if IsUnitGrouped("player") then
-        role = GetGroupMemberSelectedRole(unitTag) or LFG_ROLE_DPS
-    end
+    local role = BattleScrolls.utils.getUnitRole(unitTag)
 
     ---@type DPSMeterGroupData
     local data = {
@@ -1060,41 +1039,3 @@ function dpsMeter:OnGroupDataArrived(unitTag, typedData)
     end
 end
 
----Cleanup all event registrations for hot reload support
-function dpsMeter:Cleanup()
-    -- Cancel any timers
-    if self.lingerTimerId then
-        zo_removeCallLater(self.lingerTimerId)
-        self.lingerTimerId = nil
-    end
-    if self.previewTimerId then
-        zo_removeCallLater(self.previewTimerId)
-        self.previewTimerId = nil
-    end
-
-    -- Unregister from tick listener
-    if BattleScrolls.combatTicker then
-        BattleScrolls.combatTicker:unregisterListener(self)
-    end
-
-    -- Unregister from state observer
-    if BattleScrolls.state and BattleScrolls.state.UnregisterObserver then
-        BattleScrolls.state:UnregisterObserver(self)
-    end
-
-    -- Unregister from dpsShare
-    if BattleScrolls.dpsShare and BattleScrolls.dpsShare.UnregisterCallback then
-        BattleScrolls.dpsShare:UnregisterCallback("BattleScrolls_DPSMeter")
-    end
-
-    -- Note: HUD_SCENE callbacks are managed by ESO scene system
-    -- and don't have a clean unregister API
-
-    self.state = "HIDDEN"
-    self.calculator = nil
-    self.groupMetrics = {}
-    -- Clear stored computed values
-    self.groupDPS = nil
-    self.bossGroupDPS = nil
-    self.personalValues = nil
-end

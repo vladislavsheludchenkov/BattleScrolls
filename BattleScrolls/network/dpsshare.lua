@@ -32,8 +32,6 @@ BattleScrolls = BattleScrolls or {}
 
 ---@class DPSShare
 ---@field legacyProtocol Protocol|nil LibGroupBroadcast legacy protocol instance (438)
----@field damageProtocol Protocol|nil LibGroupBroadcast damage protocol instance (430)
----@field healingProtocol Protocol|nil LibGroupBroadcast healing protocol instance (431)
 local dpsShare = {}
 BattleScrolls.dpsShare = dpsShare
 
@@ -102,6 +100,7 @@ function dpsShare:Initialize()
     legacyProtocol:AddField(LGB.CreateNumericField("rawHPS", { minValue = 0, numBits = 20, trimValues = true }))
     legacyProtocol:AddField(LGB.CreateNumericField("effectiveHPS", { minValue = 0, numBits = 20, trimValues = true }))
     legacyProtocol:OnData(function(unitTag, data)
+        if AreUnitsEqual(unitTag, "player") then return end
         local typed = classifyLegacyData(data.allTargetsDPS, data.bossDPS, data.rawHPS, data.effectiveHPS)
         notifyAllCallbacks(unitTag, typed)
     end)
@@ -113,6 +112,7 @@ function dpsShare:Initialize()
     damageProtocol:AddField(LGB.CreateNumericField("encodedAllDPS", { minValue = 0, numBits = 10 }))
     damageProtocol:AddField(LGB.CreateOptionalField(LGB.CreateNumericField("encodedBossDPS", { minValue = 0, numBits = 10 })))
     damageProtocol:OnData(function(unitTag, data)
+        if AreUnitsEqual(unitTag, "player") then return end
         local allTargetsDPS = decodeMetric(data.encodedAllDPS)
         local bossDPS = data.encodedBossDPS and decodeMetric(data.encodedBossDPS) or nil
         ---@type DPSShareDamageData
@@ -120,13 +120,13 @@ function dpsShare:Initialize()
         notifyAllCallbacks(unitTag, typed)
     end)
     damageProtocol:Finalize({ isRelevantInCombat = true, replaceQueuedMessages = true })
-    dpsShare.damageProtocol = damageProtocol
 
     -- Healing protocol (431): encoded rawHPS + effectiveHPS
     local healingProtocol = handler:DeclareProtocol(431, "BattleScrolls_HealingData")
     healingProtocol:AddField(LGB.CreateNumericField("encodedRawHPS", { minValue = 0, numBits = 10 }))
     healingProtocol:AddField(LGB.CreateNumericField("encodedEffectiveHPS", { minValue = 0, numBits = 10 }))
     healingProtocol:OnData(function(unitTag, data)
+        if AreUnitsEqual(unitTag, "player") then return end
         local rawHPS = decodeMetric(data.encodedRawHPS)
         local effectiveHPS = decodeMetric(data.encodedEffectiveHPS)
         ---@type DPSShareHealingData
@@ -134,7 +134,6 @@ function dpsShare:Initialize()
         notifyAllCallbacks(unitTag, typed)
     end)
     healingProtocol:Finalize({ isRelevantInCombat = true, replaceQueuedMessages = true })
-    dpsShare.healingProtocol = healingProtocol
 end
 
 --- @param name string The name of the callback.

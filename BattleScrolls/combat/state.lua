@@ -75,7 +75,8 @@ BattleScrolls = BattleScrolls or {}
 ---@field targetUnitId number
 ---@field timestampMs number Absolute game time
 
----Effect stats for uptime tracking (player and group effects)
+---Effect stats for uptime tracking with player attribution
+---Mirrors BS_EffectStats hstructure in havok/structures.lua
 ---@class EffectStats
 ---@field abilityId number
 ---@field effectType number BUFF_EFFECT_TYPE_BUFF or BUFF_EFFECT_TYPE_DEBUFF
@@ -83,26 +84,14 @@ BattleScrolls = BattleScrolls or {}
 ---@field timeAtMaxStacksMs number Time spent at max observed stacks (0 if not stackable)
 ---@field applications number Number of times effect was applied
 ---@field maxStacks number Peak stack count observed
-
----Effect stats for boss debuffs (extends EffectStats with player attribution)
----@class BossEffectStats : EffectStats
----@field playerActiveTimeMs number Time YOU kept this debuff up
+---@field playerActiveTimeMs number Time YOU kept this effect up
 ---@field playerTimeAtMaxStacksMs number Time at max stacks applied by you
----@field playerApplications number Times YOU applied this debuff
-
----Effect stats for group member buffs (extends EffectStats with player attribution)
----@class GroupEffectStats : EffectStats
----@field playerActiveTimeMs number Time YOU kept this buff up on the group member
----@field playerTimeAtMaxStacksMs number Time at max stacks applied by you
----@field playerApplications number Times YOU applied this buff
-
----Effect stats for player effects with attribution (same structure as BossEffectStats)
----Tracks which effects you applied yourself vs received from supports
----@alias PlayerEffectStats BossEffectStats
-
----Effect stats with attribution (hstructure in havok/structures.lua)
----Used interchangeably with BossEffectStats/GroupEffectStats
----@alias EffectStatsWithAttribution BossEffectStats
+---@field playerApplications number Times YOU applied this effect
+---@field peakConcurrentInstances number Peak number of concurrent instances of this effect (e.g., 2 Relequen)
+---@field lastFinalizedMs number Latest endTimeMs when totalActiveTimeMs was accumulated (for retroactive correction)
+---@field lastFinalizedMaxStacksMs number Latest endTimeMs when timeAtMaxStacksMs was accumulated (for retroactive correction)
+---@field lastFinalizedPlayerMs number Latest endTimeMs when playerActiveTimeMs was accumulated (for retroactive correction)
+---@field lastFinalizedPlayerMaxStacksMs number Latest endTimeMs when playerTimeAtMaxStacksMs was accumulated (for retroactive correction)
 
 ---Active effect instance for tracking during combat
 ---@class EffectInstance
@@ -157,13 +146,14 @@ BattleScrolls = BattleScrolls or {}
 ---@field bossUnitIdRedirects table<number, number> Maps newUnitId → canonicalUnitId (merging if boss unit recreated on client)
 ---@field failedToAssignBossUnitIds table<number, boolean>
 ---@field lastDamageDoneMs number
----@field effectsOnPlayer table<number, PlayerEffectStats> Effects on player with attribution, keyed by abilityId
----@field effectsOnBosses table<string, table<number, BossEffectStats>> Effects on bosses, keyed by unitTag ("boss1")
----@field effectsOnGroup table<string, table<number, GroupEffectStats>> Effects on group members, keyed by displayName ("@Player")
+---@field effectsOnPlayer table<number, EffectStats> Effects on player with attribution, keyed by abilityId
+---@field effectsOnBosses table<string, table<number, EffectStats>> Effects on bosses, keyed by unitTag ("boss1")
+---@field effectsOnGroup table<string, table<number, EffectStats>> Effects on group members, keyed by displayName ("PlayerName")
 ---@field activeEffects table<string, EffectInstance> Currently active effects, keyed by "unitTag:effectSlot"
 ---@field playerAliveState UnitAliveState|nil Player alive/dead state (separate from unitAliveState)
 ---@field unitAliveState table<string, UnitAliveState> Per-unit alive/dead state tracking, keyed by unitTag (bosses) or displayName (group)
 ---@field bossNames table<string, string> Maps unitTag to boss name for UI display
+---@field pendingSharedData SharedDataEntry[]|nil Shared encounter data received during combat
 ---@field playerDeathCount number Number of times player died this fight
 ---@field deathRecaps DeathRecapSnapshot[] All captured death recaps (appended on each death)
 
@@ -342,6 +332,7 @@ function BattleScrolls.state:Reset()
     self.bossesByUnitId = {}
     self.bossUnitIdRedirects = {}
     self.failedToAssignBossUnitIds = {}
+    self.pendingSharedData = nil
     self.lastDamageDoneMs = 0
     self.playerDeathCount = 0
     self.deathRecaps = {}
@@ -387,6 +378,7 @@ function BattleScrolls.state:Snapshot()
     snapshot.unitAliveState = self.unitAliveState
     snapshot.bossNames = self.bossNames
     snapshot.bossUnitIdRedirects = self.bossUnitIdRedirects
+    snapshot.pendingSharedData = self.pendingSharedData
     snapshot.playerDeathCount = self.playerDeathCount
     snapshot.deathRecaps = self.deathRecaps
 

@@ -23,6 +23,7 @@ BattleScrolls_Journal_StatsTab = {
     SELF_HEALING = 6,
     HEALING_IN = 7,
     EFFECTS = 8,
+    GROUP = 9,
 }
 
 BattleScrolls_Journal_InstanceTab = {
@@ -42,19 +43,8 @@ BattleScrolls_Journal_EncounterTab = {
 }
 
 local NAVIGATION_MODE = BattleScrolls_Journal_NavigationMode
-local STATS_TAB = BattleScrolls_Journal_StatsTab
 local INSTANCE_TAB = BattleScrolls_Journal_InstanceTab
 local ENCOUNTER_TAB = BattleScrolls_Journal_EncounterTab
-
--- Filter constants
-local SELF_UNIT_ID = -1  -- Special ID for self in healing filters
-local SELF_DISPLAY_NAME = "__SELF__"  -- Special key for self in effects filter
-
--- Export constants for other modules
-BattleScrolls_Journal_FilterConstants = {
-    SELF_UNIT_ID = SELF_UNIT_ID,
-    SELF_DISPLAY_NAME = SELF_DISPLAY_NAME,
-}
 
 local canAddToMainMenu = false
 
@@ -178,6 +168,11 @@ function BattleScrolls_Journal_Gamepad:Initialize(control)
                 self:ResetTooltips()
                 -- Deactivate any active settings control to release DIRECTIONAL_INPUT
                 self:DeactivateSelectedSettingsControl()
+                -- Hide group table
+                local groupTable = BattleScrolls.journal.groupTable
+                if groupTable then
+                    groupTable:Hide()
+                end
                 -- Clean up decoded data and request GC when leaving journal
                 self.decodedEncounter = nil
                 self.abilityInfo = nil
@@ -243,9 +238,17 @@ function BattleScrolls_Journal_Gamepad:RefreshHeader()
         self.headerData.tabBarEntries = self:GetEncounterListTabBarEntries()
     elseif self.mode == NAVIGATION_MODE.STATS and self.selectedEncounter and self.selectedInstance then
         self.headerData.tabBarEntries = self:GetEncounterTabBarEntries()
+        self.headerData.data1HeaderText = GetString(BATTLESCROLLS_GROUP_COL_NAME)
+        self.headerData.data1Text = BattleScrolls.utils.GetUndecoratedDisplayName()
+        self.headerData.data2HeaderText = GetString(BATTLESCROLLS_STAT_DURATION)
+        self.headerData.data2Text = BattleScrolls.journal.utils.formatPreciseDuration(self.selectedEncounter.durationMs)
     elseif self.mode == NAVIGATION_MODE.SETTINGS then
         self.headerData.titleText = GetString(BATTLESCROLLS_UI_NAME)
         self.headerData.subtitleText = GetString(BATTLESCROLLS_UI_SETTINGS)
+    end
+
+    if self.mode == NAVIGATION_MODE.STATS then
+        ZO_GamepadGenericHeader_SetDataLayout(self.header, ZO_GAMEPAD_HEADER_LAYOUTS.DATA_PAIRS_SEPARATE)
     end
 
     ZO_GamepadGenericHeader_Refresh(self.header, self.headerData, true)
@@ -269,325 +272,7 @@ end
 -- Keybinds
 -------------------------
 function BattleScrolls_Journal_Gamepad:InitializeKeybindStripDescriptors()
-    -- Instance list keybinds
-    self.instanceKeybindStripDescriptor = {
-        alignment = KEYBIND_STRIP_ALIGN_LEFT,
-        {
-            keybind = "UI_SHORTCUT_PRIMARY",
-            name = GetString(SI_GAMEPAD_SELECT_OPTION),
-            callback = function()
-                local targetData = self.instanceList:GetTargetData()
-                ZO_ConveyorSceneFragment_SetMovingForward()
-                if targetData and targetData.isSettings then
-                    -- Navigate to settings
-                    self.mode = NAVIGATION_MODE.SETTINGS
-                    self:SetCurrentList(self.settingsList)
-                    self:RefreshList()
-                    self:SetActiveKeybinds(self.settingsKeybindStripDescriptor)
-                elseif targetData and targetData.data then
-                    -- Reset instance-related decoded fields when selecting a new instance
-                    self.abilityInfo = nil
-                    self.unitNames = nil
-                    BattleScrolls.gc:RequestGC(5)
-                    self.selectedInstance = targetData.data
-                    self.mode = NAVIGATION_MODE.ENCOUNTERS
-                    self.selectedEncounterTab = ENCOUNTER_TAB.ALL  -- Reset to first tab when drilling down
-                    self.pendingTabIndex = 1  -- Will be applied by RefreshHeader
-                    self:SetCurrentList(self.encounterList)
-                    self:RefreshList()
-                    self:SetActiveKeybinds(self.encounterKeybindStripDescriptor)
-                end
-            end,
-            enabled = function()
-                local targetData = self.instanceList:GetTargetData()
-                return targetData ~= nil and (targetData.data ~= nil or targetData.isSettings)
-            end,
-            sound = SOUNDS.GAMEPAD_MENU_FORWARD,
-        },
-        {
-            keybind = "UI_SHORTCUT_NEGATIVE",
-            name = GetString(SI_GAMEPAD_BACK_OPTION),
-            callback = function()
-                ZO_ConveyorSceneFragment_SetMovingForward()
-                SCENE_MANAGER:HideCurrentScene()
-            end,
-            sound = SOUNDS.GAMEPAD_MENU_BACK,
-        },
-        {
-            keybind = "UI_SHORTCUT_RIGHT_STICK",
-            name = GetString(BATTLESCROLLS_DELETE),
-            callback = function()
-                self:ShowDeleteInstanceDialog()
-            end,
-            visible = function()
-                local targetData = self.instanceList:GetTargetData()
-                return targetData ~= nil and targetData.data ~= nil and not targetData.isSettings
-            end,
-            sound = SOUNDS.DIALOG_ACCEPT,
-        },
-        {
-            keybind = "UI_SHORTCUT_SECONDARY",
-            name = function()
-                local targetData = self.instanceList:GetTargetData()
-                if targetData and targetData.data and targetData.data.locked then
-                    return GetString(SI_ITEM_ACTION_UNMARK_AS_LOCKED)
-                end
-                return GetString(SI_ITEM_ACTION_MARK_AS_LOCKED)
-            end,
-            callback = function()
-                self:ToggleInstanceLock()
-            end,
-            visible = function()
-                local targetData = self.instanceList:GetTargetData()
-                return targetData ~= nil and targetData.data ~= nil and not targetData.isSettings
-            end,
-        },
-    }
-
-    -- Encounter list keybinds
-    self.encounterKeybindStripDescriptor = {
-        alignment = KEYBIND_STRIP_ALIGN_LEFT,
-        {
-            keybind = "UI_SHORTCUT_PRIMARY",
-            name = GetString(SI_GAMEPAD_SELECT_OPTION),
-            callback = function()
-                local targetData = self.encounterList:GetTargetData()
-                if targetData and targetData.data then
-                    -- Reset encounter-related decoded fields when selecting a new encounter
-                    self.decodedEncounter = nil
-                    self.unitNames = nil  -- v7+: unitNames per-encounter
-                    self.arithmancer = nil
-                    BattleScrolls.gc:RequestGC(5)
-                    self.selectedEncounter = targetData.data
-                    self.mode = NAVIGATION_MODE.STATS
-                    self.selectedTab = STATS_TAB.OVERVIEW  -- Reset to first tab when drilling down
-                    -- Reset all filters when selecting a new encounter
-                    self:ResetAllFilters()
-                    self.pendingTabIndex = 1  -- Will be applied by RefreshHeader
-                    ZO_ConveyorSceneFragment_SetMovingForward()
-                    self:SetCurrentList(self.statsList)
-                    self:RefreshList()
-                    self:SetActiveKeybinds(self.statsKeybindStripDescriptor)
-                end
-            end,
-            enabled = function()
-                local targetData = self.encounterList:GetTargetData()
-                return targetData ~= nil and targetData.data ~= nil
-            end,
-            sound = SOUNDS.GAMEPAD_MENU_FORWARD,
-        },
-        {
-            keybind = "UI_SHORTCUT_NEGATIVE",
-            name = GetString(SI_GAMEPAD_BACK_OPTION),
-            callback = function()
-                self:NavigateToInstanceList()
-            end,
-            sound = SOUNDS.GAMEPAD_MENU_BACK,
-        },
-        {
-            keybind = "UI_SHORTCUT_RIGHT_STICK",
-            name = GetString(BATTLESCROLLS_DELETE),
-            callback = function()
-                self:ShowDeleteEncounterDialog()
-            end,
-            visible = function()
-                local targetData = self.encounterList:GetTargetData()
-                return targetData ~= nil and targetData.data ~= nil
-            end,
-            sound = SOUNDS.DIALOG_ACCEPT,
-        },
-    }
-
-    -- Stats view keybinds
-    self.statsKeybindStripDescriptor = {
-        alignment = KEYBIND_STRIP_ALIGN_LEFT,
-        {
-            keybind = "UI_SHORTCUT_NEGATIVE",
-            name = GetString(SI_GAMEPAD_BACK_OPTION),
-            callback = function()
-                self.mode = NAVIGATION_MODE.ENCOUNTERS
-                self.pendingTabIndex = self.selectedEncounterTab or ENCOUNTER_TAB.ALL
-                -- Clear encounter-related decoded data when going back
-                -- (keep abilityInfo/unitNames since they're instance-level)
-                self.decodedEncounter = nil
-                self.arithmancer = nil
-                BattleScrolls.gc:RequestGC(2)
-                self:ResetAllFilters()
-                ZO_ConveyorSceneFragment_SetMovingBackward()
-                self:SetCurrentList(self.encounterList)
-                self:RefreshList()
-                self:SetActiveKeybinds(self.encounterKeybindStripDescriptor)
-                -- Hide overview panel when leaving stats mode
-                if self.overviewPanel then
-                    self.overviewPanel:Hide()
-                end
-            end,
-            sound = SOUNDS.GAMEPAD_MENU_BACK,
-        },
-        -- Filter keybind
-        {
-            keybind = "UI_SHORTCUT_SECONDARY",
-            name = function()
-                if self:HasActiveFilter() then
-                    return GetString(BATTLESCROLLS_UI_FILTER_ACTIVE)
-                end
-                return GetString(BATTLESCROLLS_UI_FILTER)
-            end,
-            callback = function()
-                self:ShowFilterDialog()
-            end,
-            visible = function()
-                -- Only show on tabs that support filtering
-                return self.selectedTab == STATS_TAB.DAMAGE_DONE
-                    or self.selectedTab == STATS_TAB.BOSS_DAMAGE_DONE
-                    or self.selectedTab == STATS_TAB.DAMAGE_TAKEN
-                    or self.selectedTab == STATS_TAB.HEALING_OUT
-                    or self.selectedTab == STATS_TAB.HEALING_IN
-                    or self.selectedTab == STATS_TAB.EFFECTS
-            end,
-            sound = SOUNDS.GAMEPAD_MENU_FORWARD,
-        },
-        -- Favorite effect keybind
-        {
-            keybind = "UI_SHORTCUT_TERTIARY",
-            name = function()
-                local targetData = self.statsList:GetTargetData()
-                if targetData and targetData.effectAbilityId then
-                    local favorites = BattleScrolls.storage.savedVariables.settings.favoriteEffects
-                    if favorites[targetData.effectAbilityId] then
-                        return GetString(BATTLESCROLLS_UNFAVORITE_EFFECT)
-                    end
-                end
-                return GetString(BATTLESCROLLS_FAVORITE_EFFECT)
-            end,
-            callback = function()
-                local targetData = self.statsList:GetTargetData()
-                if targetData and targetData.effectAbilityId then
-                    -- Save current index so the list doesn't jump to the top after refresh
-                    self.restoreSelectedIndex = self.statsList:GetSelectedIndex()
-                    local favorites = BattleScrolls.storage.savedVariables.settings.favoriteEffects
-                    if favorites[targetData.effectAbilityId] then
-                        favorites[targetData.effectAbilityId] = nil
-                        PlaySound(SOUNDS.CHAMPION_STAR_STAGE_DOWN)
-                    else
-                        favorites[targetData.effectAbilityId] = true
-                        PlaySound(SOUNDS.CHAMPION_STAR_STAGE_UP)
-                    end
-
-                    for i = 1, self.statsList:GetNumEntries() do
-                        local entry = self.statsList:GetEntryData(i)
-                        if entry.effectAbilityId then
-                            entry.isFavorite = favorites[entry.effectAbilityId]
-                        end
-                    end
-
-                    self.statsRefreshPending = true
-                    self.statsList:Commit()
-                end
-            end,
-            visible = function()
-                if self.selectedTab ~= STATS_TAB.EFFECTS then return false end
-                local targetData = self.statsList:GetTargetData()
-                return targetData and targetData.effectAbilityId ~= nil
-            end,
-        },
-        {
-            keybind = "UI_SHORTCUT_RIGHT_STICK",
-            name = GetString(SI_GAMEPAD_GROUP_FINDER_SEARCH_RESULTS_REFRESH_KEYBIND),
-            callback = function()
-                self:RefreshList(true)
-            end,
-            visible = function()
-                return self.statsRefreshPending or false
-            end,
-            sound = SOUNDS.GROUP_FINDER_REFRESH_SEARCH,
-        },
-    }
-
-    -- Helper to check if current control is a slider with dual-speed support
-    local function GetSelectedSlider()
-        local control = self.settingsList:GetSelectedControl()
-        if control then
-            local slider = control:GetNamedChild("Slider")
-            if slider and slider.SetFastMode then
-                return slider
-            end
-        end
-        return nil
-    end
-
-    -- Settings view keybinds
-    self.settingsKeybindStripDescriptor = {
-        alignment = KEYBIND_STRIP_ALIGN_LEFT,
-        -- Primary action: toggle for checkboxes, fast mode for sliders
-        {
-            keybind = "UI_SHORTCUT_PRIMARY",
-            name = function()
-                local slider = GetSelectedSlider()
-                if slider then
-                    if slider.isFastMode then
-                        return GetString(BATTLESCROLLS_SETTINGS_SLIDER_RELEASE_PRECISION)
-                    else
-                        return GetString(BATTLESCROLLS_SETTINGS_SLIDER_HOLD_FAST)
-                    end
-                end
-                local targetData = self.settingsList:GetTargetData()
-                if targetData and targetData.callback then
-                    return GetString(SI_GAMEPAD_SELECT_OPTION)
-                end
-                return GetString(SI_GAMEPAD_TOGGLE_OPTION)
-            end,
-            handlesKeyUp = true,
-            callback = function(isKeyUp)
-                -- Check if we're on a slider - use hold-to-fast behavior
-                local slider = GetSelectedSlider()
-                if slider then
-                    slider:SetFastMode(not isKeyUp)  -- Press = fast on, release = fast off (back to precision)
-                    KEYBIND_STRIP:UpdateKeybindButtonGroup(self.settingsKeybindStripDescriptor)
-                    return
-                end
-
-                -- For non-sliders, only act on key down (not key up)
-                if isKeyUp then
-                    return
-                end
-
-                local targetData = self.settingsList:GetTargetData()
-                if targetData then
-                    if targetData.toggleFunction then
-                        targetData.toggleFunction()
-                        self:RefreshList()
-                    elseif targetData.callback then
-                        targetData.callback()
-                    end
-                end
-            end,
-            enabled = function()
-                -- Enable for sliders (for fast mode) or for toggle/callback items
-                local slider = GetSelectedSlider()
-                if slider then
-                    return true
-                end
-                local targetData = self.settingsList:GetTargetData()
-                return targetData ~= nil and (targetData.toggleFunction ~= nil or targetData.callback ~= nil)
-            end,
-            sound = SOUNDS.DEFAULT_CLICK,
-        },
-        {
-            keybind = "UI_SHORTCUT_NEGATIVE",
-            name = GetString(SI_GAMEPAD_BACK_OPTION),
-            callback = function()
-                self:DeactivateSelectedSettingsControl()
-                self.mode = NAVIGATION_MODE.INSTANCES
-                self.pendingTabIndex = self.selectedInstanceTab or INSTANCE_TAB.ALL
-                ZO_ConveyorSceneFragment_SetMovingBackward()
-                self:SetCurrentList(self.instanceList)
-                self:RefreshList()
-                self:SetActiveKeybinds(self.instanceKeybindStripDescriptor)
-            end,
-            sound = SOUNDS.GAMEPAD_MENU_BACK,
-        },
-    }
+    BattleScrolls.journal.keybinds.initializeKeybindStripDescriptors(self)
 end
 
 -------------------------
@@ -633,236 +318,6 @@ function BattleScrolls_Journal_Gamepad:InitializeLists()
         list:SetReselectBehavior(ZO_PARAMETRIC_SCROLL_LIST_RESELECT_BEHAVIOR.RESELECT_OLD_INDEX)
     end
 
-    local function SetupSettingsList(list)
-        -- Custom checkbox setup that mimics native options but uses our data
-        local function CheckboxSetup(control, data, selected, _reselectingDuringRebuild, _enabled, _active)
-            control.data = data
-
-            -- Set up the name label
-            local nameControl = control:GetNamedChild("Name")
-            if nameControl then
-                nameControl:SetText(data.text or "")
-            end
-
-            -- Get current value
-            local currentValue = data.getFunction and data.getFunction() or false
-
-            -- Set up checkbox state
-            local checkBoxControl = control:GetNamedChild("Checkbox")
-            if checkBoxControl then
-                ZO_CheckButton_SetCheckState(checkBoxControl, currentValue)
-                checkBoxControl.selected = selected
-                checkBoxControl:SetHidden(selected)
-            end
-
-            -- Set up On/Off labels (gamepad style)
-            local onLabel = control:GetNamedChild("On")
-            local offLabel = control:GetNamedChild("Off")
-            if onLabel and offLabel then
-                onLabel:SetHidden(not selected)
-                offLabel:SetHidden(not selected)
-                onLabel:SetColor((currentValue and ZO_SELECTED_TEXT or ZO_DISABLED_TEXT):UnpackRGBA())
-                offLabel:SetColor((currentValue and ZO_DISABLED_TEXT or ZO_SELECTED_TEXT):UnpackRGBA())
-            end
-
-            -- Handle visual state
-            local color = ZO_GamepadMenuEntryTemplate_GetLabelColor(selected, false)
-            if nameControl then
-                nameControl:SetColor(color:UnpackRGBA())
-            end
-            control:SetAlpha(ZO_GamepadMenuEntryTemplate_GetAlpha(selected))
-        end
-
-        -- Custom slider setup with dual-speed mode support
-        local function SliderSetup(control, data, selected, _reselectingDuringRebuild, enabled, _active)
-            control.data = data
-
-            -- Set up the name label
-            local nameControl = control:GetNamedChild("Name")
-            if nameControl then
-                nameControl:SetText(data.text or "")
-            end
-
-            -- Get slider control
-            local slider = control:GetNamedChild("Slider")
-            if slider then
-                -- Remove handler during setup to prevent callbacks
-                slider:SetHandler("OnValueChanged", nil)
-
-                -- Set min/max
-                slider:SetMinMax(data.minValue or 0, data.maxValue or 100)
-
-                -- Calculate step values for dual-speed mode
-                local range = (data.maxValue or 100) - (data.minValue or 0)
-                local precisionStepPercent = data.gamepadValueStepPercent or 0.5
-                local fastStepPercent = data.gamepadValueStepPercentFast or 5
-                local precisionStep = range * (precisionStepPercent / 100)
-                local fastStep = range * (fastStepPercent / 100)
-
-                -- Store step values on slider for dynamic switching
-                slider.precisionStep = precisionStep
-                slider.fastStep = fastStep
-                slider.isFastMode = false
-
-                -- Default to precision step (fine control by default)
-                slider:SetValueStep(precisionStep)
-
-                -- Set current value
-                local currentValue = data.getFunction and data.getFunction() or data.minValue
-                slider:SetValue(currentValue)
-
-                -- Set up value changed handler
-                slider:SetHandler("OnValueChanged", function(_, value)
-                    if data.setFunction then
-                        data.setFunction(value)
-                    end
-                    -- Update value label
-                    local valueLabelControl = control:GetNamedChild("ValueLabel")
-                    if valueLabelControl then
-                        valueLabelControl:SetText(string.format("%d", value))
-                    end
-                    -- Call onChange callback if defined
-                    if data.onChangeFunction then
-                        data.onChangeFunction(value)
-                    end
-                end)
-
-                -- Method to toggle fast mode (hold for fast, release for precision)
-                slider.SetFastMode = function(sliderSelf, isFast)
-                    if sliderSelf.isFastMode ~= isFast then
-                        sliderSelf.isFastMode = isFast
-                        sliderSelf:SetValueStep(isFast and sliderSelf.fastStep or sliderSelf.precisionStep)
-                    end
-                end
-
-                -- Activate/deactivate based on selection
-                slider:SetActive(selected and enabled)
-            end
-
-            -- Set up value label
-            local valueLabelControl = control:GetNamedChild("ValueLabel")
-            if valueLabelControl then
-                local currentValue = data.getFunction and data.getFunction() or data.minValue
-                valueLabelControl:SetText(string.format("%d", currentValue))
-            end
-
-            -- Handle visual state
-            local color = ZO_GamepadMenuEntryTemplate_GetLabelColor(selected, false)
-            if nameControl then
-                nameControl:SetColor(color:UnpackRGBA())
-            end
-            control:SetAlpha(ZO_GamepadMenuEntryTemplate_GetAlpha(selected))
-        end
-
-        local function SliderRelease(control)
-            local slider = control:GetNamedChild("Slider")
-            if slider then
-                slider:SetActive(false)
-                if slider.SetFastMode then
-                    slider:SetFastMode(false)  -- Reset to precision mode when released
-                end
-            end
-        end
-
-        -- Custom label/button setup for invoke callbacks
-        local function LabelSetup(control, data, selected, _reselectingDuringRebuild, _enabled, _active)
-            control.data = data
-
-            -- Set up the name label
-            local nameControl = control:GetNamedChild("Name")
-            if nameControl then
-                nameControl:SetText(data.text or "")
-            end
-
-            -- Handle visual state
-            local color = ZO_GamepadMenuEntryTemplate_GetLabelColor(selected, false)
-            if nameControl then
-                nameControl:SetColor(color:UnpackRGBA())
-            end
-            control:SetAlpha(ZO_GamepadMenuEntryTemplate_GetAlpha(selected))
-        end
-
-        -- Custom horizontal list setup for dropdown-style options
-        -- Uses ZO_GamepadHorizontalListRow which has built-in horizontalListObject
-        local function HorizontalListSetup(control, data, selected, _reselectingDuringRebuild, _enabled, _active)
-            control.data = data
-
-            -- Set up the name label (control.label is set by ZO_GamepadHorizontalListRow_Initialize)
-            if control.label then
-                control.label:SetText(data.text or "")
-            end
-
-            -- The template already creates control.horizontalListObject in OnInitialized
-            local horizontalList = control.horizontalListObject
-            if not horizontalList then
-                return
-            end
-
-            -- Clear and populate the list
-            horizontalList:Clear()
-            local currentValue = data.getFunction and data.getFunction() or nil
-            local selectedIndex = 1
-
-            for i, option in ipairs(data.valid) do
-                local entryData = {
-                    text = data.valueStrings and data.valueStrings[i] or tostring(option),
-                    value = option,
-                    parentControl = control,
-                }
-                horizontalList:AddEntry(entryData)
-                if option == currentValue then
-                    selectedIndex = i
-                end
-            end
-
-            -- Set up selection changed callback
-            horizontalList:SetOnSelectedDataChangedCallback(function(selectedData, oldData, reselecting)
-                if oldData and not reselecting and selectedData then
-                    if data.setFunction then
-                        data.setFunction(selectedData.value)
-                    end
-                    if data.onChangeFunction then
-                        data.onChangeFunction(selectedData.value)
-                    end
-                end
-            end)
-
-            horizontalList:Commit()
-            local ALLOW_EVEN_IF_DISABLED = true
-            local NO_ANIMATION = true
-            horizontalList:SetSelectedDataIndex(selectedIndex, ALLOW_EVEN_IF_DISABLED, NO_ANIMATION)
-            horizontalList:SetActive(selected)
-            horizontalList:SetSelectedFromParent(selected)
-            horizontalList:RefreshVisible(selected)
-
-            -- Handle visual state
-            local color = ZO_GamepadMenuEntryTemplate_GetLabelColor(selected, false)
-            if control.label then
-                control.label:SetColor(color:UnpackRGBA())
-            end
-            control:SetAlpha(ZO_GamepadMenuEntryTemplate_GetAlpha(selected))
-        end
-
-        local function HorizontalListRelease(control)
-            if control.horizontalListObject then
-                control.horizontalListObject:Deactivate()
-            end
-        end
-
-        list:AddDataTemplate("ZO_GamepadOptionsCheckboxRow", CheckboxSetup, ZO_GamepadMenuEntryTemplateParametricListFunction, nil, "Checkbox")
-        list:AddDataTemplateWithHeader("ZO_GamepadOptionsCheckboxRow", CheckboxSetup, ZO_GamepadMenuEntryTemplateParametricListFunction, nil, "ZO_GamepadOptionsHeaderTemplate", nil, "CheckboxHeader")
-        list:AddDataTemplate("ZO_GamepadOptionsSliderRow", SliderSetup, ZO_GamepadMenuEntryTemplateParametricListFunction)
-        list:AddDataTemplateWithHeader("ZO_GamepadOptionsSliderRow", SliderSetup, ZO_GamepadMenuEntryTemplateParametricListFunction, nil, "ZO_GamepadOptionsHeaderTemplate", nil, "SliderHeader")
-        list:SetDataTemplateReleaseFunction("ZO_GamepadOptionsSliderRow", SliderRelease)
-        list:SetDataTemplateWithHeaderReleaseFunction("ZO_GamepadOptionsSliderRow", SliderRelease)
-        list:AddDataTemplate("ZO_GamepadHorizontalListRow", HorizontalListSetup, ZO_GamepadMenuEntryTemplateParametricListFunction)
-        list:AddDataTemplateWithHeader("ZO_GamepadHorizontalListRow", HorizontalListSetup, ZO_GamepadMenuEntryTemplateParametricListFunction, nil, "ZO_GamepadOptionsHeaderTemplate", nil, "HorizontalListHeader")
-        list:SetDataTemplateReleaseFunction("ZO_GamepadHorizontalListRow", HorizontalListRelease)
-        list:SetDataTemplateWithHeaderReleaseFunction("ZO_GamepadHorizontalListRow", HorizontalListRelease)
-        list:AddDataTemplate("ZO_GamepadOptionsLabelRow", LabelSetup, ZO_GamepadMenuEntryTemplateParametricListFunction)
-        list:SetNoItemText(GetString(BATTLESCROLLS_LIST_NO_SETTINGS))
-    end
-
     self.instanceList = self:AddList("Instances", function(list)
         SetupList(list, GetString(BATTLESCROLLS_LIST_NO_DATA))
     end)
@@ -873,7 +328,7 @@ function BattleScrolls_Journal_Gamepad:InitializeLists()
         SetupList(list, GetString(BATTLESCROLLS_LIST_NO_STATS))
     end)
     self.settingsList = self:AddList("Settings", function(list)
-        SetupSettingsList(list)
+        BattleScrolls.journal.settingsTemplates.setupSettingsList(list)
     end)
 
     self.mode = NAVIGATION_MODE.INSTANCES
@@ -1068,6 +523,7 @@ function BattleScrolls_Journal_Gamepad:ShowLockErrorDialog(instance)
         mainText = mainText,
         infoOnly = true,
     })
+    PlaySound(SOUNDS.NEGATIVE_CLICK)
 end
 
 -------------------------
@@ -1097,22 +553,6 @@ end
 
 function BattleScrolls_Journal_Gamepad:GetEncounterTabBarEntries()
     return BattleScrolls.journal.chronicler.getEncounterTabBarEntries(self)
-end
-
-function BattleScrolls_Journal_Gamepad:RefreshInstanceList()
-    BattleScrolls.journal.chronicler.refreshInstanceList(self)
-end
-
-function BattleScrolls_Journal_Gamepad:RefreshEncounterList()
-    BattleScrolls.journal.chronicler.refreshEncounterList(self)
-end
-
-function BattleScrolls_Journal_Gamepad:RefreshStatsList()
-    return BattleScrolls.journal.chronicler.refreshStatsList(self)
-end
-
-function BattleScrolls_Journal_Gamepad:RefreshSettingsList()
-    BattleScrolls.journal.chronicler.refreshSettingsList(self)
 end
 
 function BattleScrolls_Journal_Gamepad:RefreshList(skipHeaderRefresh)
@@ -1167,14 +607,6 @@ end
 function BattleScrolls_Journal_Gamepad:SetFiltersForTab(tab, filters)
     self.filters = self.filters or {}
     self.filters[tab] = filters
-    BattleScrolls.gc:RequestGC()
-end
-
----Resets the filter for the current tab
-function BattleScrolls_Journal_Gamepad:ResetCurrentFilter()
-    if self.filters then
-        self.filters[self.selectedTab] = nil
-    end
     BattleScrolls.gc:RequestGC()
 end
 
