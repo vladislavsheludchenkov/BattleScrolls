@@ -1,0 +1,39 @@
+Group Journal
+
+The Journal now has a Group tab for encounters where group members participated and had Battle Scrolls installed
+
+Overview:
+- Sortable comparison table with columns for each boss, DPS, Crit%, DTPS, HPS, Alive%, and Deaths
+
+Per-player detail:
+- Damage output: DPS, total, crit%, max hit, direct%, AoE%, damage by type, DPS rank and comparison vs DD average
+- Survivability: DTPS, alive time, death count, top incoming damage abilities, death recaps
+- Healing output: raw HPS, effective HPS, overheal, self-healing
+- Per-boss damage bars with damage composition stats and damage taken
+
+Group context tooltips on the existing tabs when the data is available:
+- Boss targets on Damage Done show per-member DPS and contribution %
+- DPS and Boss DPS rows show per-member DPS breakdown
+- DTPS and damage sources on Damage Taken show per-member DTPS
+- Damage composition stats show DD average for comparison
+- Healing Out/Self Healing: raw HPS and overheal show per-member breakdown
+
+Death Tracking
+
+Death recaps are now saved with encounters and displayed in:
+- Overview tab: death count in the damage taken section
+- Damage Taken tab: deaths listed with timestamps, recap viewable in tooltip
+- Group tab: first and last death per player with full attack details
+
+Minor changes:
+- Overview panel now shows Direct % instead of DoT %
+- Event Zone override toggle in settings when Night Market is active
+- DPS meters now appear behind other UI elements such as loot history
+- "Overview" item is always selected by default on all tabs. This increases memory usage a bit, but you didn't want to have free memory anyway, did you?
+- Gamertags displayed without @ symbol
+- "Hodor" and "Bars" group meters show current fight duration in the header
+- Changed sounds for opening and closing filter/instance dialogs
+
+Localization:
+- Fixed minor pluralization issues
+- Made "stacks" terminology consistent with item sets wording in Russian (стак -> заряд) and German (Stapel -> Kumulation)
