@@ -88,6 +88,7 @@ ui/journal/dialogs.lua
 ui/journal/filters.lua
 ui/journal/overview_panel.lua
 ui/journal/chronicler.lua
+ui/journal/subheader.lua
 ui/journal/group_table.lua
 ui/journal/journal.xml
 ui/journal/dialogs.xml

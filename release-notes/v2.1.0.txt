@@ -1,0 +1,5 @@
+- Introduced an additional level of navigation: subcategories. Similar contexts are now a part of the same tab and can be switched between with left/right on a d-pad or left stick
+	- Damage Done and Boss Damage Done are now just Damage, with old tabs presented as subcategories
+	- Healing Out, Self Healing, and Healing In are now just Healing, with old tabs presented as subcategories
+	- Effects now has separate subcategories for effects on you, bosses and group members, instead of having one long list for everything
+- "Attempt to read past end of buffer" UI errors are now suppressed. Group data may still be incorrect when going through a loading screen after the fight ends, but at least you aren't getting that information right in your face as soon as you do that

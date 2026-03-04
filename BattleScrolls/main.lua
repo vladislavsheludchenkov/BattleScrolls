@@ -43,6 +43,9 @@ function BattleScrolls.OnAddOnLoaded(_, addonName)
         BattleScrolls.dpsSender:Initialize()
         BattleScrolls.dpsMeter:Initialize()
         BattleScrolls.onboarding:Initialize()
+        -- Suppressing "Attempt to read past end of buffer" from LGB
+        -- due to https://github.com/sirinsidiator/ESO-LibGroupBroadcast/issues/6
+        ZO_ERROR_FRAME.suppressedErrors[0xC078BBA0] = true
         EVENT_MANAGER:UnregisterForEvent("BattleScrolls_Main", EVENT_ADD_ON_LOADED)
     end
 end

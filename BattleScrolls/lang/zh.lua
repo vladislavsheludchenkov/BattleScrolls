@@ -9,6 +9,7 @@ local strings = {
     [BATTLESCROLLS_UI_SETTINGS] = "设置",
     [BATTLESCROLLS_UI_FILTER] = "筛选",
     [BATTLESCROLLS_UI_FILTER_ACTIVE] = "筛选（已启用）",
+    [BATTLESCROLLS_UI_SWITCH_TO] = "切换到<<1>>",
     [BATTLESCROLLS_STAT_HPS] = "HPS",
 
     -------------------------
@@ -39,7 +40,12 @@ local strings = {
     [BATTLESCROLLS_TAB_HEALING_OUT] = "治疗输出",
     [BATTLESCROLLS_TAB_SELF_HEALING] = "自我治疗",
     [BATTLESCROLLS_TAB_HEALING_IN] = "受到治疗",
+    [BATTLESCROLLS_TAB_DAMAGE] = "伤害",
+    [BATTLESCROLLS_TAB_HEALING] = "治疗",
     [BATTLESCROLLS_TAB_EFFECTS] = "效果",
+    [BATTLESCROLLS_TAB_EFFECTS_PLAYER] = "你的效果",
+    [BATTLESCROLLS_TAB_EFFECTS_BOSS] = "首领效果",
+    [BATTLESCROLLS_TAB_EFFECTS_GROUP] = "团队效果",
     [BATTLESCROLLS_TAB_GROUP] = "团队",
 
     -------------------------
@@ -617,3 +623,5 @@ local strings = {
 for stringId, stringValue in pairs(strings) do
     SafeAddString(stringId, stringValue, 1)
 end
+
+BATTLESCROLLS_KEYBIND_ICON_SCALE = 109  -- CJK: 180 * 17/28

@@ -22,8 +22,10 @@ BattleScrolls_Journal_StatsTab = {
     HEALING_OUT = 5,
     SELF_HEALING = 6,
     HEALING_IN = 7,
-    EFFECTS = 8,
-    GROUP = 9,
+    EFFECTS_PLAYER = 8,
+    EFFECTS_BOSS = 9,
+    EFFECTS_GROUP = 10,
+    GROUP = 11,
 }
 
 BattleScrolls_Journal_InstanceTab = {
@@ -80,6 +82,7 @@ local canAddToMainMenu = false
 ---@field header Control Header control
 ---@field headerData table Header configuration
 ---@field defaultInstancePosition number Default scroll position
+---@field lastSubView table<TabGroupKey, StatsTab> Remembered sub-view per tab group within session
 BattleScrolls_Journal_Gamepad = ZO_Gamepad_ParametricList_Screen:Subclass()
 
 function BattleScrolls_Journal_Gamepad:New(control)
@@ -157,6 +160,7 @@ function BattleScrolls_Journal_Gamepad:Initialize(control)
                 self.arithmancer = nil
                 BattleScrolls.gc:RequestGC(5)
                 self.selectedTab = nil
+                self.lastSubView = {}
                 self.selectedInstanceTab = INSTANCE_TAB.ALL
                 self.selectedEncounterTab = ENCOUNTER_TAB.ALL
                 self.pendingTabIndex = 1  -- Start at first tab
@@ -211,6 +215,9 @@ function BattleScrolls_Journal_Gamepad:OnDeferredInitialize()
     self:RefreshHeader()
     self:InitializeLists()
 
+    -- Initialize sub-header for tab group sub-navigation
+    BattleScrolls.journal.subheader.initialize(self)
+
     -- Initialize overview panel (for stats screen right-side display)
     local overviewPane = self.control:GetNamedChild("OverviewPane")
     if overviewPane and BattleScrolls_Journal_OverviewPanel then
@@ -262,10 +269,14 @@ function BattleScrolls_Journal_Gamepad:RefreshHeader()
     else
         ZO_GamepadGenericHeader_Deactivate(self.header)
     end
+
+    -- Refresh sub-header (show/hide based on current tab group)
+    BattleScrolls.journal.subheader.refresh(self)
 end
 
 function BattleScrolls_Journal_Gamepad:OnHiding()
     ZO_GamepadGenericHeader_Deactivate(self.header)
+    BattleScrolls.journal.subheader.deactivate(self)
 end
 
 -------------------------

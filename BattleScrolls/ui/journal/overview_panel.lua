@@ -1334,7 +1334,9 @@ function OverviewPanel:Refresh(journalUI, selectedData)
             renderers.healing.refreshPanelForSelfHealing(self, ctx):Await()
         elseif selectedTab == STATS_TAB.HEALING_IN then
             renderers.healing.refreshPanelForHealingIn(self, ctx):Await()
-        elseif selectedTab == STATS_TAB.EFFECTS then
+        elseif selectedTab == STATS_TAB.EFFECTS_PLAYER
+            or selectedTab == STATS_TAB.EFFECTS_BOSS
+            or selectedTab == STATS_TAB.EFFECTS_GROUP then
             renderers.effects.refreshPanelForEffects(self, ctx):Await()
         elseif selectedTab == STATS_TAB.GROUP then
             renderers.group.refreshPanelForGroupPlayer(self, ctx):Await()

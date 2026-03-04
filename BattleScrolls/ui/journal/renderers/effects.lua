@@ -423,154 +423,157 @@ end
 -- Public API
 -------------------------
 
----Renders the Effects stats tab
+---Renders the Effects Player sub-view (buffs + debuffs on player)
 ---@param ctx JournalRenderContext
 ---@return Effect
-function EffectsRenderer.renderEffects(ctx)
+function EffectsRenderer.renderEffectsPlayer(ctx)
+    return LibEffect.Async(function()
+        local list = ctx.list
+        local encounter = ctx.encounter
+        local durationMs = encounter.durationMs
+        local playerAliveTimeMs = encounter.playerAliveTimeMs or durationMs
+
+        if encounter.effectsOnPlayer and not ZO_IsTableEmpty(encounter.effectsOnPlayer) then
+            local result = separateBuffsAndDebuffsAsync(encounter.effectsOnPlayer, playerAliveTimeMs):Await()
+
+            if #result.buffs > 0 then
+                displayEffectEntriesAsync(list, result.buffs, playerAliveTimeMs, GetString(BATTLESCROLLS_HEADER_YOUR_BUFFS), formatEffectValueBrief):Await()
+            end
+
+            if #result.debuffs > 0 then
+                displayEffectEntriesAsync(list, result.debuffs, playerAliveTimeMs, GetString(BATTLESCROLLS_HEADER_DEBUFFS_ON_YOU), formatEffectValueBrief):Await()
+            end
+        end
+    end)
+end
+
+---Renders the Effects Boss sub-view (debuffs on bosses)
+---@param ctx JournalRenderContext
+---@return Effect
+function EffectsRenderer.renderEffectsBoss(ctx)
     return LibEffect.Async(function()
         local list = ctx.list
         local encounter = ctx.encounter
         local durationMs = encounter.durationMs
 
-        -- Player alive time (stored separately from unit alive times)
-        local playerAliveTimeMs = encounter.playerAliveTimeMs or durationMs
-
-        -------------------------
-        -- Player Buffs & Debuffs (separated)
-        -------------------------
-        if encounter.effectsOnPlayer and not ZO_IsTableEmpty(encounter.effectsOnPlayer) then
-            local result = separateBuffsAndDebuffsAsync(encounter.effectsOnPlayer, playerAliveTimeMs):Await()
-            local buffs = result.buffs
-            local debuffs = result.debuffs
-
-            -- Player Buffs section
-            if #buffs > 0 then
-                displayEffectEntriesAsync(list, buffs, playerAliveTimeMs, GetString(BATTLESCROLLS_HEADER_YOUR_BUFFS), formatEffectValueBrief):Await()
-            end
-
-            -- Player Debuffs section
-            if #debuffs > 0 then
-                displayEffectEntriesAsync(list, debuffs, playerAliveTimeMs, GetString(BATTLESCROLLS_HEADER_DEBUFFS_ON_YOU), formatEffectValueBrief):Await()
-            end
-        end
-        LibEffect.Yield():Await()
-
-        -------------------------
-        -- Debuffs on Bosses
-        -------------------------
-        if encounter.effectsOnBosses and not ZO_IsTableEmpty(encounter.effectsOnBosses) then
-            -- Build sorted list of bosses by total debuff uptime
-            -- effectsOnBosses is keyed by unitTag (e.g., "boss1")
-            local bossList = {}
-            local count = 0
-            for unitTag, bossEffects in pairs(encounter.effectsOnBosses) do
-                if not ZO_IsTableEmpty(bossEffects) then
-                    local totalUptime = 0
-                    for _, stats in pairs(bossEffects) do
-                        totalUptime = totalUptime + stats.totalActiveTimeMs
-                    end
-                    table.insert(bossList, { unitTag = unitTag, effects = bossEffects, totalUptime = totalUptime })
-                end
-                count = count + 1
-                if count % YIELD_INTERVAL == 0 then
-                    LibEffect.Yield():Await()
-                end
-            end
-            table.sort(bossList, function(a, b)
-                if a.totalUptime ~= b.totalUptime then return a.totalUptime > b.totalUptime end
-                return a.unitTag < b.unitTag
-            end)
-
-            for i, boss in ipairs(bossList) do
-                -- Look up boss name from bossNames (keyed by unitTag)
-                local rawBossName = encounter.bossNames and encounter.bossNames[boss.unitTag] or GetString(BATTLESCROLLS_UNKNOWN_BOSS)
-                local bossName = zo_strformat(SI_UNIT_NAME, rawBossName)
-                local headerText = zo_strformat(GetString(BATTLESCROLLS_HEADER_DEBUFFS_ON), bossName)
-
-                -- Use per-boss alive time for uptime calculations (keyed by unitTag, falls back to fight duration)
-                local bossAliveTimeMs = encounter.unitAliveTimeMs and encounter.unitAliveTimeMs[boss.unitTag] or durationMs
-
-                local sorted = sortEffectsByUptimeAsync(boss.effects, bossAliveTimeMs):Await()
-                displayEffectEntriesAsync(list, sorted, bossAliveTimeMs, headerText, formatEffectValueBrief):Await()
-
-                if i % YIELD_INTERVAL == 0 then
-                    LibEffect.Yield():Await()
-                end
-            end
+        if not encounter.effectsOnBosses or ZO_IsTableEmpty(encounter.effectsOnBosses) then
+            return
         end
 
-        -------------------------
-        -- Buffs on Group Members (includes self by default)
-        -------------------------
+        local bossList = {}
+        local count = 0
+        for unitTag, bossEffects in pairs(encounter.effectsOnBosses) do
+            if not ZO_IsTableEmpty(bossEffects) then
+                local totalUptime = 0
+                for _, stats in pairs(bossEffects) do
+                    totalUptime = totalUptime + stats.totalActiveTimeMs
+                end
+                table.insert(bossList, { unitTag = unitTag, effects = bossEffects, totalUptime = totalUptime })
+            end
+            count = count + 1
+            if count % YIELD_INTERVAL == 0 then
+                LibEffect.Yield():Await()
+            end
+        end
+        table.sort(bossList, function(a, b)
+            if a.totalUptime ~= b.totalUptime then return a.totalUptime > b.totalUptime end
+            return a.unitTag < b.unitTag
+        end)
+
+        for i, boss in ipairs(bossList) do
+            local rawBossName = encounter.bossNames and encounter.bossNames[boss.unitTag] or GetString(BATTLESCROLLS_UNKNOWN_BOSS)
+            local bossName = zo_strformat(SI_UNIT_NAME, rawBossName)
+            local headerText = zo_strformat(GetString(BATTLESCROLLS_HEADER_DEBUFFS_ON), bossName)
+
+            local bossAliveTimeMs = encounter.unitAliveTimeMs and encounter.unitAliveTimeMs[boss.unitTag] or durationMs
+
+            local sorted = sortEffectsByUptimeAsync(boss.effects, bossAliveTimeMs):Await()
+            displayEffectEntriesAsync(list, sorted, bossAliveTimeMs, headerText, formatEffectValueBrief):Await()
+
+            if i % YIELD_INTERVAL == 0 then
+                LibEffect.Yield():Await()
+            end
+        end
+    end)
+end
+
+---Renders the Effects Group sub-view (buffs on group members, includes self)
+---@param ctx JournalRenderContext
+---@return Effect
+function EffectsRenderer.renderEffectsGroup(ctx)
+    return LibEffect.Async(function()
+        local list = ctx.list
+        local encounter = ctx.encounter
+        local durationMs = encounter.durationMs
         local groupFilter = ctx.filters.groupFilter
 
-        -- Use shared helper to aggregate group buffs (includes per-member breakdown)
         local aggregatedByAbility, memberBreakdownByAbility = aggregateGroupBuffs(encounter, durationMs, groupFilter)
         LibEffect.Yield():Await()
 
-        if not ZO_IsTableEmpty(aggregatedByAbility) then
-                -- Sort by average uptime descending
-                local sorted = {}
-                local count = 0
-                for abilityId, stats in pairs(aggregatedByAbility) do
-                    local avgUptimePercent, avgEffectiveAliveTimeMs = computeGroupBuffAvgUptime(stats)
-                    local avgPlayerUptimePercent = computeGroupBuffAvgPlayerUptime(stats, avgEffectiveAliveTimeMs)
-                    table.insert(sorted, {
-                        abilityId = abilityId,
-                        stats = stats,
-                        memberBreakdown = memberBreakdownByAbility[abilityId],
-                        avgEffectiveAliveTimeMs = avgEffectiveAliveTimeMs,
-                        avgUptimePercent = avgUptimePercent,
-                        avgPlayerUptimePercent = avgPlayerUptimePercent,
-                    })
-                    count = count + 1
-                    if count % YIELD_INTERVAL == 0 then
-                        LibEffect.Yield():Await()
-                    end
-                end
-                local favorites = getFavorites()
-                table.sort(sorted, function(a, b)
-                    local aFav = favorites[a.abilityId] or false
-                    local bFav = favorites[b.abilityId] or false
-                    if aFav ~= bFav then return aFav end
-                    if a.avgUptimePercent ~= b.avgUptimePercent then return a.avgUptimePercent > b.avgUptimePercent end
-                    return a.abilityId < b.abilityId
-                end)
+        if ZO_IsTableEmpty(aggregatedByAbility) then
+            return
+        end
+
+        -- Sort by average uptime descending
+        local sorted = {}
+        local count = 0
+        for abilityId, stats in pairs(aggregatedByAbility) do
+            local avgUptimePercent, avgEffectiveAliveTimeMs = computeGroupBuffAvgUptime(stats)
+            local avgPlayerUptimePercent = computeGroupBuffAvgPlayerUptime(stats, avgEffectiveAliveTimeMs)
+            table.insert(sorted, {
+                abilityId = abilityId,
+                stats = stats,
+                memberBreakdown = memberBreakdownByAbility[abilityId],
+                avgEffectiveAliveTimeMs = avgEffectiveAliveTimeMs,
+                avgUptimePercent = avgUptimePercent,
+                avgPlayerUptimePercent = avgPlayerUptimePercent,
+            })
+            count = count + 1
+            if count % YIELD_INTERVAL == 0 then
                 LibEffect.Yield():Await()
+            end
+        end
+        local favorites = getFavorites()
+        table.sort(sorted, function(a, b)
+            local aFav = favorites[a.abilityId] or false
+            local bFav = favorites[b.abilityId] or false
+            if aFav ~= bFav then return aFav end
+            if a.avgUptimePercent ~= b.avgUptimePercent then return a.avgUptimePercent > b.avgUptimePercent end
+            return a.abilityId < b.abilityId
+        end)
+        LibEffect.Yield():Await()
 
-                local isFirst = true
-                for i, entry in ipairs(sorted) do
-                    local abilityName = utils.getAbilityDisplayName(entry.abilityId)
-                    local abilityIcon = GetAbilityIcon(entry.abilityId)
-                    local valueStr = formatGroupEffectValueBrief(entry.avgUptimePercent, entry.stats.memberCount, entry.avgPlayerUptimePercent)
+        local isFirst = true
+        for i, entry in ipairs(sorted) do
+            local abilityName = utils.getAbilityDisplayName(entry.abilityId)
+            local abilityIcon = GetAbilityIcon(entry.abilityId)
+            local valueStr = formatGroupEffectValueBrief(entry.avgUptimePercent, entry.stats.memberCount, entry.avgPlayerUptimePercent)
 
-                    local entryData = ZO_GamepadEntryData:New(abilityName, abilityIcon)
-                    entryData.iconFile = abilityIcon  -- Store for frame type detection
-                    entryData:SetIconTintOnSelection(true)
-                    entryData:AddSubLabel(valueStr)
-                    entryData.effectAbilityId = entry.abilityId
-                    entryData.isFavorite = favorites[entry.abilityId] or false
-                    -- Store raw data for lazy tooltip building
-                    entryData.effectTooltipData = {
-                        type = "group",
-                        title = abilityName,
-                        stats = entry.stats,
-                        durationMs = entry.avgEffectiveAliveTimeMs,
-                        memberBreakdown = entry.memberBreakdown,
-                    }
+            local entryData = ZO_GamepadEntryData:New(abilityName, abilityIcon)
+            entryData.iconFile = abilityIcon
+            entryData:SetIconTintOnSelection(true)
+            entryData:AddSubLabel(valueStr)
+            entryData.effectAbilityId = entry.abilityId
+            entryData.isFavorite = favorites[entry.abilityId] or false
+            entryData.effectTooltipData = {
+                type = "group",
+                title = abilityName,
+                stats = entry.stats,
+                durationMs = entry.avgEffectiveAliveTimeMs,
+                memberBreakdown = entry.memberBreakdown,
+            }
 
-                    if isFirst then
-                        entryData:SetHeader(GetString(BATTLESCROLLS_HEADER_BUFFS_ON_GROUP))
-                        list:AddEntryWithHeader("BattleScrolls_AbilityEntryTemplate", entryData)
-                        isFirst = false
-                    else
-                        list:AddEntry("BattleScrolls_AbilityEntryTemplate", entryData)
-                    end
+            if isFirst then
+                entryData:SetHeader(GetString(BATTLESCROLLS_HEADER_BUFFS_ON_GROUP))
+                list:AddEntryWithHeader("BattleScrolls_AbilityEntryTemplate", entryData)
+                isFirst = false
+            else
+                list:AddEntry("BattleScrolls_AbilityEntryTemplate", entryData)
+            end
 
-                    if i % YIELD_INTERVAL == 0 then
-                        LibEffect.Yield():Await()
-                    end
-                end
+            if i % YIELD_INTERVAL == 0 then
+                LibEffect.Yield():Await()
+            end
         end
     end)
 end

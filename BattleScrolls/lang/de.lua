@@ -9,6 +9,7 @@ local strings = {
     [BATTLESCROLLS_UI_SETTINGS] = "Einstellungen",
     [BATTLESCROLLS_UI_FILTER] = "Filter",
     [BATTLESCROLLS_UI_FILTER_ACTIVE] = "Filter (Aktiv)",
+    [BATTLESCROLLS_UI_SWITCH_TO] = "Zeige <<1>>",
     [BATTLESCROLLS_STAT_HPS] = "HPS",
 
     -------------------------
@@ -39,7 +40,12 @@ local strings = {
     [BATTLESCROLLS_TAB_HEALING_OUT] = "Ausgehende Heilung",
     [BATTLESCROLLS_TAB_SELF_HEALING] = "Selbstheilung",
     [BATTLESCROLLS_TAB_HEALING_IN] = "Erhaltene Heilung",
+    [BATTLESCROLLS_TAB_DAMAGE] = "Schaden",
+    [BATTLESCROLLS_TAB_HEALING] = "Heilung",
     [BATTLESCROLLS_TAB_EFFECTS] = "Effekte",
+    [BATTLESCROLLS_TAB_EFFECTS_PLAYER] = "Deine Effekte",
+    [BATTLESCROLLS_TAB_EFFECTS_BOSS] = "Bosseffekte",
+    [BATTLESCROLLS_TAB_EFFECTS_GROUP] = "Gruppeneffekte",
     [BATTLESCROLLS_TAB_GROUP] = "Gruppe",
 
     -------------------------

@@ -204,7 +204,7 @@ function keybinds.initializeKeybindStripDescriptors(journalUI)
                     or journalUI.selectedTab == STATS_TAB.DAMAGE_TAKEN
                     or journalUI.selectedTab == STATS_TAB.HEALING_OUT
                     or journalUI.selectedTab == STATS_TAB.HEALING_IN
-                    or journalUI.selectedTab == STATS_TAB.EFFECTS
+                    or journalUI.selectedTab == STATS_TAB.EFFECTS_GROUP
             end,
             sound = SOUNDS.GAMEPAD_MENU_FORWARD,
         },
@@ -247,7 +247,9 @@ function keybinds.initializeKeybindStripDescriptors(journalUI)
                 end
             end,
             visible = function()
-                if journalUI.selectedTab ~= STATS_TAB.EFFECTS then return false end
+                if journalUI.selectedTab ~= STATS_TAB.EFFECTS_PLAYER
+                    and journalUI.selectedTab ~= STATS_TAB.EFFECTS_BOSS
+                    and journalUI.selectedTab ~= STATS_TAB.EFFECTS_GROUP then return false end
                 local targetData = journalUI.statsList:GetTargetData()
                 return targetData and targetData.effectAbilityId ~= nil
             end,
@@ -281,6 +283,57 @@ function keybinds.initializeKeybindStripDescriptors(journalUI)
                     and journalUI.statsList:GetTargetData().isOverviewEntry
             end,
             sound = SOUNDS.GAMEPAD_MENU_FORWARD,
+        },
+        -- Sub-view navigation indicators (D-pad left/right)
+        -- INPUT_LEFT/RIGHT aren't in GAMEPAD_BUTTON_ORDER so they default to 0, appearing before BACK(2)/FILTER(3).
+        -- gamepadOrder = 100 pushes them to the end.
+        {
+            gamepadOrder = 100,
+            keybind = "UI_SHORTCUT_INPUT_LEFT",
+            name = function()
+                local rightIcon = ZO_Keybindings_GetHighestPriorityBindingStringFromAction("UI_SHORTCUT_INPUT_RIGHT", KEYBIND_TEXT_OPTIONS_FULL_NAME, KEYBIND_TEXTURE_OPTIONS_EMBED_MARKUP, true, false, BattleScrolls.constants.keybindIconScale) or ""
+                local selectedTab = journalUI.selectedTab
+                local groupKey = selectedTab and journal.TabToGroup[selectedTab]
+                local decodedEncounter = journalUI.decodedEncounter
+                if not groupKey or not decodedEncounter or not decodedEncounter._tabVisibility then
+                    return ""
+                end
+
+                local visibleSubViews = journal.chronicler.getVisibleSubViews(groupKey, decodedEncounter._tabVisibility)
+                local count = #visibleSubViews
+                if count < 2 then return "" end
+
+                -- Find current index in visible sub-views
+                local currentIdx = 1
+                for i, tab in ipairs(visibleSubViews) do
+                    if tab == selectedTab then
+                        currentIdx = i
+                        break
+                    end
+                end
+
+                local leftTab = visibleSubViews[currentIdx == 1 and count or (currentIdx - 1)]
+                local rightTab = visibleSubViews[currentIdx == count and 1 or (currentIdx + 1)]
+
+                local function viewName(tab)
+                    local labelId = journal.SubViewLabels[tab]
+                    return labelId and GetString(_G[labelId]) or ""
+                end
+
+                local leftName = zo_strformat(BATTLESCROLLS_UI_SWITCH_TO, viewName(leftTab))
+                if leftTab == rightTab then
+                    -- 2 sub-views: both directions go to the same tab
+                    return string.format("%s %s", rightIcon, leftName)
+                else
+                    -- 3+ sub-views: different destinations for each direction
+                    local rightName = zo_strformat(BATTLESCROLLS_UI_SWITCH_TO, viewName(rightTab))
+                    return string.format("%s  %s %s", leftName, rightIcon, rightName)
+                end
+            end,
+            callback = function() end,
+            visible = function()
+                return journal.subheader.visible or false
+            end,
         },
     }
 

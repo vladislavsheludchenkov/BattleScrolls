@@ -9,6 +9,7 @@ ZO_CreateStringId("BATTLESCROLLS_UI_NAME", "Battle Scrolls")
 ZO_CreateStringId("BATTLESCROLLS_UI_SETTINGS", "Settings")
 ZO_CreateStringId("BATTLESCROLLS_UI_FILTER", "Filter")
 ZO_CreateStringId("BATTLESCROLLS_UI_FILTER_ACTIVE", "Filter (Active)")
+ZO_CreateStringId("BATTLESCROLLS_UI_SWITCH_TO", "Switch to <<1>>")
 
 -------------------------
 -- Zone/Instance Tabs
@@ -38,7 +39,12 @@ ZO_CreateStringId("BATTLESCROLLS_TAB_DAMAGE_TAKEN", "Damage Taken")
 ZO_CreateStringId("BATTLESCROLLS_TAB_HEALING_OUT", "Healing Out")
 ZO_CreateStringId("BATTLESCROLLS_TAB_SELF_HEALING", "Self Healing")
 ZO_CreateStringId("BATTLESCROLLS_TAB_HEALING_IN", "Healing In")
+ZO_CreateStringId("BATTLESCROLLS_TAB_DAMAGE", "Damage")
+ZO_CreateStringId("BATTLESCROLLS_TAB_HEALING", "Healing")
 ZO_CreateStringId("BATTLESCROLLS_TAB_EFFECTS", "Effects")
+ZO_CreateStringId("BATTLESCROLLS_TAB_EFFECTS_PLAYER", "Your Effects")
+ZO_CreateStringId("BATTLESCROLLS_TAB_EFFECTS_BOSS", "Boss Effects")
+ZO_CreateStringId("BATTLESCROLLS_TAB_EFFECTS_GROUP", "Group Effects")
 ZO_CreateStringId("BATTLESCROLLS_TAB_GROUP", "Group")
 
 -------------------------

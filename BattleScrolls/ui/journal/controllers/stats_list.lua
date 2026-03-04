@@ -50,8 +50,12 @@ function StatsListController.renderTab(ctx, selectedTab)
             renderers.healing.renderSelfHealing(ctx):Await()
         elseif selectedTab == StatsTab.HEALING_IN then
             renderers.healing.renderHealingIn(ctx):Await()
-        elseif selectedTab == StatsTab.EFFECTS then
-            renderers.effects.renderEffects(ctx):Await()
+        elseif selectedTab == StatsTab.EFFECTS_PLAYER then
+            renderers.effects.renderEffectsPlayer(ctx):Await()
+        elseif selectedTab == StatsTab.EFFECTS_BOSS then
+            renderers.effects.renderEffectsBoss(ctx):Await()
+        elseif selectedTab == StatsTab.EFFECTS_GROUP then
+            renderers.effects.renderEffectsGroup(ctx):Await()
         elseif selectedTab == StatsTab.GROUP then
             renderers.group.renderGroup(ctx):Await()
         end

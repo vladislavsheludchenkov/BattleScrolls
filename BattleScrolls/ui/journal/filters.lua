@@ -44,7 +44,7 @@ function filters.getDialogTitle(journalUI)
         return GetString(BATTLESCROLLS_FILTER_BY_TARGET)
     elseif selectedTab == StatsTab.HEALING_IN then
         return GetString(BATTLESCROLLS_FILTER_BY_SOURCE)
-    elseif selectedTab == StatsTab.EFFECTS then
+    elseif selectedTab == StatsTab.EFFECTS_GROUP then
         return GetString(BATTLESCROLLS_FILTER_BY_GROUP_MEMBER)
     end
     return GetString(BATTLESCROLLS_FILTER)
@@ -71,7 +71,7 @@ function filters.initializePending(journalUI)
     local currentMainFilter
     if journalUI.selectedTab == StatsTab.DAMAGE_TAKEN or journalUI.selectedTab == StatsTab.HEALING_IN then
         currentMainFilter = currentSourceFilter
-    elseif journalUI.selectedTab == StatsTab.EFFECTS then
+    elseif journalUI.selectedTab == StatsTab.EFFECTS_GROUP then
         currentMainFilter = currentGroupFilter
     else
         currentMainFilter = currentTargetFilter
@@ -164,7 +164,7 @@ function filters.applyPending(journalUI)
         tabFilters.sourceFilter = mainFilter
     elseif journalUI.selectedTab == StatsTab.HEALING_OUT then
         tabFilters.targetFilter = mainFilter
-    elseif journalUI.selectedTab == StatsTab.EFFECTS then
+    elseif journalUI.selectedTab == StatsTab.EFFECTS_GROUP then
         tabFilters.groupFilter = mainFilter
     end
 
@@ -370,7 +370,7 @@ function filters.getFilterableUnits(journalUI)
         end
         return groupUnitsByName(sources, SELF_UNIT_ID, sources[SELF_UNIT_ID])
 
-    elseif selectedTab == StatsTab.EFFECTS then
+    elseif selectedTab == StatsTab.EFFECTS_GROUP then
         local selfName = utils.GetUndecoratedDisplayName()
         local hasPlayerEffects = encounter.effectsOnPlayer and not ZO_IsTableEmpty(encounter.effectsOnPlayer)
         local members = {}

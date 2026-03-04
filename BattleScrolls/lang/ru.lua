@@ -10,6 +10,7 @@ local strings = {
     [BATTLESCROLLS_UI_SETTINGS] = "Настройки",
     [BATTLESCROLLS_UI_FILTER] = "Фильтр",
     [BATTLESCROLLS_UI_FILTER_ACTIVE] = "Фильтр (Активен)",
+    [BATTLESCROLLS_UI_SWITCH_TO] = "Показать <<1>>",
     [BATTLESCROLLS_STAT_HPS] = "HPS",
 
     -------------------------
@@ -40,7 +41,12 @@ local strings = {
     [BATTLESCROLLS_TAB_HEALING_OUT] = "Исходящее исцеление",
     [BATTLESCROLLS_TAB_SELF_HEALING] = "Самоисцеление",
     [BATTLESCROLLS_TAB_HEALING_IN] = "Полученное исцеление",
+    [BATTLESCROLLS_TAB_DAMAGE] = "Урон",
+    [BATTLESCROLLS_TAB_HEALING] = "Исцеление",
     [BATTLESCROLLS_TAB_EFFECTS] = "Эффекты",
+    [BATTLESCROLLS_TAB_EFFECTS_PLAYER] = "Ваши эффекты",
+    [BATTLESCROLLS_TAB_EFFECTS_BOSS] = "Эффекты боссов",
+    [BATTLESCROLLS_TAB_EFFECTS_GROUP] = "Эффекты группы",
     [BATTLESCROLLS_TAB_GROUP] = "Группа",
 
     -------------------------

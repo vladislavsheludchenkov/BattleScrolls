@@ -41,8 +41,42 @@ journal.StatsTab = {
     HEALING_OUT = 5,
     SELF_HEALING = 6,
     HEALING_IN = 7,
-    EFFECTS = 8,
-    GROUP = 9,
+    EFFECTS_PLAYER = 8,
+    EFFECTS_BOSS = 9,
+    EFFECTS_GROUP = 10,
+    GROUP = 11,
+}
+
+-------------------------
+-- Tab Groups (parent tabs with sub-views)
+-------------------------
+---@alias TabGroupKey "DAMAGE"|"HEALING"|"EFFECTS"
+
+journal.TabGroups = {
+    DAMAGE  = { journal.StatsTab.BOSS_DAMAGE_DONE, journal.StatsTab.DAMAGE_DONE },
+    HEALING = { journal.StatsTab.HEALING_OUT, journal.StatsTab.SELF_HEALING, journal.StatsTab.HEALING_IN },
+    EFFECTS = { journal.StatsTab.EFFECTS_PLAYER, journal.StatsTab.EFFECTS_BOSS, journal.StatsTab.EFFECTS_GROUP },
+}
+
+-- Reverse lookup: StatsTab value → group key (nil for standalone tabs)
+---@type table<StatsTab, TabGroupKey>
+journal.TabToGroup = {}
+for groupKey, tabs in pairs(journal.TabGroups) do
+    for _, tab in ipairs(tabs) do
+        journal.TabToGroup[tab] = groupKey
+    end
+end
+
+-- Sub-view labels keyed by StatsTab value (used by subheader)
+journal.SubViewLabels = {
+    [journal.StatsTab.BOSS_DAMAGE_DONE] = "BATTLESCROLLS_TAB_BOSS_DAMAGE_DONE",
+    [journal.StatsTab.DAMAGE_DONE] = "BATTLESCROLLS_TAB_DAMAGE_DONE",
+    [journal.StatsTab.HEALING_OUT] = "BATTLESCROLLS_TAB_HEALING_OUT",
+    [journal.StatsTab.SELF_HEALING] = "BATTLESCROLLS_TAB_SELF_HEALING",
+    [journal.StatsTab.HEALING_IN] = "BATTLESCROLLS_TAB_HEALING_IN",
+    [journal.StatsTab.EFFECTS_PLAYER] = "BATTLESCROLLS_TAB_EFFECTS_PLAYER",
+    [journal.StatsTab.EFFECTS_BOSS] = "BATTLESCROLLS_TAB_EFFECTS_BOSS",
+    [journal.StatsTab.EFFECTS_GROUP] = "BATTLESCROLLS_TAB_EFFECTS_GROUP",
 }
 
 -------------------------
@@ -190,8 +224,10 @@ journal.StatIcons = {
 ---| 5 # HEALING_OUT
 ---| 6 # SELF_HEALING
 ---| 7 # HEALING_IN
----| 8 # EFFECTS
----| 9 # GROUP
+---| 8 # EFFECTS_PLAYER
+---| 9 # EFFECTS_BOSS
+---| 10 # EFFECTS_GROUP
+---| 11 # GROUP
 
 ---@alias InstanceTab
 ---| 1 # ALL

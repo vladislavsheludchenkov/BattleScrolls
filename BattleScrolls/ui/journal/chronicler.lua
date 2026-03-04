@@ -495,10 +495,10 @@ function chronicler.computeTabVisibility(decodedEncounter)
         if dealtDamageToBosses then break end
     end
 
-    -- Check effects
-    local hasEffects = (decodedEncounter.effectsOnPlayer and not ZO_IsTableEmpty(decodedEncounter.effectsOnPlayer))
-        or (decodedEncounter.effectsOnBosses and not ZO_IsTableEmpty(decodedEncounter.effectsOnBosses))
-        or (decodedEncounter.effectsOnGroup and not ZO_IsTableEmpty(decodedEncounter.effectsOnGroup))
+    -- Check effects (per-type)
+    local hasEffectsPlayer = decodedEncounter.effectsOnPlayer and not ZO_IsTableEmpty(decodedEncounter.effectsOnPlayer)
+    local hasEffectsBoss = decodedEncounter.effectsOnBosses and not ZO_IsTableEmpty(decodedEncounter.effectsOnBosses)
+    local hasEffectsGroup = decodedEncounter.effectsOnGroup and not ZO_IsTableEmpty(decodedEncounter.effectsOnGroup)
 
     decodedEncounter._tabVisibility = {
         dealtDamage = dealtDamage,
@@ -507,9 +507,54 @@ function chronicler.computeTabVisibility(decodedEncounter)
         hasHealingOutToGroup = not ZO_IsTableEmpty(decodedEncounter.healingStats.healingOutToGroup),
         hasSelfHealing = decodedEncounter.healingStats.selfHealing.total.raw > 0,
         hasHealingInFromGroup = not ZO_IsTableEmpty(decodedEncounter.healingStats.healingInFromGroup),
-        hasEffects = hasEffects,
+        hasEffectsPlayer = hasEffectsPlayer or false,
+        hasEffectsBoss = hasEffectsBoss or false,
+        hasEffectsGroup = hasEffectsGroup or false,
+        hasAnyEffects = (hasEffectsPlayer or hasEffectsBoss or hasEffectsGroup) or false,
         hasGroupData = decodedEncounter.sharedData ~= nil and #decodedEncounter.sharedData >= 2,
     }
+end
+
+---Returns the visible sub-views for a tab group, given tab visibility
+---@param groupKey TabGroupKey
+---@param tabVis table Pre-computed tab visibility flags
+---@return StatsTab[] visibleSubViews
+local function getVisibleSubViews(groupKey, tabVis)
+    local TabGroups = journal.TabGroups
+    local visibilityChecks = {
+        [STATS_TAB.BOSS_DAMAGE_DONE] = tabVis.dealtDamageToBosses,
+        [STATS_TAB.DAMAGE_DONE] = tabVis.dealtDamage,
+        [STATS_TAB.HEALING_OUT] = tabVis.hasHealingOutToGroup,
+        [STATS_TAB.SELF_HEALING] = tabVis.hasSelfHealing,
+        [STATS_TAB.HEALING_IN] = tabVis.hasHealingInFromGroup,
+        [STATS_TAB.EFFECTS_PLAYER] = tabVis.hasEffectsPlayer,
+        [STATS_TAB.EFFECTS_BOSS] = tabVis.hasEffectsBoss,
+        [STATS_TAB.EFFECTS_GROUP] = tabVis.hasEffectsGroup,
+    }
+    local visible = {}
+    for _, tab in ipairs(TabGroups[groupKey]) do
+        if visibilityChecks[tab] then
+            table.insert(visible, tab)
+        end
+    end
+    return visible
+end
+
+---Picks the best sub-view for a tab group: last-used if still visible, otherwise first visible
+---@param journalUI BattleScrolls_Journal_Gamepad
+---@param groupKey TabGroupKey
+---@param visibleSubViews StatsTab[]
+---@return StatsTab
+local function pickSubView(journalUI, groupKey, visibleSubViews)
+    local lastSubView = journalUI.lastSubView and journalUI.lastSubView[groupKey]
+    if lastSubView then
+        for _, tab in ipairs(visibleSubViews) do
+            if tab == lastSubView then
+                return lastSubView
+            end
+        end
+    end
+    return visibleSubViews[1]
 end
 
 ---Gets tab bar entries for an encounter stats view
@@ -518,6 +563,7 @@ end
 function chronicler.getEncounterTabBarEntries(journalUI)
     local entries = {}
 
+    -- 1. Overview (always present)
     table.insert(entries, {
         text = GetString(BATTLESCROLLS_TAB_OVERVIEW),
         callback = function()
@@ -540,30 +586,22 @@ function chronicler.getEncounterTabBarEntries(journalUI)
         return entries
     end
 
-    if tabVis.dealtDamageToBosses then
+    -- 2. Damage (parent tab — sub-views: Boss Damage Done, Damage Done)
+    local damageSubViews = getVisibleSubViews("DAMAGE", tabVis)
+    if #damageSubViews > 0 then
         table.insert(entries, {
-            text = GetString(BATTLESCROLLS_TAB_BOSS_DAMAGE_DONE),
+            text = GetString(BATTLESCROLLS_TAB_DAMAGE),
             callback = function()
-                if journalUI.selectedTab ~= STATS_TAB.BOSS_DAMAGE_DONE then
-                    journalUI.selectedTab = STATS_TAB.BOSS_DAMAGE_DONE
+                local subView = pickSubView(journalUI, "DAMAGE", damageSubViews)
+                if journalUI.selectedTab ~= subView then
+                    journalUI.selectedTab = subView
                     chronicler.refreshList(journalUI, true)
                 end
             end,
         })
     end
 
-    if tabVis.dealtDamage then
-        table.insert(entries, {
-            text = GetString(BATTLESCROLLS_TAB_DAMAGE_DONE),
-            callback = function()
-                if journalUI.selectedTab ~= STATS_TAB.DAMAGE_DONE then
-                    journalUI.selectedTab = STATS_TAB.DAMAGE_DONE
-                    chronicler.refreshList(journalUI, true)
-                end
-            end,
-        })
-    end
-
+    -- 3. Damage Taken (standalone)
     if tabVis.hasDamageTaken then
         table.insert(entries, {
             text = GetString(BATTLESCROLLS_TAB_DAMAGE_TAKEN),
@@ -576,54 +614,37 @@ function chronicler.getEncounterTabBarEntries(journalUI)
         })
     end
 
-    if tabVis.hasHealingOutToGroup then
+    -- 4. Healing (parent tab — sub-views: Healing Out, Self Healing, Healing In)
+    local healingSubViews = getVisibleSubViews("HEALING", tabVis)
+    if #healingSubViews > 0 then
         table.insert(entries, {
-            text = GetString(BATTLESCROLLS_TAB_HEALING_OUT),
+            text = GetString(BATTLESCROLLS_TAB_HEALING),
             callback = function()
-                if journalUI.selectedTab ~= STATS_TAB.HEALING_OUT then
-                    journalUI.selectedTab = STATS_TAB.HEALING_OUT
+                local subView = pickSubView(journalUI, "HEALING", healingSubViews)
+                if journalUI.selectedTab ~= subView then
+                    journalUI.selectedTab = subView
                     chronicler.refreshList(journalUI, true)
                 end
             end,
         })
     end
 
-    if tabVis.hasSelfHealing then
-        table.insert(entries, {
-            text = GetString(BATTLESCROLLS_TAB_SELF_HEALING),
-            callback = function()
-                if journalUI.selectedTab ~= STATS_TAB.SELF_HEALING then
-                    journalUI.selectedTab = STATS_TAB.SELF_HEALING
-                    chronicler.refreshList(journalUI, true)
-                end
-            end,
-        })
-    end
-
-    if tabVis.hasHealingInFromGroup then
-        table.insert(entries, {
-            text = GetString(BATTLESCROLLS_TAB_HEALING_IN),
-            callback = function()
-                if journalUI.selectedTab ~= STATS_TAB.HEALING_IN then
-                    journalUI.selectedTab = STATS_TAB.HEALING_IN
-                    chronicler.refreshList(journalUI, true)
-                end
-            end,
-        })
-    end
-
-    if tabVis.hasEffects then
+    -- 5. Effects (parent tab — sub-views: Player, Boss, Group)
+    local effectsSubViews = getVisibleSubViews("EFFECTS", tabVis)
+    if #effectsSubViews > 0 then
         table.insert(entries, {
             text = GetString(BATTLESCROLLS_TAB_EFFECTS),
             callback = function()
-                if journalUI.selectedTab ~= STATS_TAB.EFFECTS then
-                    journalUI.selectedTab = STATS_TAB.EFFECTS
+                local subView = pickSubView(journalUI, "EFFECTS", effectsSubViews)
+                if journalUI.selectedTab ~= subView then
+                    journalUI.selectedTab = subView
                     chronicler.refreshList(journalUI, true)
                 end
             end,
         })
     end
 
+    -- 6. Group (standalone)
     if tabVis.hasGroupData then
         table.insert(entries, {
             text = GetString(BATTLESCROLLS_TAB_GROUP),
@@ -696,7 +717,16 @@ function chronicler.refreshList(journalUI, skipHeaderRefresh)
     elseif journalUI.mode == NAVIGATION_MODE.SETTINGS then
         chronicler.refreshSettingsList(journalUI)
     end
+
+    -- Refresh sub-header on every list refresh (handles show/hide based on tab).
+    -- Skip when navigating within the sub-header to preserve scroll animation.
+    if not journal.subheader.navigating then
+        journal.subheader.refresh(journalUI)
+    end
 end
+
+-- Expose for subheader module
+chronicler.getVisibleSubViews = getVisibleSubViews
 
 -- Export to namespace
 journal.chronicler = chronicler

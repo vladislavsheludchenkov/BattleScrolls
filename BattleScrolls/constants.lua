@@ -34,6 +34,14 @@ local constants = {}
 
 BattleScrolls.constants = constants
 
+-- |k| markup scales relative to font height; the keybind strip uses
+-- ZoFontGamepad22 for the key icon and ZoFontGamepad34 for the name label.
+-- CJK font strings remap these sizes (17/28 instead of 22/34), so the
+-- embedded icon scale must differ.  180 * keyFont / nameFont.
+-- CJK lang files set BattleScrolls._keybindIconScale before constants.lua loads.
+constants.keybindIconScale = BATTLESCROLLS_KEYBIND_ICON_SCALE or 117
+BATTLESCROLLS_KEYBIND_ICON_SCALE = nil
+
 -- The maximum supported DPS, anything above may be represented by math.huge when transferring
 constants.huge = 1000000
 

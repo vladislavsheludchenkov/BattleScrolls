@@ -9,6 +9,7 @@ local strings = {
     [BATTLESCROLLS_UI_SETTINGS] = "設定",
     [BATTLESCROLLS_UI_FILTER] = "フィルター",
     [BATTLESCROLLS_UI_FILTER_ACTIVE] = "フィルター（有効）",
+    [BATTLESCROLLS_UI_SWITCH_TO] = "<<1>>に切り替え",
     [BATTLESCROLLS_STAT_HPS] = "HPS",
 
     -------------------------
@@ -39,7 +40,12 @@ local strings = {
     [BATTLESCROLLS_TAB_HEALING_OUT] = "与回復",
     [BATTLESCROLLS_TAB_SELF_HEALING] = "自己回復",
     [BATTLESCROLLS_TAB_HEALING_IN] = "被回復",
+    [BATTLESCROLLS_TAB_DAMAGE] = "ダメージ",
+    [BATTLESCROLLS_TAB_HEALING] = "回復",
     [BATTLESCROLLS_TAB_EFFECTS] = "効果",
+    [BATTLESCROLLS_TAB_EFFECTS_PLAYER] = "自分の効果",
+    [BATTLESCROLLS_TAB_EFFECTS_BOSS] = "ボス効果",
+    [BATTLESCROLLS_TAB_EFFECTS_GROUP] = "グループ効果",
     [BATTLESCROLLS_TAB_GROUP] = "グループ",
 
     -------------------------
@@ -617,3 +623,5 @@ local strings = {
 for stringId, stringValue in pairs(strings) do
     SafeAddString(stringId, stringValue, 1)
 end
+
+BATTLESCROLLS_KEYBIND_ICON_SCALE = 109  -- CJK: 180 * 17/28
