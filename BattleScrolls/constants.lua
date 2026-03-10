@@ -283,36 +283,30 @@ constants.aoeAbilityIds = {
     [193275] = true, -- Sanctum of the Abyssal Sea (Difficult to test.) | Last Checked: U47
 
     -- CATEGORY: Skill>Class>Dragonknight>Ardent Flame
-    [28995] = true, -- Dragonknight Standard | Last Checked: U47
-    [20930] = true, -- Engulfing Flames (Initial Conal Hit) | Last Checked: U47
-    [20917] = true, -- Fiery Breath (Initial Conal Hit) | Last Checked: U47
-    [20944] = true, -- Noxious Breath (Initial Conal Hit) | Last Checked: U47
-    [98438] = true, -- Shackle (Synergy DMG) | Last Checked: U47
-    [32960] = true, -- Shifting Standard | Last Checked: U47
-    [32948] = true, -- Standard of Might | Last Checked: U47
+    [31842] = true, -- Core of Flame | Last Checked: U49 PTS 4
+    [328787] = true, -- Heart of Flame (Only findable with logs. EVENT_COMBAT_EVENT returned a hit value of 0 for this) | Last Checked: U49 PTS 4
+    [28969] = true, -- Inferno | Last Checked: U49 PTS 4
+    [61945] = true, -- Incinerate | Last Checked: U49 PTS 4
+    [20824] = true, -- Power Lash (Flame lash with stacks) | Last Checked: U49 PTS 4
+    [98438] = true, -- Shackle (Synergy DMG) | Last Checked: U49 PTS 4
+    [32960] = true, -- Shifting Standard | Last Checked: U49 PTS 4
+    [32794] = true, -- Soul of Flame | Last Checked: U49 PTS 4
+    [256798] = true, -- Volcanic Whip | Last Checked: U49 PTS 4
+    [20252] = true, -- Burning Talons (Initial Hit) | Last Checked: U49 PTS 4
 
     -- CATEGORY: Skill>Class>Dragonknight>Draconic Power
-    [20252] = true, -- Burning Talons (Initial Hit) | Last Checked: U47
-    [20251] = true, -- Choking Talons | Last Checked: U47
+    [20251] = true, -- Choking Talons | Last Checked: U49 PTS 4
     [20245] = true, -- Dark Talons | Last Checked: U47
-    [32792] = true, -- Deep Breath (Initial Hit) | Last Checked: U47
-    [32794] = true, -- Deep Breath (Delayed Hit) | Last Checked: U47
-    [29014] = true, -- Dragon Leap | Last Checked: U47
-    [32785] = true, -- Draw Essence (Initial Hit) | Last Checked: U47
-    [32787] = true, -- Draw Essence (Delayed Hit) | Last Checked: U47
+    [20944] = true, -- Disintegrating Dragonfire (Initial Hit) | Last Checked: U49 PTS 4
+    [29014] = true, -- Dragon Leap | Last Checked: U49 PTS 4
+    [20917] = true, -- Dragonfire Breath (Initial Hit) | Last Checked: U49 PTS 4
+    [31104] = true, -- Engulfing Dragonfire | Last Checked: U49 PTS 4
     [32716] = true, -- Ferocious Leap | Last Checked: U47
-    [31837] = true, -- Inhale (Initial Hit) | Last Checked: U47
-    [31842] = true, -- Inhale (Delayed Hit) | Last Checked: U47
-    [32720] = true, -- Take Flight | Last Checked: U47
+    [32974] = true, -- Ignite (Synergy DMG from talons) | Last Checked:  U49 PTS 4
+    [32720] = true, -- Take Flight | Last Checked: U49 PTS 4
 
     -- CATEGORY: Skill>Class>Dragonknight>Earthen Heart
-    [17979] = true, -- Corrosive Armor (DMG to Nearby Enemies) | Last Checked: U47
-    [32711] = true, -- Eruption (DOT) | Last Checked: U47
-    [32714] = true, -- Eruption (Initial Hit) | Last Checked: U47
-    [15959] = true, -- Magma Armor (DMG to Nearby Enemies) | Last Checked: U47
-    [17875] = true, -- Magma Shell (DMG to Nearby Enemies) | Last Checked: U47
-    [134340] = true, -- Stone Giant (Initial Hit) | Last Checked: U47
-    [134310] = true, -- Stonefist (Initial Hit) | Last Checked: U47
+    [17879] = true, -- Corrosive Armor (DMG to Nearby Enemies) | Last Checked: U47
 
     -- CATEGORY: Skill>Class>Necromancer>Bone Tyrant
     [115115] = true, -- Death Scythe | Last Checked: U47
