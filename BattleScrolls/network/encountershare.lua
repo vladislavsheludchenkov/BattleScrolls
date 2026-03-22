@@ -3,7 +3,8 @@
 -- Post-combat encounter data sharing via LibGroupBroadcast
 --
 -- Defines the protocol format for sharing combat stats with
--- group members after each fight. Uses LGB protocol 436.
+-- group members after each fight. Uses LGB protocol 436
+-- (send + receive) and 437 (receive only, for forward compat).
 -----------------------------------------------------------
 
 if not SemisPlaygroundCheckAccess() then
@@ -14,6 +15,7 @@ BattleScrolls = BattleScrolls or {}
 
 ---@class EncounterShare
 ---@field protocol Protocol|nil LibGroupBroadcast encounter share protocol instance (436)
+---@field newProtocol Protocol|nil LibGroupBroadcast protocol 437 instance (receive only)
 local encounterShare = {}
 BattleScrolls.encounterShare = encounterShare
 
@@ -243,31 +245,19 @@ end
 -- INITIALIZE
 -- =============================================================================
 
----Initialize the encounter sharing protocol with LibGroupBroadcast
-function encounterShare:Initialize()
-    local LGB = LibGroupBroadcast
-    if not LGB then
-        -- BattleScrolls.log.Warn("EncounterShare: LibGroupBroadcast not available")
-        return
-    end
+---Adds all shared encounter data fields to a protocol (reused by 436 and 437)
+---@param protocol Protocol The protocol to add fields to
+---@param LGB table LibGroupBroadcast reference
+local function addEncounterFields(protocol, LGB)
+    protocol:AddField(LGB.CreateNumericField("timestampLow17", { minValue = 0, numBits = 17, trimValues = true }))
+    protocol:AddField(LGB.CreateNumericField("durationMs", { minValue = 0, numBits = 24, trimValues = true }))
+    protocol:AddField(LGB.CreateNumericField("totalDamage", { minValue = 0, numBits = 30, trimValues = true }))
+    protocol:AddField(LGB.CreatePercentageField("critPercent", { numBits = 10, trimValues = true }))
+    protocol:AddField(LGB.CreatePercentageField("dotPercent", { numBits = 10, trimValues = true }))
+    protocol:AddField(LGB.CreatePercentageField("aoePercent", { numBits = 10, trimValues = true }))
+    protocol:AddField(LGB.CreateNumericField("maxHit", { minValue = 0, numBits = 24, trimValues = true }))
 
-    local handler = BattleScrolls.lgbHandler
-    if not handler then
-        return
-    end
-
-    -- Declare protocol 436 (automatically uses FlexSizeDataMessage for variable-length payloads)
-    local shareProtocol = handler:DeclareProtocol(436, "BattleScrolls_EncounterShare")
-
-    shareProtocol:AddField(LGB.CreateNumericField("timestampLow17", { minValue = 0, numBits = 17, trimValues = true }))
-    shareProtocol:AddField(LGB.CreateNumericField("durationMs", { minValue = 0, numBits = 24, trimValues = true }))
-    shareProtocol:AddField(LGB.CreateNumericField("totalDamage", { minValue = 0, numBits = 30, trimValues = true }))
-    shareProtocol:AddField(LGB.CreatePercentageField("critPercent", { numBits = 10, trimValues = true }))
-    shareProtocol:AddField(LGB.CreatePercentageField("dotPercent", { numBits = 10, trimValues = true }))
-    shareProtocol:AddField(LGB.CreatePercentageField("aoePercent", { numBits = 10, trimValues = true }))
-    shareProtocol:AddField(LGB.CreateNumericField("maxHit", { minValue = 0, numBits = 24, trimValues = true }))
-
-    shareProtocol:AddField(LGB.CreateArrayField(
+    protocol:AddField(LGB.CreateArrayField(
         LGB.CreateTableField("damageByType", {
             LGB.CreateNumericField("type", { minValue = 0, numBits = 4, trimValues = true }),
             LGB.CreateNumericField("damage", { minValue = 0, numBits = 30, trimValues = true }),
@@ -275,7 +265,7 @@ function encounterShare:Initialize()
         { maxLength = 13 }
     ))
 
-    shareProtocol:AddField(LGB.CreateArrayField(
+    protocol:AddField(LGB.CreateArrayField(
         LGB.CreateTableField("bossDamage", {
             LGB.CreateNumericField("bossTag", { minValue = 0, numBits = 4, trimValues = true }),
             LGB.CreateNumericField("tagSeq", { minValue = 0, numBits = 3, trimValues = true }),
@@ -288,9 +278,9 @@ function encounterShare:Initialize()
         { maxLength = 24 }
     ))
 
-    shareProtocol:AddField(LGB.CreateNumericField("totalDamageTaken", { minValue = 0, numBits = 30, trimValues = true }))
+    protocol:AddField(LGB.CreateNumericField("totalDamageTaken", { minValue = 0, numBits = 30, trimValues = true }))
 
-    shareProtocol:AddField(LGB.CreateArrayField(
+    protocol:AddField(LGB.CreateArrayField(
         LGB.CreateTableField("bossDamageTaken", {
             LGB.CreateNumericField("bossTag", { minValue = 0, numBits = 4, trimValues = true }),
             LGB.CreateNumericField("tagSeq", { minValue = 0, numBits = 3, trimValues = true }),
@@ -299,7 +289,7 @@ function encounterShare:Initialize()
         { maxLength = 24 }
     ))
 
-    shareProtocol:AddField(LGB.CreateOptionalField(
+    protocol:AddField(LGB.CreateOptionalField(
         LGB.CreateTableField("healing", {
             LGB.CreateNumericField("rawOut", { minValue = 0, numBits = 30, trimValues = true }),
             LGB.CreateNumericField("effectiveOut", { minValue = 0, numBits = 30, trimValues = true }),
@@ -308,11 +298,11 @@ function encounterShare:Initialize()
         })
     ))
 
-    shareProtocol:AddField(LGB.CreateOptionalField(
+    protocol:AddField(LGB.CreateOptionalField(
         LGB.CreateNumericField("playerAliveTimeMs", { minValue = 0, numBits = 24, trimValues = true })
     ))
 
-    shareProtocol:AddField(LGB.CreateArrayField(
+    protocol:AddField(LGB.CreateArrayField(
         LGB.CreateTableField("topDamageTakenAbilities", {
             LGB.CreateNumericField("abilityId", { minValue = 0, numBits = 20, trimValues = true }),
             LGB.CreatePercentageField("damagePercent", { numBits = 10, trimValues = true }),
@@ -320,7 +310,7 @@ function encounterShare:Initialize()
         { maxLength = 5 }
     ))
 
-    shareProtocol:AddField(LGB.CreateOptionalField(
+    protocol:AddField(LGB.CreateOptionalField(
         LGB.CreateTableField("deaths", {
             LGB.CreateNumericField("deathCount", { minValue = 1, numBits = 4, trimValues = true }),
             LGB.CreateTableField("first", {
@@ -347,10 +337,37 @@ function encounterShare:Initialize()
             ),
         })
     ))
+end
 
+---Initialize the encounter sharing protocol with LibGroupBroadcast
+function encounterShare:Initialize()
+    local LGB = LibGroupBroadcast
+    if not LGB then
+        -- BattleScrolls.log.Warn("EncounterShare: LibGroupBroadcast not available")
+        return
+    end
+
+    local handler = BattleScrolls.lgbHandler
+    if not handler then
+        return
+    end
+
+    -- Protocol 436 (send + receive): main encounter share protocol
+    local shareProtocol = handler:DeclareProtocol(436, "BattleScrolls_EncounterShare")
+    addEncounterFields(shareProtocol, LGB)
     shareProtocol:OnData(onReceive)
     shareProtocol:Finalize({ isRelevantInCombat = false, replaceQueuedMessages = false })
     encounterShare.protocol = shareProtocol
+
+    -- Protocol 437 (receive only): forward compat with newer clients that append setupHash
+    local newProtocol = handler:DeclareProtocol(437, "BattleScrolls_EncounterShareV2")
+    addEncounterFields(newProtocol, LGB)
+    newProtocol:AddField(LGB.CreateOptionalField(
+        LGB.CreateNumericField("setupHash", { minValue = 0, numBits = 16, trimValues = true })
+    ))
+    newProtocol:OnData(onReceive)
+    newProtocol:Finalize({ isRelevantInCombat = false, replaceQueuedMessages = false })
+    encounterShare.newProtocol = newProtocol
 
     -- BattleScrolls.log.Info("EncounterShare: initialized")
 end
