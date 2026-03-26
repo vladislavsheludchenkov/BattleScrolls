@@ -1,0 +1,1 @@
+Reduces flickering happening in Group menu

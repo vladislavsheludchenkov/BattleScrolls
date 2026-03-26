@@ -589,12 +589,11 @@ function GroupRenderer.renderGroup(ctx)
                 else
                     tooltip.panelSpec = combatPanelSpec
                 end
-                -- Refresh via the current list target so we always render
-                -- whichever entry is actually selected (not a stale deselect)
+                -- Only refresh the panel when this entry is the current target.
+                -- Skips redundant renders from deselect setup of a previous row.
                 local journalUI = ctx.journalUI
-                if journalUI then
-                    local chronicler = journal.chronicler
-                    chronicler.refreshTooltip(journalUI, journalUI.statsList:GetTargetData())
+                if journalUI and journalUI.statsList:GetTargetData() == entryData then
+                    journal.chronicler.refreshTooltip(journalUI, entryData)
                 end
             end
 
