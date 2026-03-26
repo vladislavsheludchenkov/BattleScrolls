@@ -26,6 +26,7 @@ BattleScrolls_Journal_StatsTab = {
     EFFECTS_BOSS = 9,
     EFFECTS_GROUP = 10,
     GROUP = 11,
+    SETUP = 12,
 }
 
 BattleScrolls_Journal_InstanceTab = {
@@ -138,10 +139,23 @@ function BattleScrolls_Journal_Gamepad:Initialize(control)
     LibEffect.Async(function()
         LibEffect.Sleep(1850):Await()
 
+        -- Initialize overview panel (before fragment/scene so it's available
+        -- to character stats integration before the Journal is ever opened)
+        local overviewPane = control:GetNamedChild("OverviewPane")
+        if overviewPane and BattleScrolls_Journal_OverviewPanel then
+            self.overviewPanel = BattleScrolls_Journal_OverviewPanel:New(overviewPane)
+        end
+
         -- Create fragment
         BATTLESCROLLS_JOURNAL_GAMEPAD_FRAGMENT = ZO_FadeSceneFragment:New(control)
         BATTLESCROLLS_JOURNAL_GAMEPAD_FRAGMENT:RegisterCallback("StateChange", function(_oldState, newState)
             if newState == SCENE_FRAGMENT_SHOWING then
+                -- Failsafe: restore panel parent if it was re-parented away
+                -- (e.g. by character stats integration)
+                if self.overviewPanel then
+                    self.overviewPanel:RestoreParent()
+                end
+
                 -- Check if onboarding needs to be shown
                 if BattleScrolls.onboarding and BattleScrolls.onboarding:NeedsOnboarding() then
                     BattleScrolls.onboarding:Show(function()
@@ -217,12 +231,6 @@ function BattleScrolls_Journal_Gamepad:OnDeferredInitialize()
 
     -- Initialize sub-header for tab group sub-navigation
     BattleScrolls.journal.subheader.initialize(self)
-
-    -- Initialize overview panel (for stats screen right-side display)
-    local overviewPane = self.control:GetNamedChild("OverviewPane")
-    if overviewPane and BattleScrolls_Journal_OverviewPanel then
-        self.overviewPanel = BattleScrolls_Journal_OverviewPanel:New(overviewPane)
-    end
 end
 
 function BattleScrolls_Journal_Gamepad:PerformUpdate()
@@ -337,6 +345,10 @@ function BattleScrolls_Journal_Gamepad:InitializeLists()
     end)
     self.statsList = self:AddList("Stats", function(list)
         SetupList(list, GetString(BATTLESCROLLS_LIST_NO_STATS))
+        -- Register horizontal list template for group tab's combat/build switcher
+        local hList = BattleScrolls.journal.horizontalList
+        list:AddDataTemplate("BattleScrolls_HorizontalListRow", hList.iconSetup, ZO_GamepadMenuEntryTemplateParametricListFunction)
+        list:SetDataTemplateReleaseFunction("BattleScrolls_HorizontalListRow", hList.release)
     end)
     self.settingsList = self:AddList("Settings", function(list)
         BattleScrolls.journal.settingsTemplates.setupSettingsList(list)
@@ -350,7 +362,8 @@ end
 -------------------------
 
 ---Deactivates the currently selected settings control (slider or horizontal list)
----This must be called when leaving settings or hiding the scene to release DIRECTIONAL_INPUT
+---and any active horizontal list on the stats list (group tab's combat/build switcher).
+---Must be called when leaving settings/stats or hiding the scene to release DIRECTIONAL_INPUT.
 function BattleScrolls_Journal_Gamepad:DeactivateSelectedSettingsControl()
     local selectedControl = self.settingsList:GetSelectedControl()
     if selectedControl then
@@ -363,6 +376,12 @@ function BattleScrolls_Journal_Gamepad:DeactivateSelectedSettingsControl()
         if selectedControl.horizontalListObject then
             selectedControl.horizontalListObject:Deactivate()
         end
+    end
+
+    -- Also deactivate any horizontal list on the stats list (group tab entries)
+    local statsControl = self.statsList:GetSelectedControl()
+    if statsControl and statsControl.horizontalListObject then
+        statsControl.horizontalListObject:Deactivate()
     end
 end
 

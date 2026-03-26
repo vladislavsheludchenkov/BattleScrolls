@@ -617,6 +617,78 @@ local strings = {
     [BATTLESCROLLS_GROUP_COL_TOTAL] = "Total",
     [BATTLESCROLLS_GROUP_COL_CRIT] = "Crit",
     [BATTLESCROLLS_GROUP_COL_ALIVE] = "Vivo",
+
+    -------------------------
+    -- Setup Tab
+    -------------------------
+    [BATTLESCROLLS_TAB_BUILD] = "Arquetipo",
+    [BATTLESCROLLS_SETUP_ABILITIES] = "Habilidades",
+    [BATTLESCROLLS_SETUP_FRONT_BAR] = "Barra primaria",
+    [BATTLESCROLLS_SETUP_BACK_BAR] = "Barra secundaria",
+    [BATTLESCROLLS_SETUP_GEAR_SETS] = "Conjuntos de equipo",
+    [BATTLESCROLLS_SETUP_EQUIPMENT] = "Equipo",
+    [BATTLESCROLLS_SETUP_POISONS] = "Venenos",
+    [BATTLESCROLLS_SETUP_CHARACTER] = "Personaje",
+    [BATTLESCROLLS_SETUP_CLASS_SKILLS] = "Líneas de habilidades de clase",
+    [BATTLESCROLLS_SETUP_MUNDUS] = "Mundus",
+    [BATTLESCROLLS_SETUP_FOOD] = "Comida",
+    [BATTLESCROLLS_WEAPON_GREATSWORD] = "Mandoble",
+    [BATTLESCROLLS_WEAPON_BATTLE_AXE] = "Hacha de batalla",
+    [BATTLESCROLLS_WEAPON_MAUL] = "Maza",
+
+    -------------------------
+    -- Food Buff Descriptions
+    -------------------------
+    [BATTLESCROLLS_FOOD_MAX_HEALTH] = "Salud máxima",
+    [BATTLESCROLLS_FOOD_MAX_MAGICKA] = "Magia máxima",
+    [BATTLESCROLLS_FOOD_MAX_STAMINA] = "Aguante máximo",
+    [BATTLESCROLLS_FOOD_MAX_HEALTH_MAGICKA] = "Salud y magia máximas",
+    [BATTLESCROLLS_FOOD_MAX_HEALTH_STAMINA] = "Salud y aguante máximos",
+    [BATTLESCROLLS_FOOD_MAX_MAGICKA_STAMINA] = "Magia y aguante máximos",
+    [BATTLESCROLLS_FOOD_MAX_TRISTAT] = "Salud, magia y aguante máximos",
+    [BATTLESCROLLS_FOOD_HEALTH_RECOVERY] = "Recuperación de salud",
+    [BATTLESCROLLS_FOOD_MAGICKA_RECOVERY] = "Recuperación de magia",
+    [BATTLESCROLLS_FOOD_STAMINA_RECOVERY] = "Recuperación de aguante",
+    [BATTLESCROLLS_FOOD_HEALTH_MAGICKA_RECOVERY] = "Recuperación de salud y magia",
+    [BATTLESCROLLS_FOOD_HEALTH_STAMINA_RECOVERY] = "Recuperación de salud y aguante",
+    [BATTLESCROLLS_FOOD_MAGICKA_STAMINA_RECOVERY] = "Recuperación de magia y aguante",
+    [BATTLESCROLLS_FOOD_RECOVERY_TRISTAT] = "Recuperación de salud, magia y aguante",
+
+    -------------------------
+    -- Alchemy Traits
+    -------------------------
+    [BATTLESCROLLS_ALCHEMY_TRAIT1] = "Restauración de salud",
+    [BATTLESCROLLS_ALCHEMY_TRAIT2] = "Reducción de salud",
+    [BATTLESCROLLS_ALCHEMY_TRAIT3] = "Restauración de magia",
+    [BATTLESCROLLS_ALCHEMY_TRAIT4] = "Reducción de magia",
+    [BATTLESCROLLS_ALCHEMY_TRAIT5] = "Restauración de aguante",
+    [BATTLESCROLLS_ALCHEMY_TRAIT6] = "Reducción de aguante",
+    [BATTLESCROLLS_ALCHEMY_TRAIT7] = "Aumento de resistencia mágica",
+    [BATTLESCROLLS_ALCHEMY_TRAIT8] = "Fisura",
+    [BATTLESCROLLS_ALCHEMY_TRAIT9] = "Aumento de armadura",
+    [BATTLESCROLLS_ALCHEMY_TRAIT10] = "Fractura",
+    [BATTLESCROLLS_ALCHEMY_TRAIT11] = "Aumento de poder mágico",
+    [BATTLESCROLLS_ALCHEMY_TRAIT12] = "Cobardía",
+    [BATTLESCROLLS_ALCHEMY_TRAIT13] = "Aumento del poder físico",
+    [BATTLESCROLLS_ALCHEMY_TRAIT14] = "Mutilación",
+    [BATTLESCROLLS_ALCHEMY_TRAIT15] = "Crítico mágico",
+    [BATTLESCROLLS_ALCHEMY_TRAIT16] = "Incertidumbre",
+    [BATTLESCROLLS_ALCHEMY_TRAIT17] = "Crítico físico",
+    [BATTLESCROLLS_ALCHEMY_TRAIT18] = "Debilitación",
+    [BATTLESCROLLS_ALCHEMY_TRAIT19] = "Imparable",
+    [BATTLESCROLLS_ALCHEMY_TRAIT20] = "Captura",
+    [BATTLESCROLLS_ALCHEMY_TRAIT21] = "Detección",
+    [BATTLESCROLLS_ALCHEMY_TRAIT22] = "Invisible",
+    [BATTLESCROLLS_ALCHEMY_TRAIT23] = "Velocidad",
+    [BATTLESCROLLS_ALCHEMY_TRAIT24] = "Impedimento",
+    [BATTLESCROLLS_ALCHEMY_TRAIT25] = "Protección",
+    [BATTLESCROLLS_ALCHEMY_TRAIT26] = "Vulnerabilidad",
+    [BATTLESCROLLS_ALCHEMY_TRAIT27] = "Salud prolongada",
+    [BATTLESCROLLS_ALCHEMY_TRAIT28] = "Reducción de salud insidiosa",
+    [BATTLESCROLLS_ALCHEMY_TRAIT29] = "Vitalidad",
+    [BATTLESCROLLS_ALCHEMY_TRAIT30] = "Profanación",
+    [BATTLESCROLLS_ALCHEMY_TRAIT31] = "Heroísmo",
+    [BATTLESCROLLS_ALCHEMY_TRAIT32] = "Timidez",
 }
 
 -- Register translations

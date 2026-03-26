@@ -43,7 +43,7 @@ constants.keybindIconScale = BATTLESCROLLS_KEYBIND_ICON_SCALE or 117
 BATTLESCROLLS_KEYBIND_ICON_SCALE = nil
 
 -- The maximum supported DPS, anything above may be represented by math.huge when transferring
-constants.huge = 1000000
+constants.huge = 2 ^ 20
 
 constants.BOSS_TAGS = BOSS_TAGS
 
@@ -590,4 +590,123 @@ constants.aoeAbilityIds = {
     [58864] = true, -- Claws of Anguish (Initial Hit) | Last Checked: U47
     [58879] = true, -- Claws of Life (Initial Hit) | Last Checked: U47
     [58855] = true, -- Infectious Claw (Initial Hit) | Last Checked: U47
+}
+
+-------------------------
+-- Race Icons (gamepad character create icons, keyed by raceId)
+-------------------------
+
+---@type table<number, string>
+constants.raceIcons = {
+    [1]  = "EsoUI/Art/CharacterCreate/Gamepad/CharacterCreate_bretonIcon_down.dds",
+    [2]  = "EsoUI/Art/CharacterCreate/Gamepad/CharacterCreate_redguardIcon_down.dds",
+    [3]  = "EsoUI/Art/CharacterCreate/Gamepad/CharacterCreate_orcIcon_down.dds",
+    [4]  = "EsoUI/Art/CharacterCreate/Gamepad/CharacterCreate_dunmerIcon_down.dds",
+    [5]  = "EsoUI/Art/CharacterCreate/Gamepad/CharacterCreate_nordIcon_down.dds",
+    [6]  = "EsoUI/Art/CharacterCreate/Gamepad/CharacterCreate_argonianIcon_down.dds",
+    [7]  = "EsoUI/Art/CharacterCreate/Gamepad/CharacterCreate_altmerIcon_down.dds",
+    [8]  = "EsoUI/Art/CharacterCreate/Gamepad/CharacterCreate_bosmerIcon_down.dds",
+    [9]  = "EsoUI/Art/CharacterCreate/Gamepad/CharacterCreate_khajiitIcon_down.dds",
+    [10] = "EsoUI/Art/CharacterCreate/Gamepad/CharacterCreate_imperialIcon_down.dds",
+}
+
+-------------------------
+-- Food Buff Ability IDs
+-------------------------
+
+--- Maps food stat combination keys (sorted, comma-joined IDs from foodAbilityInfo arrays)
+--- to localized string IDs for display.
+---@type table<string, number>
+constants.FOOD_COMBO_STRINGS = {
+    ["1"] = BATTLESCROLLS_FOOD_MAX_HEALTH,
+    ["2"] = BATTLESCROLLS_FOOD_MAX_MAGICKA,
+    ["3"] = BATTLESCROLLS_FOOD_MAX_STAMINA,
+    ["1,2"] = BATTLESCROLLS_FOOD_MAX_HEALTH_MAGICKA,
+    ["1,3"] = BATTLESCROLLS_FOOD_MAX_HEALTH_STAMINA,
+    ["2,3"] = BATTLESCROLLS_FOOD_MAX_MAGICKA_STAMINA,
+    ["1,2,3"] = BATTLESCROLLS_FOOD_MAX_TRISTAT,
+    ["4"] = BATTLESCROLLS_FOOD_HEALTH_RECOVERY,
+    ["5"] = BATTLESCROLLS_FOOD_MAGICKA_RECOVERY,
+    ["6"] = BATTLESCROLLS_FOOD_STAMINA_RECOVERY,
+    ["4,5"] = BATTLESCROLLS_FOOD_HEALTH_MAGICKA_RECOVERY,
+    ["4,6"] = BATTLESCROLLS_FOOD_HEALTH_STAMINA_RECOVERY,
+    ["5,6"] = BATTLESCROLLS_FOOD_MAGICKA_STAMINA_RECOVERY,
+    ["4,5,6"] = BATTLESCROLLS_FOOD_RECOVERY_TRISTAT,
+}
+
+--- Food buff ability ID registry.
+--- Value is either an itemId (number) for unique foods, or a stat array (number[]) for generic foods.
+--- Stat IDs: 1=Max Health, 2=Max Magicka, 3=Max Stamina, 4=Health Recovery, 5=Magicka Recovery, 6=Stamina Recovery
+---@type table<number, number|number[]>
+constants.foodAbilityInfo = {
+    -- Generic foods (shared ability across many items)
+    [61218] = { 1, 2, 3 }, -- Max Health, Max Magicka, Max Stamina
+    [61255] = { 1, 3 }, -- Max Health, Max Stamina
+    [61257] = { 1, 2 }, -- Max Health, Max Magicka
+    [61259] = { 1 }, -- Max Health
+    [61260] = { 2 }, -- Max Magicka
+    [61261] = { 3 }, -- Max Stamina
+    [61294] = { 2, 3 }, -- Max Magicka, Max Stamina
+    [61322] = { 4 }, -- Health Recovery
+    [61325] = { 5 }, -- Magicka Recovery
+    [61328] = { 6 }, -- Stamina Recovery
+    [61335] = { 4, 5 }, -- Health Recovery, Magicka Recovery
+    [61340] = { 4, 6 }, -- Health Recovery, Stamina Recovery
+    [61345] = { 5, 6 }, -- Magicka Recovery, Stamina Recovery
+    [61350] = { 4, 5, 6 }, -- Health Recovery, Magicka Recovery, Stamina Recovery
+    [66551] = { 1 }, -- Max Health (scaling)
+    [66568] = { 2 }, -- Max Magicka (scaling)
+    [66576] = { 3 }, -- Max Stamina (scaling)
+    [66586] = { 4 }, -- Health Recovery (scaling)
+    [66590] = { 5 }, -- Magicka Recovery (scaling)
+    [66594] = { 6 }, -- Stamina Recovery (scaling)
+    [84678] = { 2 }, -- Max Magicka (event food)
+    -- Unique foods (single item per ability)
+    [68411] = 64711, -- Crown Fortifying Meal
+    [68416] = 64712, -- Crown Refreshing Drink
+    [72816] = 71056, -- Orzorga's Red Frothgar
+    [72819] = 71057, -- Orzorga's Tripe Trifle Pocket
+    [72822] = 71058, -- Orzorga's Blood Price Pie
+    [72824] = 71059, -- Orzorga's Smoked Bear Haunch
+    [72956] = 71074, -- Cyrodilic Field Tack
+    [72959] = 71075, -- Cyrodilic Field Treat
+    [72961] = 71076, -- Cyrodilic Field Bar
+    [72965] = 71077, -- Cyrodilic Field Brew
+    [72968] = 71078, -- Cyrodilic Field Tea
+    [72971] = 71079, -- Cyrodilic Field Tonic
+    [84681] = 87686, -- Crisp and Crunchy Pumpkin Snack Skewer
+    [84700] = 87687, -- Bowl of "Peeled Eyeballs"
+    [84704] = 87690, -- Witchmother's Party Punch
+    [84709] = 87691, -- Crunchy Spider Skewer
+    [84720] = 87695, -- Ghastly Eye Bowl
+    [84725] = 87696, -- Frosted Brains
+    [84731] = 87697, -- Witchmother's Potent Brew
+    [84735] = 87699, -- Purifying Bloody Mara
+    [85484] = 94437, -- Crown Crate Fortifying Meal
+    [85497] = 94438, -- Crown Crate Refreshing Drink
+    [86559] = 101879, -- Hissmir Fish-Eye Rye
+    [86673] = 112425, -- Lava Foot Soup-and-Saltrice
+    [86677] = 112426, -- Bergama Warning Fire
+    [86746] = 112433, -- Betnikh Twice-Spiked Ale
+    [86749] = 112434, -- Jagga-Drenched "Mud Ball"
+    [86787] = 112438, -- Rajhin's Sugar Claws
+    [86789] = 112439, -- Alcaire Festival Sword-Pie
+    [86791] = 112440, -- Snow Bear Glow-Wine
+    [89955] = 120762, -- Candied Jester's Coins
+    [89957] = 120763, -- Dubious Camoran Throne
+    [89971] = 120764, -- Jewels of Misrule
+    [92433] = 124677, -- Crown Stout Magic Liqueur
+    [92435] = 124675, -- Crown Combat Mystic's Stew
+    [92474] = 124676, -- Crown Vigorous Ragout
+    [92476] = 124678, -- Crown Vigorous Tincture
+    [100488] = 133555, -- Spring-Loaded Infusion
+    [100498] = 133556, -- Clockwork Citrus Filet
+    [100502] = 133554, -- Deregulated Mushroom Stew
+    [107748] = 139016, -- Artaeum Pickled Fish Bowl
+    [107789] = 139018, -- Artaeum Takeaway Broth
+    [127531] = 153625, -- Corrupting Bloody Mara
+    [127572] = 153627, -- Pack Leader's Bone Broth
+    [127596] = 153629, -- Bewitched Sugar Skulls
+    [148633] = 171322, -- Sparkling Mudcrab Apple Cider
+    [245302] = 120436, -- Princess's Delight
 }

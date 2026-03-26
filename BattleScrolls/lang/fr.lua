@@ -617,6 +617,78 @@ local strings = {
     [BATTLESCROLLS_GROUP_COL_TOTAL] = "Total",
     [BATTLESCROLLS_GROUP_COL_CRIT] = "Crit",
     [BATTLESCROLLS_GROUP_COL_ALIVE] = "Vivant",
+
+    -------------------------
+    -- Setup Tab
+    -------------------------
+    [BATTLESCROLLS_TAB_BUILD] = "Archétype",
+    [BATTLESCROLLS_SETUP_ABILITIES] = "Compétences",
+    [BATTLESCROLLS_SETUP_FRONT_BAR] = "Barre primaire",
+    [BATTLESCROLLS_SETUP_BACK_BAR] = "Barre secondaire",
+    [BATTLESCROLLS_SETUP_GEAR_SETS] = "Ensembles d'équipement",
+    [BATTLESCROLLS_SETUP_EQUIPMENT] = "Équipement",
+    [BATTLESCROLLS_SETUP_POISONS] = "Poisons",
+    [BATTLESCROLLS_SETUP_CHARACTER] = "Personnage",
+    [BATTLESCROLLS_SETUP_CLASS_SKILLS] = "Lignes de compétences de classe",
+    [BATTLESCROLLS_SETUP_MUNDUS] = "Mundus",
+    [BATTLESCROLLS_SETUP_FOOD] = "Nourriture",
+    [BATTLESCROLLS_WEAPON_GREATSWORD] = "Espadon",
+    [BATTLESCROLLS_WEAPON_BATTLE_AXE] = "Hache de guerre",
+    [BATTLESCROLLS_WEAPON_MAUL] = "Masse",
+
+    -------------------------
+    -- Food Buff Descriptions
+    -------------------------
+    [BATTLESCROLLS_FOOD_MAX_HEALTH] = "Santé maximale",
+    [BATTLESCROLLS_FOOD_MAX_MAGICKA] = "Magie maximale",
+    [BATTLESCROLLS_FOOD_MAX_STAMINA] = "Endurance maximale",
+    [BATTLESCROLLS_FOOD_MAX_HEALTH_MAGICKA] = "Santé et magie maximales",
+    [BATTLESCROLLS_FOOD_MAX_HEALTH_STAMINA] = "Santé et endurance maximales",
+    [BATTLESCROLLS_FOOD_MAX_MAGICKA_STAMINA] = "Magie et endurance maximales",
+    [BATTLESCROLLS_FOOD_MAX_TRISTAT] = "Santé, magie et endurance maximales",
+    [BATTLESCROLLS_FOOD_HEALTH_RECOVERY] = "Récupération de santé",
+    [BATTLESCROLLS_FOOD_MAGICKA_RECOVERY] = "Récupération de magie",
+    [BATTLESCROLLS_FOOD_STAMINA_RECOVERY] = "Récupération d'endurance",
+    [BATTLESCROLLS_FOOD_HEALTH_MAGICKA_RECOVERY] = "Récupération de santé et de magie",
+    [BATTLESCROLLS_FOOD_HEALTH_STAMINA_RECOVERY] = "Récupération de santé et d'endurance",
+    [BATTLESCROLLS_FOOD_MAGICKA_STAMINA_RECOVERY] = "Récupération de magie et d'endurance",
+    [BATTLESCROLLS_FOOD_RECOVERY_TRISTAT] = "Récupération de santé, de magie et d'endurance",
+
+    -------------------------
+    -- Alchemy Traits
+    -------------------------
+    [BATTLESCROLLS_ALCHEMY_TRAIT1] = "Rend de la Santé",
+    [BATTLESCROLLS_ALCHEMY_TRAIT2] = "Réduit la Santé",
+    [BATTLESCROLLS_ALCHEMY_TRAIT3] = "Rend de la Magie",
+    [BATTLESCROLLS_ALCHEMY_TRAIT4] = "Réduit la Magie",
+    [BATTLESCROLLS_ALCHEMY_TRAIT5] = "Rend de la Vigueur",
+    [BATTLESCROLLS_ALCHEMY_TRAIT6] = "Ravage de Vigueur",
+    [BATTLESCROLLS_ALCHEMY_TRAIT7] = "Augmente la résistance aux sorts",
+    [BATTLESCROLLS_ALCHEMY_TRAIT8] = "Brèche",
+    [BATTLESCROLLS_ALCHEMY_TRAIT9] = "Augmente l'armure",
+    [BATTLESCROLLS_ALCHEMY_TRAIT10] = "Fracture",
+    [BATTLESCROLLS_ALCHEMY_TRAIT11] = "Augmente la puissance des sorts",
+    [BATTLESCROLLS_ALCHEMY_TRAIT12] = "Couardise",
+    [BATTLESCROLLS_ALCHEMY_TRAIT13] = "Augmente la puissance de l'arme",
+    [BATTLESCROLLS_ALCHEMY_TRAIT14] = "Mutilation",
+    [BATTLESCROLLS_ALCHEMY_TRAIT15] = "Critique de sorts",
+    [BATTLESCROLLS_ALCHEMY_TRAIT16] = "Incertitude",
+    [BATTLESCROLLS_ALCHEMY_TRAIT17] = "Critique d'armes",
+    [BATTLESCROLLS_ALCHEMY_TRAIT18] = "Affaiblissement",
+    [BATTLESCROLLS_ALCHEMY_TRAIT19] = "Implacable",
+    [BATTLESCROLLS_ALCHEMY_TRAIT20] = "Capture",
+    [BATTLESCROLLS_ALCHEMY_TRAIT21] = "Détection",
+    [BATTLESCROLLS_ALCHEMY_TRAIT22] = "Invisible",
+    [BATTLESCROLLS_ALCHEMY_TRAIT23] = "Vitesse",
+    [BATTLESCROLLS_ALCHEMY_TRAIT24] = "Entrave",
+    [BATTLESCROLLS_ALCHEMY_TRAIT25] = "Protection",
+    [BATTLESCROLLS_ALCHEMY_TRAIT26] = "Vulnérabilité",
+    [BATTLESCROLLS_ALCHEMY_TRAIT27] = "Santé persistante",
+    [BATTLESCROLLS_ALCHEMY_TRAIT28] = "Ravage de Santé graduel",
+    [BATTLESCROLLS_ALCHEMY_TRAIT29] = "Vitalité",
+    [BATTLESCROLLS_ALCHEMY_TRAIT30] = "Profanation",
+    [BATTLESCROLLS_ALCHEMY_TRAIT31] = "Héroïsme",
+    [BATTLESCROLLS_ALCHEMY_TRAIT32] = "Timidité",
 }
 
 -- Register translations

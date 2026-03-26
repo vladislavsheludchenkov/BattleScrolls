@@ -38,11 +38,14 @@ function BattleScrolls.OnAddOnLoaded(_, addonName)
         BattleScrolls.effectsReconciler:Initialize()
         BattleScrolls.scribe:Initialize()
         BattleScrolls.combatTicker:Initialize()
+        BattleScrolls.setupCapture:Initialize()
         BattleScrolls.dpsShare:Initialize()
         BattleScrolls.encounterShare:Initialize()
+        BattleScrolls.setupShare:Initialize()
         BattleScrolls.dpsSender:Initialize()
         BattleScrolls.dpsMeter:Initialize()
         BattleScrolls.onboarding:Initialize()
+        BattleScrolls.characterStats:Initialize()
         -- Suppressing "Attempt to read past end of buffer" from LGB
         -- due to https://github.com/sirinsidiator/ESO-LibGroupBroadcast/issues/6
         ZO_ERROR_FRAME.suppressedErrors[0xC078BBA0] = true

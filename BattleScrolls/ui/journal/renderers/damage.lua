@@ -16,11 +16,69 @@ local STAT_ICONS = journal.StatIcons
 local coreUtils = BattleScrolls.utils
 local Arithmancer = BattleScrolls.arithmancer
 local tooltips = journal.tooltips
+local EntryBuilder = journal.EntryBuilder
+
+local ROW_CONTENT = journal.ROW_CONTENT
 
 local DamageRenderer = {}
 
 -- Yield frequency for loops (yield every N iterations)
 local YIELD_INTERVAL = 20
+
+-------------------------
+-- Section Builders (for overview panel specs)
+-------------------------
+
+---@param col ColumnBuilder
+---@param sectionLabel string
+---@param dps number
+---@param groupDps number|nil
+---@param share number
+---@return Control|nil
+local function buildDamageSummary(col, sectionLabel, dps, groupDps, share)
+    return col:Section(sectionLabel,
+        col:StatRow(GetString(BATTLESCROLLS_STAT_DPS), utils.formatNumber(dps)),
+        groupDps and col:StatRow(GetString(BATTLESCROLLS_STAT_GROUP_DPS), utils.formatNumber(groupDps)),
+        col:StatRow(GetString(BATTLESCROLLS_OVERVIEW_SHARE), utils.formatPercent(share))
+    )
+end
+
+---@param col ColumnBuilder
+---@param dotPercent number|nil
+---@param directPercent number|nil
+---@param aoePercent number|nil
+---@param stPercent number|nil
+---@return Control|nil
+local function buildDamageComposition(col, dotPercent, directPercent, aoePercent, stPercent)
+    return col:Section(GetString(BATTLESCROLLS_OVERVIEW_COMPOSITION),
+        directPercent and col:StatRow(GetString(BATTLESCROLLS_DELIVERY_DIRECT), utils.formatPercent(directPercent)),
+        dotPercent and col:StatRow(GetString(BATTLESCROLLS_DELIVERY_DOT), utils.formatPercent(dotPercent)),
+        aoePercent and col:StatRow(GetString(BATTLESCROLLS_AOE), utils.formatPercent(aoePercent)),
+        stPercent and col:StatRow(GetString(BATTLESCROLLS_SINGLE_TARGET), utils.formatPercent(stPercent))
+    )
+end
+
+---@param col ColumnBuilder
+---@param critRate number
+---@param maxHit number
+---@return Control|nil
+local function buildDamageQuality(col, critRate, maxHit)
+    return col:Section(GetString(BATTLESCROLLS_OVERVIEW_QUALITY),
+        critRate > 0 and col:StatRow(GetString(BATTLESCROLLS_OVERVIEW_CRIT_RATE), utils.formatPercent(critRate)),
+        maxHit > 0 and col:StatRow(GetString(BATTLESCROLLS_OVERVIEW_MAX_HIT), utils.formatNumber(maxHit))
+    )
+end
+
+---@param col ColumnBuilder
+---@param dtps number
+---@param total number
+---@return Control|nil
+local function buildDamageTakenSummary(col, dtps, total)
+    return col:Section(GetString(BATTLESCROLLS_OVERVIEW_SUMMARY),
+        col:StatRow(GetString(BATTLESCROLLS_STAT_DTPS), utils.formatNumber(dtps)),
+        col:StatRow(GetString(BATTLESCROLLS_OVERVIEW_TOTAL), utils.formatNumber(total))
+    )
+end
 
 -------------------------
 -- Internal Helpers
@@ -31,6 +89,43 @@ local YIELD_INTERVAL = 20
 ---@field ticks number Number of ticks
 ---@field critTicks number Number of critical ticks
 ---@field maxHit number Maximum hit value
+
+---Builds tooltip text for an ability entry from its critStats and metadata
+---@param merged table Merged ability entry
+---@return string tooltipText
+local function buildAbilityTooltipText(merged)
+    local lines = {}
+
+    -- Total line
+    table.insert(lines, string.format("%s: %s", GetString(BATTLESCROLLS_OVERVIEW_TOTAL), ZO_CommaDelimitNumber(merged.totalDamage)))
+
+    -- Damage type and delivery info
+    if merged.damageTypeDesc then
+        table.insert(lines, merged.damageTypeDesc)
+    end
+    if merged.overTimeOrDirectDesc then
+        table.insert(lines, merged.overTimeOrDirectDesc)
+    end
+
+    if merged.breakdown then
+        -- Multi-variant breakdown
+        table.insert(lines, "")
+        tooltips.appendTickStats(lines, merged.breakdown.critStats)
+
+        for _, entry in ipairs(merged.breakdown.entries) do
+            table.insert(lines, "")
+            local pct = merged.totalDamage > 0 and (entry.damage / merged.totalDamage * 100) or 0
+            table.insert(lines, string.format("%s: %s (%.1f%%)", entry.displayName, ZO_CommaDelimitNumber(entry.damage), pct))
+            tooltips.appendTickStats(lines, entry.critStats, "  ")
+        end
+    else
+        -- Single variant
+        table.insert(lines, "")
+        tooltips.appendTickStats(lines, merged.critStats)
+    end
+
+    return table.concat(lines, "\n")
+end
 
 ---Builds ability breakdown entries from a nested damage table (async with yields)
 ---@param damageTable table<number, table<number, DamageDoneStorage>>
@@ -361,27 +456,17 @@ local function displayAbilityBreakdownAsync(list, abilityEntries, totalDamage, d
 
             local abilityIcon = GetAbilityIcon(merged.abilityId)
             local valueStr = utils.formatDamageWithPercent(merged.totalDamage, totalDamage, durationSec)
+            local tooltipText = buildAbilityTooltipText(merged)
 
-            local entryData = ZO_GamepadEntryData:New(merged.baseName, abilityIcon)
-            entryData.iconFile = abilityIcon
-            entryData:SetIconTintOnSelection(true)
-            entryData:AddSubLabel(valueStr)
-
-            if merged.breakdown then
-                entryData.abilityBreakdown = merged.breakdown
-            else
-                entryData.critStats = merged.critStats
-                entryData.damageTypeDesc = merged.damageTypeDesc
-                entryData.overTimeOrDirectDesc = merged.overTimeOrDirectDesc
-            end
-
-            if isFirst then
-                entryData:SetHeader(headerText)
-                list:AddEntryWithHeader("BattleScrolls_AbilityEntryTemplate", entryData)
-                isFirst = false
-            else
-                list:AddEntry("BattleScrolls_AbilityEntryTemplate", entryData)
-            end
+            EntryBuilder.addEntry(list, {
+                label = merged.baseName,
+                sublabel = valueStr,
+                icon = abilityIcon,
+                frame = true,
+                header = isFirst and headerText or nil,
+                tooltip = { type = "text", title = merged.baseName, text = tooltipText },
+            })
+            isFirst = false
 
             if i % YIELD_INTERVAL == 0 then
                 LibEffect.Yield():Await()
@@ -416,12 +501,14 @@ local function displayDamageTypeBreakdown(list, byDamageType, totalDamage, durat
             return 0
         end)
 
-        if isFirst then
-            utils.addStatEntry(list, typeName, valueStr, typeIcon, GetString(BATTLESCROLLS_HEADER_BY_DAMAGE_TYPE), nil, ttText)
-            isFirst = false
-        else
-            utils.addStatEntry(list, typeName, valueStr, typeIcon, nil, nil, ttText)
-        end
+        EntryBuilder.addEntry(list, {
+            label = typeName,
+            sublabel = valueStr,
+            icon = typeIcon,
+            header = isFirst and GetString(BATTLESCROLLS_HEADER_BY_DAMAGE_TYPE) or nil,
+            tooltip = ttText and { type = "text", title = typeName, text = ttText } or nil,
+        })
+        isFirst = false
     end
 end
 
@@ -448,8 +535,19 @@ local function displayDirectVsDoTBreakdown(list, dotVsDirect, totalDamage, durat
             return (1 - data.dotPercent) * 100
         end)
 
-        utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_DIRECT_DAMAGE), directStr, STAT_ICONS.DIRECT, GetString(BATTLESCROLLS_HEADER_DIRECT_VS_DOT), nil, directTtText)
-        utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_DAMAGE_OVER_TIME), dotStr, STAT_ICONS.DOT, nil, nil, dotTtText)
+        EntryBuilder.addEntry(list, {
+            label = GetString(BATTLESCROLLS_STAT_DIRECT_DAMAGE),
+            sublabel = directStr,
+            icon = STAT_ICONS.DIRECT,
+            header = GetString(BATTLESCROLLS_HEADER_DIRECT_VS_DOT),
+            tooltip = directTtText and { type = "text", title = GetString(BATTLESCROLLS_STAT_DIRECT_DAMAGE), text = directTtText } or nil,
+        })
+        EntryBuilder.addEntry(list, {
+            label = GetString(BATTLESCROLLS_STAT_DAMAGE_OVER_TIME),
+            sublabel = dotStr,
+            icon = STAT_ICONS.DOT,
+            tooltip = dotTtText and { type = "text", title = GetString(BATTLESCROLLS_STAT_DAMAGE_OVER_TIME), text = dotTtText } or nil,
+        })
     end
 end
 
@@ -471,8 +569,19 @@ local function displayAoeVsSingleTargetBreakdown(list, aoeVsSingleTarget, totalD
             return (1 - data.aoePercent) * 100
         end)
 
-        utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_AOE_DAMAGE), aoeStr, STAT_ICONS.AOE, GetString(BATTLESCROLLS_HEADER_AOE_VS_SINGLE), nil, aoeTtText)
-        utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_SINGLE_TARGET_DAMAGE), singleTargetStr, STAT_ICONS.SINGLE_TARGET, nil, nil, stTtText)
+        EntryBuilder.addEntry(list, {
+            label = GetString(BATTLESCROLLS_STAT_AOE_DAMAGE),
+            sublabel = aoeStr,
+            icon = STAT_ICONS.AOE,
+            header = GetString(BATTLESCROLLS_HEADER_AOE_VS_SINGLE),
+            tooltip = aoeTtText and { type = "text", title = GetString(BATTLESCROLLS_STAT_AOE_DAMAGE), text = aoeTtText } or nil,
+        })
+        EntryBuilder.addEntry(list, {
+            label = GetString(BATTLESCROLLS_STAT_SINGLE_TARGET_DAMAGE),
+            sublabel = singleTargetStr,
+            icon = STAT_ICONS.SINGLE_TARGET,
+            tooltip = stTtText and { type = "text", title = GetString(BATTLESCROLLS_STAT_SINGLE_TARGET_DAMAGE), text = stTtText } or nil,
+        })
     end
 end
 
@@ -516,12 +625,13 @@ local function displayTargetBreakdownAsync(list, damageTable, totalDamage, durat
                 ttTitle, ttText = tooltips.buildBossGroupTooltip(unitId, encounter, arithmancerInst, durationSec)
             end
 
-            if isFirst then
-                utils.addStatEntry(list, targetName, valueStr, nil, GetString(BATTLESCROLLS_HEADER_BY_TARGET), ttTitle, ttText)
-                isFirst = false
-            else
-                utils.addStatEntry(list, targetName, valueStr, nil, nil, ttTitle, ttText)
-            end
+            EntryBuilder.addEntry(list, {
+                label = targetName,
+                sublabel = valueStr,
+                header = isFirst and GetString(BATTLESCROLLS_HEADER_BY_TARGET) or nil,
+                tooltip = ttTitle and { type = "text", title = ttTitle, text = ttText or "" } or nil,
+            })
+            isFirst = false
         end
     end)
 end
@@ -560,13 +670,35 @@ function DamageRenderer.renderBossDamageDone(ctx)
         local summary = bossCalc:getDamageSummary()
         local totalBossDamage = summary.personalTotal
 
-        utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_TOTAL_BOSS_DAMAGE), ZO_CommaDelimitNumber(totalBossDamage), STAT_ICONS.DAMAGE, GetString(BATTLESCROLLS_STAT_SUMMARY))
+        EntryBuilder.addEntry(list, {
+            label = GetString(BATTLESCROLLS_STAT_TOTAL_BOSS_DAMAGE),
+            sublabel = ZO_CommaDelimitNumber(totalBossDamage),
+            icon = STAT_ICONS.DAMAGE,
+            header = GetString(BATTLESCROLLS_STAT_SUMMARY),
+        })
         local bossDpsTtTitle, bossDpsTtText = tooltips.buildGroupDpsTooltip(encounter, true)
-        utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_BOSS_DPS), ZO_CommaDelimitNumber(math.floor(summary.dps)), STAT_ICONS.DPS, nil, bossDpsTtTitle, bossDpsTtText)
+        EntryBuilder.addEntry(list, {
+            label = GetString(BATTLESCROLLS_STAT_BOSS_DPS),
+            sublabel = ZO_CommaDelimitNumber(math.floor(summary.dps)),
+            icon = STAT_ICONS.DPS,
+            tooltip = bossDpsTtTitle and { type = "text", title = bossDpsTtTitle, text = bossDpsTtText or "" } or nil,
+        })
         if summary.groupTotal then
-            utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_GROUP_SHARE), string.format("%.1f%%", summary.share), STAT_ICONS.SHARE)
-            utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_GROUP_BOSS_DAMAGE), ZO_CommaDelimitNumber(summary.groupTotal), STAT_ICONS.GROUP_DAMAGE)
-            utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_GROUP_BOSS_DPS), ZO_CommaDelimitNumber(math.floor(summary.groupDps)), STAT_ICONS.GROUP_DPS)
+            EntryBuilder.addEntry(list, {
+                label = GetString(BATTLESCROLLS_STAT_GROUP_SHARE),
+                sublabel = string.format("%.1f%%", summary.share),
+                icon = STAT_ICONS.SHARE,
+            })
+            EntryBuilder.addEntry(list, {
+                label = GetString(BATTLESCROLLS_STAT_GROUP_BOSS_DAMAGE),
+                sublabel = ZO_CommaDelimitNumber(summary.groupTotal),
+                icon = STAT_ICONS.GROUP_DAMAGE,
+            })
+            EntryBuilder.addEntry(list, {
+                label = GetString(BATTLESCROLLS_STAT_GROUP_BOSS_DPS),
+                sublabel = ZO_CommaDelimitNumber(math.floor(summary.groupDps)),
+                icon = STAT_ICONS.GROUP_DPS,
+            })
         end
         LibEffect.Yield():Await()
 
@@ -614,13 +746,35 @@ function DamageRenderer.renderDamageDone(ctx)
         local summary = calc:getDamageSummary()
         local totalDamage = summary.personalTotal
 
-        utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_TOTAL_DAMAGE), ZO_CommaDelimitNumber(totalDamage), STAT_ICONS.DAMAGE, GetString(BATTLESCROLLS_STAT_SUMMARY))
+        EntryBuilder.addEntry(list, {
+            label = GetString(BATTLESCROLLS_STAT_TOTAL_DAMAGE),
+            sublabel = ZO_CommaDelimitNumber(totalDamage),
+            icon = STAT_ICONS.DAMAGE,
+            header = GetString(BATTLESCROLLS_STAT_SUMMARY),
+        })
         local dpsTtTitle, dpsTtText = tooltips.buildGroupDpsTooltip(encounter, false)
-        utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_DPS), ZO_CommaDelimitNumber(math.floor(summary.dps)), STAT_ICONS.DPS, nil, dpsTtTitle, dpsTtText)
+        EntryBuilder.addEntry(list, {
+            label = GetString(BATTLESCROLLS_STAT_DPS),
+            sublabel = ZO_CommaDelimitNumber(math.floor(summary.dps)),
+            icon = STAT_ICONS.DPS,
+            tooltip = dpsTtTitle and { type = "text", title = dpsTtTitle, text = dpsTtText or "" } or nil,
+        })
         if summary.groupTotal then
-            utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_GROUP_SHARE), string.format("%.1f%%", summary.share), STAT_ICONS.SHARE)
-            utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_GROUP_DAMAGE), ZO_CommaDelimitNumber(summary.groupTotal), STAT_ICONS.GROUP_DAMAGE)
-            utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_GROUP_DPS), ZO_CommaDelimitNumber(math.floor(summary.groupDps)), STAT_ICONS.GROUP_DPS)
+            EntryBuilder.addEntry(list, {
+                label = GetString(BATTLESCROLLS_STAT_GROUP_SHARE),
+                sublabel = string.format("%.1f%%", summary.share),
+                icon = STAT_ICONS.SHARE,
+            })
+            EntryBuilder.addEntry(list, {
+                label = GetString(BATTLESCROLLS_STAT_GROUP_DAMAGE),
+                sublabel = ZO_CommaDelimitNumber(summary.groupTotal),
+                icon = STAT_ICONS.GROUP_DAMAGE,
+            })
+            EntryBuilder.addEntry(list, {
+                label = GetString(BATTLESCROLLS_STAT_GROUP_DPS),
+                sublabel = ZO_CommaDelimitNumber(math.floor(summary.groupDps)),
+                icon = STAT_ICONS.GROUP_DPS,
+            })
         end
         LibEffect.Yield():Await()
 
@@ -667,9 +821,19 @@ function DamageRenderer.renderDamageTaken(ctx)
         local totalDamageTaken = Arithmancer.ComputeNestedTotal(filteredDamageTaken)
 
         -- Summary
-        utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_TOTAL_DAMAGE_TAKEN), ZO_CommaDelimitNumber(totalDamageTaken), STAT_ICONS.DAMAGE_TAKEN, GetString(BATTLESCROLLS_STAT_SUMMARY))
+        EntryBuilder.addEntry(list, {
+            label = GetString(BATTLESCROLLS_STAT_TOTAL_DAMAGE_TAKEN),
+            sublabel = ZO_CommaDelimitNumber(totalDamageTaken),
+            icon = STAT_ICONS.DAMAGE_TAKEN,
+            header = GetString(BATTLESCROLLS_STAT_SUMMARY),
+        })
         local dtpsTtTitle, dtpsTtText = tooltips.buildGroupDtpsTooltip(encounter)
-        utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_DTPS), ZO_CommaDelimitNumber(math.floor(totalDamageTaken / durationSec)), STAT_ICONS.DPS, nil, dtpsTtTitle, dtpsTtText)
+        EntryBuilder.addEntry(list, {
+            label = GetString(BATTLESCROLLS_STAT_DTPS),
+            sublabel = ZO_CommaDelimitNumber(math.floor(totalDamageTaken / durationSec)),
+            icon = STAT_ICONS.DPS,
+            tooltip = dtpsTtTitle and { type = "text", title = dtpsTtTitle, text = dtpsTtText or "" } or nil,
+        })
         LibEffect.Yield():Await()
 
         -- Deaths
@@ -692,18 +856,29 @@ function DamageRenderer.renderDamageTaken(ctx)
 
                 local sublabel = zo_strformat(GetString(BATTLESCROLLS_GROUP_DEATH_AT), utils.formatDuration(recap.timeOffsetMs))
 
-                local entryData = ZO_GamepadEntryData:New(label, STAT_ICONS.DEATH)
-                entryData:SetIconTintOnSelection(true)
-                entryData:AddSubLabel(sublabel)
-                entryData.deathRecapData = recap
-
-                if isFirst then
-                    entryData:SetHeader(GetString(BATTLESCROLLS_HEADER_DEATHS))
-                    list:AddEntryWithHeader("ZO_GamepadItemSubEntryTemplate", entryData)
-                    isFirst = false
-                else
-                    list:AddEntry("ZO_GamepadItemSubEntryTemplate", entryData)
+                local resolvedRows = {}
+                for j, attack in ipairs(recap.attacks) do
+                    resolvedRows[#resolvedRows + 1] = {
+                        icon = GetAbilityIcon(attack.abilityId),
+                        label = utils.getAbilityDisplayName(attack.abilityId),
+                        value = utils.formatCompact(attack.damage),
+                        isHighlighted = (j == #recap.attacks),
+                    }
                 end
+
+                EntryBuilder.addEntry(list, {
+                    label = label,
+                    sublabel = sublabel,
+                    icon = STAT_ICONS.DEATH,
+                    header = isFirst and GetString(BATTLESCROLLS_HEADER_DEATHS) or nil,
+                    tooltip = {
+                        type = "detailRows",
+                        title = label,
+                        subtitle = sublabel,
+                        rows = resolvedRows,
+                    },
+                })
+                isFirst = false
             end
         end
 
@@ -711,10 +886,10 @@ function DamageRenderer.renderDamageTaken(ctx)
         local abilityEntries = buildAbilityEntriesAsync(filteredDamageTaken, nil, nil):Await()
         displayAbilityBreakdownAsync(list, abilityEntries, totalDamageTaken, durationSec, abilityInfo, unitNames, GetString(BATTLESCROLLS_HEADER_BY_ABILITY)):Await()
 
-        -- By Damage Type (no group avg — sharedData has outgoing damage stats, not incoming)
+        -- By Damage Type (no group avg -- sharedData has outgoing damage stats, not incoming)
         displayDamageTypeBreakdown(list, calc:damageTakenByType(), totalDamageTaken, durationSec, nil)
 
-        -- Direct vs DoT (no group avg — same reason)
+        -- Direct vs DoT (no group avg -- same reason)
         displayDirectVsDoTBreakdown(list, calc:damageTakenDotVsDirect(), totalDamageTaken, durationSec, nil)
 
         -- By Source (who dealt the damage to us)
@@ -748,12 +923,13 @@ function DamageRenderer.renderDamageTaken(ctx)
 
             local ttTitle, ttText = tooltips.buildBossDamageTakenGroupTooltip(unitId, encounter)
 
-            if isFirst then
-                utils.addStatEntry(list, sourceName, valueStr, nil, GetString(BATTLESCROLLS_HEADER_BY_SOURCE), ttTitle, ttText)
-                isFirst = false
-            else
-                utils.addStatEntry(list, sourceName, valueStr, nil, nil, ttTitle, ttText)
-            end
+            EntryBuilder.addEntry(list, {
+                label = sourceName,
+                sublabel = valueStr,
+                header = isFirst and GetString(BATTLESCROLLS_HEADER_BY_SOURCE) or nil,
+                tooltip = ttTitle and { type = "text", title = ttTitle, text = ttText or "" } or nil,
+            })
+            isFirst = false
         end
     end)
 end
@@ -959,182 +1135,192 @@ end
 -- Overview Panel Refresh Functions
 -------------------------
 
+-- Import panel layout constants
+local SECTION_GAP = journal.SECTION_GAP
+local Q3_INSET = journal.Q3_INSET
+
 ---@class DamageDonePanelConfig
 ---@field useBossFilter boolean If true, build filter from bossesUnits when no targetFilter provided
 ---@field q4SectionLabel number String ID for Q4 section header (BATTLESCROLLS_OVERVIEW_BOSSES or BATTLESCROLLS_OVERVIEW_TARGETS)
 
----Shared implementation for Boss Damage and Damage Done panels
----@param panel BattleScrolls_Journal_OverviewPanel The overview panel
+---Shared implementation for Boss Damage and Damage Done panel specs
 ---@param ctx { arithmancer: table, encounter: table, durationS: number, unitNames: table, filters: table, abilityInfo: table }
 ---@param config DamageDonePanelConfig
----@return Effect<nil>
-local function refreshDamageDonePanel(panel, ctx, config)
-    return LibEffect.Async(function()
-        local lastControl = nil
-        local filters = ctx.filters or {}
-        local targetFilter = filters.targetFilter
-        local sourceFilter = filters.sourceFilter
-        local encounter = ctx.encounter
-        local durationS = ctx.durationS
-        local unitNames = ctx.unitNames
-        local arithmancer = ctx.arithmancer
-        local abilityInfo = ctx.abilityInfo
+---@return PanelSpec
+local function buildDamageDonePanelSpec(ctx, config)
+    return {
+        layout = "three-column",
+        build = function(q2, q3, q4)
+            local filters = ctx.filters or {}
+            local targetFilter = filters.targetFilter
+            local sourceFilter = filters.sourceFilter
+            local encounter = ctx.encounter
+            local durationS = ctx.durationS
+            local unitNames = ctx.unitNames
+            local arithmancer = ctx.arithmancer
+            local abilityInfo = ctx.abilityInfo
 
-        -- Create filtered arithmancer based on config
-        local calc
-        if config.useBossFilter then
-            -- Boss damage tab: auto-build boss filter when no user targetFilter
-            -- ForBosses returns nil only if no bosses exist; tab visibility prevents this but guard for safety
-            calc = Arithmancer:ForBosses(encounter, abilityInfo, {
-                targetFilter = targetFilter,
-                sourceFilter = sourceFilter,
-            })
-            if not calc then return end
-        elseif targetFilter or sourceFilter then
-            calc = Arithmancer:Make(encounter, abilityInfo, { targetFilter = targetFilter, sourceFilter = sourceFilter })
-        else
-            calc = arithmancer
-        end
+            -- Create filtered arithmancer based on config
+            local calc
+            if config.useBossFilter then
+                -- Boss damage tab: auto-build boss filter when no user targetFilter
+                -- ForBosses returns nil only if no bosses exist; tab visibility prevents this but guard for safety
+                calc = Arithmancer:ForBosses(encounter, abilityInfo, {
+                    targetFilter = targetFilter,
+                    sourceFilter = sourceFilter,
+                })
+                if not calc then return end
+            elseif targetFilter or sourceFilter then
+                calc = Arithmancer:Make(encounter, abilityInfo, { targetFilter = targetFilter, sourceFilter = sourceFilter })
+            else
+                calc = arithmancer
+            end
 
-        -- Pre-filter damage data for Q3/Q4 sections
-        local filteredDamageTable = calc:filteredDamageTable()
+            -- Pre-filter damage data for Q3/Q4 sections
+            local filteredDamageTable = calc:filteredDamageTable()
 
-        -- Q2: Summary section using Arithmancer - returns {dps, groupDps, share}
-        local summaryData = calc:getDamageSummary()
-        local personalDamage = summaryData.dps * durationS  -- Reconstruct for Q3 ability bars
-        lastControl = panel:renderDamageSummarySection(GetString(BATTLESCROLLS_OVERVIEW_SUMMARY), lastControl,
-            summaryData.dps, summaryData.groupDps, summaryData.share)
-        LibEffect.YieldWithGC():Await()
+            -- Q2: Summary + composition + quality
+            local summaryData = calc:getDamageSummary()
+            local personalDamage = summaryData.dps * durationS  -- Reconstruct for Q3 ability bars
 
-        -- Composition section - returns {dotPercent, directPercent, aoePercent, stPercent}
-        local compositionData = calc:getDamageComposition()
-        lastControl = panel:renderDamageCompositionSection(lastControl,
-            compositionData.dotPercent, compositionData.directPercent, compositionData.aoePercent, compositionData.stPercent)
-        LibEffect.YieldWithGC():Await()
+            local summarySection = buildDamageSummary(q2, GetString(BATTLESCROLLS_OVERVIEW_SUMMARY),
+                summaryData.dps, summaryData.groupDps, summaryData.share)
+            LibEffect.YieldWithGC():Await()
 
-        -- Quality metrics - returns {critRate, maxHit}
-        local qualityData = calc:getDamageQuality()
-        if qualityData.critRate > 0 or qualityData.maxHit > 0 then
-            lastControl = panel:renderDamageQualitySection(lastControl, qualityData.critRate, qualityData.maxHit)
-        end
+            local compositionData = calc:getDamageComposition()
+            local compSection = buildDamageComposition(q2,
+                compositionData.dotPercent, compositionData.directPercent, compositionData.aoePercent, compositionData.stPercent)
+            LibEffect.YieldWithGC():Await()
 
-        LibEffect.Yield():Await()
+            local qualityData = calc:getDamageQuality()
+            local qualitySection
+            if qualityData.critRate > 0 or qualityData.maxHit > 0 then
+                qualitySection = buildDamageQuality(q2, qualityData.critRate, qualityData.maxHit)
+            end
 
-        -- Q3: Top abilities
-        local q3Control = nil
-        local maxAbilities = panel:GetMaxAbilities()
-        local topAbilities = DamageRenderer.extractTopAbilitiesAsync(filteredDamageTable, nil, nil, maxAbilities):Await()
-        if #topAbilities > 0 then
-            q3Control = panel:AddQ3Section(GetString(BATTLESCROLLS_OVERVIEW_TOP_ABILITIES), q3Control)
-            local topValue = topAbilities[1].total
-            for _, ability in ipairs(topAbilities) do
-                q3Control = panel:AddAbilityBar(ability, topValue, personalDamage, durationS, q3Control)
+            q2:mount(SECTION_GAP, 0, summarySection, compSection, qualitySection)
+            LibEffect.Yield():Await()
+
+            -- Q3: Top abilities
+            local maxAbilities = q3:maxItems(ROW_CONTENT.ABILITY_BAR, 10)
+            local topAbilities = DamageRenderer.extractTopAbilitiesAsync(filteredDamageTable, nil, nil, maxAbilities):Await()
+            if #topAbilities > 0 then
+                local topValue = topAbilities[1].total
+                local abilityBars = {}
+                for _, ability in ipairs(topAbilities) do
+                    abilityBars[#abilityBars + 1] = q3:AbilityBar(ability, topValue, personalDamage, durationS)
+                end
+                local q3Section = q3:Section(GetString(BATTLESCROLLS_OVERVIEW_TOP_ABILITIES), abilityBars)
+                q3:mount(SECTION_GAP, Q3_INSET, q3Section)
+            end
+
+            LibEffect.YieldWithGC():Await()
+
+            -- Q4: Target breakdown
+            local maxTargets = q4:maxItems(ROW_CONTENT.STAT_ROW, 10)
+            local targets = DamageRenderer.extractTargetBreakdownAsync(filteredDamageTable, unitNames, nil, nil, maxTargets):Await()
+            if #targets > 0 then
+                local targetRows = {}
+                for _, target in ipairs(targets) do
+                    targetRows[#targetRows + 1] = q4:StatRow(target.name, utils.formatTargetDPS(target.total, durationS))
+                end
+                local q4Section = q4:Section(GetString(config.q4SectionLabel), targetRows)
+                q4:mount(SECTION_GAP, Q3_INSET, q4Section)
             end
         end
-
-        LibEffect.YieldWithGC():Await()
-
-        -- Q4: Target breakdown
-        local q4Control = nil
-        local maxTargets = panel:GetMaxTargets()
-        local targets = DamageRenderer.extractTargetBreakdownAsync(filteredDamageTable, unitNames, nil, nil, maxTargets):Await()
-        if #targets > 0 then
-            q4Control = panel:AddQ4Section(GetString(config.q4SectionLabel), q4Control)
-            for _, target in ipairs(targets) do
-                q4Control = panel:AddTargetRow(target.name, utils.formatTargetDPS(target.total, durationS), q4Control)
-            end
-        end
-    end)
+    }
 end
 
----Refreshes the overview panel for Boss Damage tab
----@param panel BattleScrolls_Journal_OverviewPanel The overview panel
+---Builds panel spec for Boss Damage tab
 ---@param ctx { arithmancer: table, encounter: table, durationS: number, unitNames: table, filters: table, abilityInfo: table }
----@return Effect<nil>
-function DamageRenderer.refreshPanelForBossDamage(panel, ctx)
-    return refreshDamageDonePanel(panel, ctx, {
+---@return PanelSpec
+function DamageRenderer.buildBossDamagePanelSpec(ctx)
+    return buildDamageDonePanelSpec(ctx, {
         useBossFilter = true,
         q4SectionLabel = BATTLESCROLLS_OVERVIEW_BOSSES,
     })
 end
 
----Refreshes the overview panel for Damage Done tab
----@param panel BattleScrolls_Journal_OverviewPanel The overview panel
+---Builds panel spec for Damage Done tab
 ---@param ctx { arithmancer: table, encounter: table, durationS: number, unitNames: table, filters: table, abilityInfo: table }
----@return Effect<nil>
-function DamageRenderer.refreshPanelForDamageDone(panel, ctx)
-    return refreshDamageDonePanel(panel, ctx, {
+---@return PanelSpec
+function DamageRenderer.buildDamageDonePanelSpec(ctx)
+    return buildDamageDonePanelSpec(ctx, {
         useBossFilter = false,
         q4SectionLabel = BATTLESCROLLS_OVERVIEW_TARGETS,
     })
 end
 
----Refreshes the overview panel for Damage Taken tab
----@param panel BattleScrolls_Journal_OverviewPanel The overview panel
+---Builds panel spec for Damage Taken tab
 ---@param ctx { arithmancer: table, encounter: table, durationS: number, unitNames: table, filters: table }
----@return Effect<nil>
-function DamageRenderer.refreshPanelForDamageTaken(panel, ctx)
-    return LibEffect.Async(function()
-        local lastControl = nil
-        local filters = ctx.filters or {}
-        local sourceFilter = filters.sourceFilter
-        local encounter = ctx.encounter
-        local durationS = ctx.durationS
-        local unitNames = ctx.unitNames
-        local arithmancer = ctx.arithmancer
-        local abilityInfo = ctx.abilityInfo
+---@return PanelSpec
+function DamageRenderer.buildDamageTakenPanelSpec(ctx)
+    return {
+        layout = "three-column",
+        build = function(q2, q3, q4)
+            local filters = ctx.filters or {}
+            local sourceFilter = filters.sourceFilter
+            local encounter = ctx.encounter
+            local durationS = ctx.durationS
+            local unitNames = ctx.unitNames
+            local arithmancer = ctx.arithmancer
+            local abilityInfo = ctx.abilityInfo
 
-        -- Create filtered arithmancer for Q2 summaries and Q3/Q4 display
-        local calc = sourceFilter
-            and Arithmancer:Make(encounter, abilityInfo, { sourceFilter = sourceFilter })
-            or arithmancer
-        local filteredDamageTaken = calc:filteredDamageTakenTable()
+            -- Create filtered arithmancer for Q2 summaries and Q3/Q4 display
+            local calc = sourceFilter
+                and Arithmancer:Make(encounter, abilityInfo, { sourceFilter = sourceFilter })
+                or arithmancer
+            local filteredDamageTaken = calc:filteredDamageTakenTable()
 
-        -- Q2: Summary section - returns {dtps, total}
-        local summaryData = calc:getDamageTakenSummary()
-        local totalDamageTaken = summaryData.total  -- Keep for Q3 ability bars
-        lastControl = panel:renderDamageTakenSummarySection(lastControl, summaryData.dtps, summaryData.total)
-        LibEffect.YieldWithGC():Await()
+            -- Q2: Summary + composition + quality
+            local summaryData = calc:getDamageTakenSummary()
+            local totalDamageTaken = summaryData.total  -- Keep for Q3 ability bars
 
-        -- Composition section - returns {dotPercent, directPercent, aoePercent, stPercent}
-        local compositionData = calc:getDamageTakenComposition()
-        lastControl = panel:renderDamageCompositionSection(lastControl,
-            compositionData.dotPercent, compositionData.directPercent, compositionData.aoePercent, compositionData.stPercent)
-        LibEffect.YieldWithGC():Await()
+            local summarySection = buildDamageTakenSummary(q2, summaryData.dtps, summaryData.total)
+            LibEffect.YieldWithGC():Await()
 
-        -- Quality metrics - returns {critRate, maxHit}
-        local qualityData = calc:getDamageTakenQuality()
-        if qualityData.critRate > 0 or qualityData.maxHit > 0 then
-            lastControl = panel:renderDamageQualitySection(lastControl, qualityData.critRate, qualityData.maxHit)
-        end
+            local compositionData = calc:getDamageTakenComposition()
+            local compSection = buildDamageComposition(q2,
+                compositionData.dotPercent, compositionData.directPercent, compositionData.aoePercent, compositionData.stPercent)
+            LibEffect.YieldWithGC():Await()
 
-        LibEffect.Yield():Await()
+            local qualityData = calc:getDamageTakenQuality()
+            local qualitySection
+            if qualityData.critRate > 0 or qualityData.maxHit > 0 then
+                qualitySection = buildDamageQuality(q2, qualityData.critRate, qualityData.maxHit)
+            end
 
-        -- Q3: Top damage taken abilities (using filtered data)
-        local q3Control = nil
-        local maxAbilities = panel:GetMaxAbilities()
-        local topAbilities = DamageRenderer.extractDamageTakenAbilitiesAsync(filteredDamageTaken, maxAbilities):Await()
-        if #topAbilities > 0 then
-            q3Control = panel:AddQ3Section(GetString(BATTLESCROLLS_OVERVIEW_TOP_INCOMING), q3Control)
-            local topValue = topAbilities[1].total
-            for _, ability in ipairs(topAbilities) do
-                q3Control = panel:AddAbilityBar(ability, topValue, totalDamageTaken, durationS, q3Control)
+            q2:mount(SECTION_GAP, 0, summarySection, compSection, qualitySection)
+            LibEffect.Yield():Await()
+
+            -- Q3: Top damage taken abilities (using filtered data)
+            local maxAbilities = q3:maxItems(ROW_CONTENT.ABILITY_BAR, 10)
+            local topAbilities = DamageRenderer.extractDamageTakenAbilitiesAsync(filteredDamageTaken, maxAbilities):Await()
+            if #topAbilities > 0 then
+                local topValue = topAbilities[1].total
+                local abilityBars = {}
+                for _, ability in ipairs(topAbilities) do
+                    abilityBars[#abilityBars + 1] = q3:AbilityBar(ability, topValue, totalDamageTaken, durationS)
+                end
+                local q3Section = q3:Section(GetString(BATTLESCROLLS_OVERVIEW_TOP_INCOMING), abilityBars)
+                q3:mount(SECTION_GAP, Q3_INSET, q3Section)
+            end
+
+            LibEffect.YieldWithGC():Await()
+
+            -- Q4: Damage sources (using filtered data)
+            local maxTargets = q4:maxItems(ROW_CONTENT.STAT_ROW, 10)
+            local sources = DamageRenderer.extractDamageTakenSourcesAsync(filteredDamageTaken, unitNames, maxTargets):Await()
+            if #sources > 0 then
+                local sourceRows = {}
+                for _, source in ipairs(sources) do
+                    sourceRows[#sourceRows + 1] = q4:StatRow(source.name, utils.formatTargetDPS(source.total, durationS))
+                end
+                local q4Section = q4:Section(GetString(BATTLESCROLLS_OVERVIEW_SOURCES), sourceRows)
+                q4:mount(SECTION_GAP, Q3_INSET, q4Section)
             end
         end
-
-        LibEffect.YieldWithGC():Await()
-
-        -- Q4: Damage sources (using filtered data)
-        local q4Control = nil
-        local maxTargets = panel:GetMaxTargets()
-        local sources = DamageRenderer.extractDamageTakenSourcesAsync(filteredDamageTaken, unitNames, maxTargets):Await()
-        if #sources > 0 then
-            q4Control = panel:AddQ4Section(GetString(BATTLESCROLLS_OVERVIEW_SOURCES), q4Control)
-            for _, source in ipairs(sources) do
-                q4Control = panel:AddTargetRow(source.name, utils.formatTargetDPS(source.total, durationS), q4Control)
-            end
-        end
-    end)
+    }
 end
 
 -- Export to namespace

@@ -13,31 +13,9 @@ end
 local journal = BattleScrolls.journal
 local utils = journal.utils
 local StatIcons = journal.StatIcons
+local EntryBuilder = journal.EntryBuilder
 
 local OverviewRenderer = {}
-
--------------------------
--- Height Calculation Helpers
--------------------------
-
--- Row heights for section calculation (must match XML and overview_panel.lua constants)
-local ROW_CONTENT = {
-    SECTION_HEADER = 50,  -- BattleScrolls_OverviewSectionHeader
-    STAT_ROW = 36,        -- BattleScrolls_OverviewStatRow
-}
-local ROW_GAPS = {
-    SECTION_HEADER = 15,  -- Anchor gap between sections
-    STAT_ROW = 10,        -- Anchor gap between stat rows
-}
-
----Calculates height for a Q2 section (header + N rows)
----@param rowCount number Number of stat rows in the section
----@return number height Total height in pixels
-local function CalculateSectionHeight(rowCount)
-    local headerHeight = ROW_CONTENT.SECTION_HEADER + ROW_GAPS.SECTION_HEADER
-    local rowsHeight = rowCount * ROW_CONTENT.STAT_ROW + math.max(0, rowCount - 1) * ROW_GAPS.STAT_ROW
-    return headerHeight + rowsHeight
-end
 
 ---Calculates dynamic section priorities based on player metrics
 ---Lower priority number = higher importance (selected first)
@@ -65,24 +43,57 @@ local function CalculateDynamicPriorities(dps, hps, dtps)
     local dtpsRelevance = weightedDTPS / totalActivity
 
     -- Map relevance to priority range
-    -- Higher relevance → lower priority number (higher priority)
+    -- Higher relevance -> lower priority number (higher priority)
     -- Priority range: 2 (highest for role-specific) to 5 (lowest)
     local priorityRange = 3  -- 5 - 2 = 3
     local basePriority = 2
 
-    -- Encounter is always priority 1
-    local encounterPriority = 1
+    -- Encounter gets lowest priority (shown only if space remains)
+    local encounterPriority = 100
 
-    -- Damage priority: high DPS relevance → low priority number
+    -- Damage priority: high DPS relevance -> low priority number
     local damagePriority = basePriority + priorityRange * (1 - dpsRelevance)
 
-    -- Healing priority: high HPS relevance → low priority number
+    -- Healing priority: high HPS relevance -> low priority number
     local healingPriority = basePriority + priorityRange * (1 - hpsRelevance)
 
-    -- Damage taken priority: high DTPS relevance → low priority number
+    -- Damage taken priority: high DTPS relevance -> low priority number
     local damageTakenPriority = basePriority + priorityRange * (1 - dtpsRelevance)
 
     return encounterPriority, damagePriority, healingPriority, damageTakenPriority
+end
+
+-------------------------
+-- Proc Tooltip Builder
+-------------------------
+
+---Builds tooltip text for a proc entry, showing per-enemy breakdown
+---@param procData ProcData
+---@param unitNames table<number, string>
+---@return string text Formatted tooltip text with per-enemy breakdown
+local function buildProcTooltipText(procData, unitNames)
+    local lines = {}
+
+    -- Summary line
+    local totalProcsStr = zo_strformat(GetString(BATTLESCROLLS_STAT_TOTAL_PROCS), procData.totalProcs)
+    lines[#lines + 1] = totalProcsStr
+
+    -- Median interval
+    if procData.medianIntervalMs > 0 then
+        lines[#lines + 1] = string.format("%s: %.1fs",
+            GetString(BATTLESCROLLS_STAT_MEDIAN_INTERVAL), procData.medianIntervalMs / 1000)
+    end
+
+    -- Per-enemy breakdown
+    if procData.procsByEnemy and #procData.procsByEnemy > 0 then
+        lines[#lines + 1] = ""
+        for _, enemy in ipairs(procData.procsByEnemy) do
+            local enemyName = unitNames[enemy.unitId] or string.format("#%d", enemy.unitId)
+            lines[#lines + 1] = string.format("%s: %d", enemyName, enemy.procCount)
+        end
+    end
+
+    return table.concat(lines, "\n")
 end
 
 -------------------------
@@ -98,12 +109,16 @@ function OverviewRenderer.renderOverview(ctx)
         local encounter = ctx.encounter
         local unitNames = ctx.unitNames
         local durationSec = ctx.durationSec
-        local arithmancer = ctx.arithmancer
 
         -------------------------
         -- Summary
         -------------------------
-        utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_DURATION), utils.formatDuration(encounter.durationMs), StatIcons.DURATION, GetString(BATTLESCROLLS_STAT_SUMMARY))
+        EntryBuilder.addEntry(list, {
+            label = GetString(BATTLESCROLLS_STAT_DURATION),
+            sublabel = utils.formatDuration(encounter.durationMs),
+            icon = StatIcons.DURATION,
+            header = GetString(BATTLESCROLLS_STAT_SUMMARY),
+        })
 
         -------------------------
         -- Boss Damage Done
@@ -114,13 +129,26 @@ function OverviewRenderer.renderOverview(ctx)
         local bossGroupTotalDamage = bossCalc and bossCalc:groupTotalDamage() or 0
 
         if bossPersonalTotalDamage > 0 then
-            utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_PERSONAL_BOSS_DAMAGE), ZO_CommaDelimitNumber(bossPersonalTotalDamage), StatIcons.DAMAGE, GetString(BATTLESCROLLS_HEADER_BOSS_DAMAGE_DONE))
-            utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_PERSONAL_BOSS_DPS), ZO_CommaDelimitNumber(math.floor(bossPersonalTotalDamage / durationSec)), StatIcons.DPS)
+            EntryBuilder.addEntry(list, {
+                label = GetString(BATTLESCROLLS_STAT_PERSONAL_BOSS_DAMAGE),
+                sublabel = ZO_CommaDelimitNumber(bossPersonalTotalDamage),
+                icon = StatIcons.DAMAGE,
+                header = GetString(BATTLESCROLLS_HEADER_BOSS_DAMAGE_DONE),
+            })
+            EntryBuilder.addEntry(list, {
+                label = GetString(BATTLESCROLLS_STAT_PERSONAL_BOSS_DPS),
+                sublabel = ZO_CommaDelimitNumber(math.floor(bossPersonalTotalDamage / durationSec)),
+                icon = StatIcons.DPS,
+            })
 
             -- Only show share if there's actual group data (group damage > personal damage)
             if bossGroupTotalDamage > bossPersonalTotalDamage then
                 local groupPercent = (bossPersonalTotalDamage / bossGroupTotalDamage) * 100
-                utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_PERSONAL_BOSS_DAMAGE_SHARE), string.format("%.1f%%", groupPercent), StatIcons.SHARE)
+                EntryBuilder.addEntry(list, {
+                    label = GetString(BATTLESCROLLS_STAT_PERSONAL_BOSS_DAMAGE_SHARE),
+                    sublabel = string.format("%.1f%%", groupPercent),
+                    icon = StatIcons.SHARE,
+                })
             end
         end
         LibEffect.Yield():Await()
@@ -128,17 +156,31 @@ function OverviewRenderer.renderOverview(ctx)
         -------------------------
         -- Total Damage Done
         -------------------------
+        local arithmancer = ctx.arithmancer
         local personalTotalDamage = arithmancer:personalTotalDamage()
         local groupTotalDamage = arithmancer:groupTotalDamage()
 
         if personalTotalDamage > 0 then
-            utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_PERSONAL_DAMAGE), ZO_CommaDelimitNumber(personalTotalDamage), StatIcons.DAMAGE, GetString(BATTLESCROLLS_HEADER_TOTAL_DAMAGE_DONE))
-            utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_PERSONAL_DPS), ZO_CommaDelimitNumber(math.floor(personalTotalDamage / durationSec)), StatIcons.DPS)
+            EntryBuilder.addEntry(list, {
+                label = GetString(BATTLESCROLLS_STAT_PERSONAL_DAMAGE),
+                sublabel = ZO_CommaDelimitNumber(personalTotalDamage),
+                icon = StatIcons.DAMAGE,
+                header = GetString(BATTLESCROLLS_HEADER_TOTAL_DAMAGE_DONE),
+            })
+            EntryBuilder.addEntry(list, {
+                label = GetString(BATTLESCROLLS_STAT_PERSONAL_DPS),
+                sublabel = ZO_CommaDelimitNumber(math.floor(personalTotalDamage / durationSec)),
+                icon = StatIcons.DPS,
+            })
 
             -- Only show share if there's actual group data (group damage > personal damage)
             if groupTotalDamage > personalTotalDamage then
                 local groupPercent = (personalTotalDamage / groupTotalDamage) * 100
-                utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_PERSONAL_SHARE), string.format("%.1f%%", groupPercent), StatIcons.SHARE)
+                EntryBuilder.addEntry(list, {
+                    label = GetString(BATTLESCROLLS_STAT_PERSONAL_SHARE),
+                    sublabel = string.format("%.1f%%", groupPercent),
+                    icon = StatIcons.SHARE,
+                })
             end
         end
         LibEffect.Yield():Await()
@@ -148,10 +190,23 @@ function OverviewRenderer.renderOverview(ctx)
         -------------------------
         local damageTakenTotal = arithmancer:damageTakenTotal()
         if damageTakenTotal > 0 then
-            utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_TOTAL_DAMAGE_TAKEN), ZO_CommaDelimitNumber(damageTakenTotal), StatIcons.DAMAGE_TAKEN, GetString(BATTLESCROLLS_HEADER_DAMAGE_TAKEN))
-            utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_DTPS), ZO_CommaDelimitNumber(math.floor(damageTakenTotal / durationSec)), StatIcons.DPS)
+            EntryBuilder.addEntry(list, {
+                label = GetString(BATTLESCROLLS_STAT_TOTAL_DAMAGE_TAKEN),
+                sublabel = ZO_CommaDelimitNumber(damageTakenTotal),
+                icon = StatIcons.DAMAGE_TAKEN,
+                header = GetString(BATTLESCROLLS_HEADER_DAMAGE_TAKEN),
+            })
+            EntryBuilder.addEntry(list, {
+                label = GetString(BATTLESCROLLS_STAT_DTPS),
+                sublabel = ZO_CommaDelimitNumber(math.floor(damageTakenTotal / durationSec)),
+                icon = StatIcons.DPS,
+            })
             if encounter.deaths then
-                utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_DEATH_COUNT), tostring(encounter.deaths.deathCount), StatIcons.DEATH)
+                EntryBuilder.addEntry(list, {
+                    label = GetString(BATTLESCROLLS_STAT_DEATH_COUNT),
+                    sublabel = tostring(encounter.deaths.deathCount),
+                    icon = StatIcons.DEATH,
+                })
             end
         end
         LibEffect.Yield():Await()
@@ -165,10 +220,27 @@ function OverviewRenderer.renderOverview(ctx)
         local selfHealingRaw = encounter.healingStats.selfHealing.total.raw
         local selfHealingReal = encounter.healingStats.selfHealing.total.real
         if selfHealingRaw > 0 then
-            utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_RAW_SELF_HEALING), ZO_CommaDelimitNumber(selfHealingRaw), StatIcons.HEALING, GetString(BATTLESCROLLS_HEADER_HEALING))
-            utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_RAW_SELF_HPS), ZO_CommaDelimitNumber(math.floor(selfHealingRaw / durationSec)), StatIcons.HPS)
-            utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_EFFECTIVE_SELF_HEALING), ZO_CommaDelimitNumber(selfHealingReal), StatIcons.HEALING)
-            utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_EFFECTIVE_SELF_HPS), ZO_CommaDelimitNumber(math.floor(selfHealingReal / durationSec)), StatIcons.HPS)
+            EntryBuilder.addEntry(list, {
+                label = GetString(BATTLESCROLLS_STAT_RAW_SELF_HEALING),
+                sublabel = ZO_CommaDelimitNumber(selfHealingRaw),
+                icon = StatIcons.HEALING,
+                header = GetString(BATTLESCROLLS_HEADER_HEALING),
+            })
+            EntryBuilder.addEntry(list, {
+                label = GetString(BATTLESCROLLS_STAT_RAW_SELF_HPS),
+                sublabel = ZO_CommaDelimitNumber(math.floor(selfHealingRaw / durationSec)),
+                icon = StatIcons.HPS,
+            })
+            EntryBuilder.addEntry(list, {
+                label = GetString(BATTLESCROLLS_STAT_EFFECTIVE_SELF_HEALING),
+                sublabel = ZO_CommaDelimitNumber(selfHealingReal),
+                icon = StatIcons.HEALING,
+            })
+            EntryBuilder.addEntry(list, {
+                label = GetString(BATTLESCROLLS_STAT_EFFECTIVE_SELF_HPS),
+                sublabel = ZO_CommaDelimitNumber(math.floor(selfHealingReal / durationSec)),
+                icon = StatIcons.HPS,
+            })
             healingSectionStarted = true
         end
 
@@ -176,10 +248,27 @@ function OverviewRenderer.renderOverview(ctx)
         local healingOutRaw, healingOutReal = utils.calculateHealingTotals(encounter.healingStats.healingOutToGroup)
         if healingOutRaw > 0 then
             local header = healingSectionStarted and nil or GetString(BATTLESCROLLS_HEADER_HEALING)
-            utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_RAW_HEALING_OUT), ZO_CommaDelimitNumber(healingOutRaw), StatIcons.HEALING, header)
-            utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_RAW_HEALING_OUT_HPS), ZO_CommaDelimitNumber(math.floor(healingOutRaw / durationSec)), StatIcons.HPS)
-            utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_EFFECTIVE_HEALING_OUT), ZO_CommaDelimitNumber(healingOutReal), StatIcons.HEALING)
-            utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_EFFECTIVE_HEALING_OUT_HPS), ZO_CommaDelimitNumber(math.floor(healingOutReal / durationSec)), StatIcons.HPS)
+            EntryBuilder.addEntry(list, {
+                label = GetString(BATTLESCROLLS_STAT_RAW_HEALING_OUT),
+                sublabel = ZO_CommaDelimitNumber(healingOutRaw),
+                icon = StatIcons.HEALING,
+                header = header,
+            })
+            EntryBuilder.addEntry(list, {
+                label = GetString(BATTLESCROLLS_STAT_RAW_HEALING_OUT_HPS),
+                sublabel = ZO_CommaDelimitNumber(math.floor(healingOutRaw / durationSec)),
+                icon = StatIcons.HPS,
+            })
+            EntryBuilder.addEntry(list, {
+                label = GetString(BATTLESCROLLS_STAT_EFFECTIVE_HEALING_OUT),
+                sublabel = ZO_CommaDelimitNumber(healingOutReal),
+                icon = StatIcons.HEALING,
+            })
+            EntryBuilder.addEntry(list, {
+                label = GetString(BATTLESCROLLS_STAT_EFFECTIVE_HEALING_OUT_HPS),
+                sublabel = ZO_CommaDelimitNumber(math.floor(healingOutReal / durationSec)),
+                icon = StatIcons.HPS,
+            })
             healingSectionStarted = true
         end
 
@@ -187,10 +276,27 @@ function OverviewRenderer.renderOverview(ctx)
         local healingInRaw, healingInReal = utils.calculateHealingTotals(encounter.healingStats.healingInFromGroup)
         if healingInRaw > 0 then
             local header = healingSectionStarted and nil or GetString(BATTLESCROLLS_HEADER_HEALING)
-            utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_RAW_HEALING_IN), ZO_CommaDelimitNumber(healingInRaw), StatIcons.HEALING, header)
-            utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_RAW_HEALING_IN_HPS), ZO_CommaDelimitNumber(math.floor(healingInRaw / durationSec)), StatIcons.HPS)
-            utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_EFFECTIVE_HEALING_IN), ZO_CommaDelimitNumber(healingInReal), StatIcons.HEALING)
-            utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_EFFECTIVE_HEALING_IN_HPS), ZO_CommaDelimitNumber(math.floor(healingInReal / durationSec)), StatIcons.HPS)
+            EntryBuilder.addEntry(list, {
+                label = GetString(BATTLESCROLLS_STAT_RAW_HEALING_IN),
+                sublabel = ZO_CommaDelimitNumber(healingInRaw),
+                icon = StatIcons.HEALING,
+                header = header,
+            })
+            EntryBuilder.addEntry(list, {
+                label = GetString(BATTLESCROLLS_STAT_RAW_HEALING_IN_HPS),
+                sublabel = ZO_CommaDelimitNumber(math.floor(healingInRaw / durationSec)),
+                icon = StatIcons.HPS,
+            })
+            EntryBuilder.addEntry(list, {
+                label = GetString(BATTLESCROLLS_STAT_EFFECTIVE_HEALING_IN),
+                sublabel = ZO_CommaDelimitNumber(healingInReal),
+                icon = StatIcons.HEALING,
+            })
+            EntryBuilder.addEntry(list, {
+                label = GetString(BATTLESCROLLS_STAT_EFFECTIVE_HEALING_IN_HPS),
+                sublabel = ZO_CommaDelimitNumber(math.floor(healingInReal / durationSec)),
+                icon = StatIcons.HPS,
+            })
         end
         LibEffect.Yield():Await()
 
@@ -214,20 +320,19 @@ function OverviewRenderer.renderOverview(ctx)
                     valueStr = totalProcsStr
                 end
 
-                local entryData = ZO_GamepadEntryData:New(abilityName, abilityIcon)
-                entryData.iconFile = abilityIcon  -- Store for frame type detection
-                entryData:SetIconTintOnSelection(true)
-                entryData:AddSubLabel(valueStr)
-                entryData.procData = procData
-                entryData.unitNames = unitNames  -- Store for tooltip display
-
-                if isFirst then
-                    entryData:SetHeader(GetString(BATTLESCROLLS_HEADER_PROC_TRACKING))
-                    list:AddEntryWithHeader("BattleScrolls_AbilityEntryTemplate", entryData)
-                    isFirst = false
-                else
-                    list:AddEntry("BattleScrolls_AbilityEntryTemplate", entryData)
-                end
+                EntryBuilder.addEntry(list, {
+                    label = abilityName,
+                    sublabel = valueStr,
+                    icon = abilityIcon,
+                    frame = true,
+                    header = isFirst and GetString(BATTLESCROLLS_HEADER_PROC_TRACKING) or nil,
+                    tooltip = {
+                        type = "text",
+                        title = abilityName,
+                        text = buildProcTooltipText(procData, unitNames),
+                    },
+                })
+                isFirst = false
             end
         end
     end)
@@ -236,28 +341,6 @@ end
 -------------------------
 -- Overview Panel Helpers
 -------------------------
-
----Determines the player's primary role based on fight metrics
----Used for Q3/Q4 content selection (top abilities and targets)
----@param dps number Personal DPS
----@param hps number Personal effective HPS
----@param dtps number Damage taken per second
----@return string role "dps", "healer", or "tank"
-local function DetectPlayerRole(dps, hps, dtps)
-    local tankScore = dtps * 10
-    local healingScore = hps
-    local ddScore = dps
-
-    if tankScore > healingScore and tankScore > ddScore then
-        return "tank"
-    end
-
-    if healingScore > ddScore then
-        return "healer"
-    end
-
-    return "dps"
-end
 
 -------------------------
 -- Overview Panel Refresh Function
@@ -292,380 +375,173 @@ local function GetMostPrevalentHealingType(selfHealingData, healingOutData, heal
     return nil, nil, nil
 end
 
----Refreshes the overview panel for Overview tab
+---Builds a PanelSpec for the Overview tab overview panel
 ---Uses priority-based section selection: shows most important sections that fit within available height
 ---Sections: Encounter (always), Damage Output, Healing (most prevalent type), Damage Taken
 ---Priorities are calculated dynamically based on player DPS/HPS/DTPS relevance
----@param panel BattleScrolls_Journal_OverviewPanel The overview panel
 ---@param ctx { arithmancer: table, encounter: table, durationS: number, unitNames: table, abilityInfo: table }
----@return Effect<nil>
-function OverviewRenderer.refreshPanelForOverview(panel, ctx)
-    return LibEffect.Async(function()
-        local arithmancer = ctx.arithmancer
-        local encounter = ctx.encounter
-        local durationS = ctx.durationS
-        local unitNames = ctx.unitNames
-        local abilityInfo = ctx.abilityInfo
-        local DamageRenderer = journal.renderers.damage
-        local HealingRenderer = journal.renderers.healing
+---@return PanelSpec
+function OverviewRenderer.buildOverviewPanelSpec(ctx)
+    return {
+        layout = "wide-right",
+        ---@diagnostic disable-next-line: unused-local -- wide-right layout doesn't use Q4
+        build = function(q2, q3, q4)
+            local arithmancer = ctx.arithmancer
+            local encounter = ctx.encounter
+            local durationS = ctx.durationS
+            local abilityInfo = ctx.abilityInfo
+            -- Damage summaries: {dps, groupDps, share}
+            local Arithmancer = BattleScrolls.arithmancer
+            local bossCalc = Arithmancer:ForBosses(encounter, abilityInfo)
+            local bossDamageSummary = bossCalc and bossCalc:getDamageSummary() or nil
+            local totalDamageSummary = arithmancer:getDamageSummary()
+            local hasDamage = totalDamageSummary.dps > 0
+            local personalDPS = totalDamageSummary.dps
 
-        -- Damage summaries: {dps, groupDps, share}
-        local Arithmancer = BattleScrolls.arithmancer
-        local bossCalc = Arithmancer:ForBosses(encounter, abilityInfo)
-        local bossDamageSummary = bossCalc and bossCalc:getDamageSummary() or nil
-        local totalDamageSummary = arithmancer:getDamageSummary()
-        local hasDamage = totalDamageSummary.dps > 0
-        local personalDPS = totalDamageSummary.dps
-        local totalDamage = personalDPS * durationS  -- For Q3 ability share calculations
+            -- Damage taken summary: {dtps, total}
+            local damageTakenSummary = arithmancer:getDamageTakenSummary()
+            local damageTaken = damageTakenSummary.total
+            local hasDamageTaken = damageTaken > 0
 
-        -- Damage taken summary: {dtps, total}
-        local damageTakenSummary = arithmancer:getDamageTakenSummary()
-        local damageTaken = damageTakenSummary.total
-        local hasDamageTaken = damageTaken > 0
-        local personalDTPS = damageTakenSummary.dtps
+            local personalDTPS = damageTakenSummary.dtps
 
-        -- Healing summaries: {rawHps, effectiveHps, total, rawTotal, overhealPercent}
-        local selfHealingData = arithmancer:getSelfHealingSummary()
-        local healingOutData = arithmancer:getHealingOutSummary()
-        local healingInData = arithmancer:getHealingInSummary()
+            -- Healing summaries: {rawHps, effectiveHps, total, rawTotal, overhealPercent}
+            local selfHealingData = arithmancer:getSelfHealingSummary()
+            local healingOutData = arithmancer:getHealingOutSummary()
+            local healingInData = arithmancer:getHealingInSummary()
 
-        -- Normalize healing data (nil if no data)
-        if selfHealingData.rawTotal == 0 then selfHealingData = nil end
-        if healingOutData.rawTotal == 0 then healingOutData = nil end
-        if healingInData.rawTotal == 0 then healingInData = nil end
+            -- Normalize healing data (nil if no data)
+            if selfHealingData.rawTotal == 0 then selfHealingData = nil end
+            if healingOutData.rawTotal == 0 then healingOutData = nil end
+            if healingInData.rawTotal == 0 then healingInData = nil end
 
-        -- Determine most prevalent healing type FIRST (needed for HPS calculation)
-        local prevalentHealingType, prevalentHealingData, prevalentHealingLabel =
-            GetMostPrevalentHealingType(selfHealingData, healingOutData, healingInData)
+            -- Determine most prevalent healing type FIRST (needed for HPS calculation)
+            local prevalentHealingType, prevalentHealingData, prevalentHealingLabel =
+                GetMostPrevalentHealingType(selfHealingData, healingOutData, healingInData)
 
-        -- Use the prevalent healing type's HPS for role detection and priority calculation
-        -- This ensures the healing section's priority matches what we're actually showing
-        local prevalentHPS = prevalentHealingData and prevalentHealingData.rawHps or 0
+            -- Use the prevalent healing type's HPS for role detection and priority calculation
+            -- This ensures the healing section's priority matches what we're actually showing
+            local prevalentHPS = prevalentHealingData and prevalentHealingData.rawHps or 0
 
-        -- Detect the player's primary role based on fight metrics (for Q3/Q4 content)
-        local playerRole = DetectPlayerRole(personalDPS, prevalentHPS, personalDTPS)
+            -- Pre-compute composition data: {dotPercent, directPercent, aoePercent, stPercent}
+            local compositionCalc = bossCalc or arithmancer
+            local compositionData = compositionCalc:getDamageComposition()
 
-        -- Pre-compute composition data: {dotPercent, directPercent, aoePercent, stPercent}
-        local compositionCalc = bossCalc or arithmancer
-        local compositionData = compositionCalc:getDamageComposition()
+            -- Pre-compute quality data: {critRate, maxHit}
+            local qualityData = compositionCalc:getDamageQuality()
+            local critRate = qualityData.critRate
+            local maxHit = qualityData.maxHit
 
-        -- Pre-compute quality data: {critRate, maxHit}
-        local qualityData = compositionCalc:getDamageQuality()
-        local critRate = qualityData.critRate
-        local maxHit = qualityData.maxHit
+            -- Compute HoT% for the prevalent healing type
+            local prevalentHotPercent = nil
+            if prevalentHealingType and encounter.healingStats then
+                local healingRawData = nil
 
-        -- Compute HoT% for the prevalent healing type
-        local prevalentHotPercent = nil
-        if prevalentHealingType and encounter.healingStats then
-            local healingRawData = nil
-
-            if prevalentHealingType == "selfHealing" then
-                healingRawData = encounter.healingStats.selfHealing
-            elseif prevalentHealingType == "healingOut" then
-                -- Aggregate across all targets for healing out
-                local healingOutToGroup = encounter.healingStats.healingOutToGroup
-                if healingOutToGroup then
-                    local totalHot, totalDirect = 0, 0
-                    for _, targetData in pairs(healingOutToGroup) do
-                        local hotVsDirect = Arithmancer.ComputeByHotVsDirect(targetData, abilityInfo)
-                        totalHot = totalHot + (hotVsDirect.hot and hotVsDirect.hot.raw or 0)
-                        totalDirect = totalDirect + (hotVsDirect.direct and hotVsDirect.direct.raw or 0)
+                if prevalentHealingType == "selfHealing" then
+                    healingRawData = encounter.healingStats.selfHealing
+                elseif prevalentHealingType == "healingOut" then
+                    -- Aggregate across all targets for healing out
+                    local healingOutToGroup = encounter.healingStats.healingOutToGroup
+                    if healingOutToGroup then
+                        local totalHot, totalDirect = 0, 0
+                        for _, targetData in pairs(healingOutToGroup) do
+                            local hotVsDirect = Arithmancer.ComputeByHotVsDirect(targetData, abilityInfo)
+                            totalHot = totalHot + (hotVsDirect.hot and hotVsDirect.hot.raw or 0)
+                            totalDirect = totalDirect + (hotVsDirect.direct and hotVsDirect.direct.raw or 0)
+                        end
+                        local totalRaw = totalHot + totalDirect
+                        if totalRaw > 0 then
+                            prevalentHotPercent = totalHot / totalRaw * 100
+                        end
                     end
+                elseif prevalentHealingType == "healingIn" then
+                    -- Aggregate across all sources for healing in
+                    local healingInFromGroup = encounter.healingStats.healingInFromGroup
+                    if healingInFromGroup then
+                        local totalHot, totalDirect = 0, 0
+                        for _, sourceData in pairs(healingInFromGroup) do
+                            local hotVsDirect = Arithmancer.ComputeByHotVsDirect(sourceData, abilityInfo)
+                            totalHot = totalHot + (hotVsDirect.hot and hotVsDirect.hot.raw or 0)
+                            totalDirect = totalDirect + (hotVsDirect.direct and hotVsDirect.direct.raw or 0)
+                        end
+                        local totalRaw = totalHot + totalDirect
+                        if totalRaw > 0 then
+                            prevalentHotPercent = totalHot / totalRaw * 100
+                        end
+                    end
+                end
+
+                -- For selfHealing, compute directly
+                if healingRawData and not prevalentHotPercent then
+                    local hotVsDirect = Arithmancer.ComputeByHotVsDirect(healingRawData, abilityInfo)
+                    local totalHot = hotVsDirect.hot and hotVsDirect.hot.raw or 0
+                    local totalDirect = hotVsDirect.direct and hotVsDirect.direct.raw or 0
                     local totalRaw = totalHot + totalDirect
                     if totalRaw > 0 then
                         prevalentHotPercent = totalHot / totalRaw * 100
                     end
                 end
-            elseif prevalentHealingType == "healingIn" then
-                -- Aggregate across all sources for healing in
-                local healingInFromGroup = encounter.healingStats.healingInFromGroup
-                if healingInFromGroup then
-                    local totalHot, totalDirect = 0, 0
-                    for _, sourceData in pairs(healingInFromGroup) do
-                        local hotVsDirect = Arithmancer.ComputeByHotVsDirect(sourceData, abilityInfo)
-                        totalHot = totalHot + (hotVsDirect.hot and hotVsDirect.hot.raw or 0)
-                        totalDirect = totalDirect + (hotVsDirect.direct and hotVsDirect.direct.raw or 0)
-                    end
-                    local totalRaw = totalHot + totalDirect
-                    if totalRaw > 0 then
-                        prevalentHotPercent = totalHot / totalRaw * 100
-                    end
-                end
             end
 
-            -- For selfHealing, compute directly
-            if healingRawData and not prevalentHotPercent then
-                local hotVsDirect = Arithmancer.ComputeByHotVsDirect(healingRawData, abilityInfo)
-                local totalHot = hotVsDirect.hot and hotVsDirect.hot.raw or 0
-                local totalDirect = hotVsDirect.direct and hotVsDirect.direct.raw or 0
-                local totalRaw = totalHot + totalDirect
-                if totalRaw > 0 then
-                    prevalentHotPercent = totalHot / totalRaw * 100
-                end
-            end
-        end
+            LibEffect.Yield():Await()
 
-        LibEffect.Yield():Await()
+            -------------------------
+            -- Q2: Priority-Based Section Selection
+            -------------------------
 
-        -------------------------
-        -- Q2: Priority-Based Section Selection
-        -------------------------
+            -- Calculate dynamic priorities based on player metrics
+            local encounterPriority, damagePriority, healingPriority, damageTakenPriority =
+                CalculateDynamicPriorities(personalDPS, prevalentHPS, personalDTPS)
 
-        -- Calculate dynamic priorities based on player metrics
-        local encounterPriority, damagePriority, healingPriority, damageTakenPriority =
-            CalculateDynamicPriorities(personalDPS, prevalentHPS, personalDTPS)
+            local bossDps = bossDamageSummary and bossDamageSummary.dps or nil
+            local deathCount = encounter.deaths and encounter.deaths.deathCount or 0
 
-        -- Pre-calculate row counts for each section
-        -- Damage Output: Total DPS (1) + optional Boss DPS, Share, Crit, MaxHit, DoT%, AoE%
-        local damageRowCount = 1  -- Always Total DPS
-        local bossDps = bossDamageSummary and bossDamageSummary.dps or nil
-        if bossDps and bossDps > 0 then damageRowCount = damageRowCount + 1 end
-        if totalDamageSummary.groupDps and totalDamageSummary.groupDps > personalDPS then damageRowCount = damageRowCount + 1 end
-        if critRate > 0 then damageRowCount = damageRowCount + 1 end
-        if maxHit > 0 then damageRowCount = damageRowCount + 1 end
-        if compositionData.directPercent then damageRowCount = damageRowCount + 1 end
-        if compositionData.aoePercent then damageRowCount = damageRowCount + 1 end
+            -- Build sections using ColumnBuilder
+            local encounterSection = q2:Section(GetString(BATTLESCROLLS_OVERVIEW_ENCOUNTER),
+                q2:StatRow(GetString(BATTLESCROLLS_TOOLTIP_DURATION), utils.formatPreciseDuration(encounter.durationMs))
+            )
 
-        -- Healing: Raw HPS, Effective HPS, Overheal% (3) + optional HoT%
-        local healingRowCount = 3
-        if prevalentHotPercent then healingRowCount = healingRowCount + 1 end
+            local dmgSection = hasDamage
+                and q2:Section(GetString(BATTLESCROLLS_OVERVIEW_DAMAGE_OUTPUT),
+                    (bossDps and bossDps > 0) and q2:StatRow(GetString(BATTLESCROLLS_BOSS_DAMAGE), utils.formatNumber(bossDps) .. " DPS"),
+                    q2:StatRow(GetString(BATTLESCROLLS_DAMAGE_DONE), utils.formatNumber(totalDamageSummary.dps) .. " DPS"),
+                    (totalDamageSummary.groupDps and totalDamageSummary.groupDps > totalDamageSummary.dps) and q2:StatRow(GetString(BATTLESCROLLS_OVERVIEW_SHARE), utils.formatPercent(totalDamageSummary.share)),
+                    critRate > 0 and q2:StatRow(GetString(BATTLESCROLLS_OVERVIEW_CRIT_RATE), utils.formatPercent(critRate)),
+                    maxHit > 0 and q2:StatRow(GetString(BATTLESCROLLS_OVERVIEW_MAX_HIT), utils.formatNumber(maxHit)),
+                    compositionData.directPercent and q2:StatRow(GetString(BATTLESCROLLS_DELIVERY_DIRECT), utils.formatPercent(compositionData.directPercent)),
+                    compositionData.aoePercent and q2:StatRow(GetString(BATTLESCROLLS_AOE), utils.formatPercent(compositionData.aoePercent)))
+                or nil
 
-        -- Damage Taken: DTPS, Total (2) + optional Death Count
-        local deathCount = encounter.deaths and encounter.deaths.deathCount or 0
-        local damageTakenRowCount = 2
-        if deathCount > 0 then damageTakenRowCount = damageTakenRowCount + 1 end
+            local healSection = prevalentHealingData
+                and q2:Section(prevalentHealingLabel,
+                    q2:StatRow(GetString(BATTLESCROLLS_HEALING_RAW_HPS), utils.formatNumber(prevalentHealingData.rawHps)),
+                    q2:StatRow(GetString(BATTLESCROLLS_HEALING_EFFECTIVE_HPS), utils.formatNumber(prevalentHealingData.effectiveHps)),
+                    q2:StatRow(GetString(BATTLESCROLLS_HEALING_OVERHEAL), utils.formatPercent(prevalentHealingData.overhealPercent)),
+                    prevalentHotPercent and q2:StatRow(GetString(BATTLESCROLLS_DELIVERY_HOT), utils.formatPercent(prevalentHotPercent)))
+                or nil
 
-        -- Define all Q2 sections with priority, displayOrder, condition, height, and render function
-        ---@type { id: string, priority: number, displayOrder: number, condition: boolean, height: number, render: fun(lastControl: Control|nil): Control }[]
-        local sections = {
-            {
-                id = "encounter",
-                priority = encounterPriority,
-                displayOrder = 1,
-                condition = true,  -- Always show encounter section
-                height = CalculateSectionHeight(1),  -- Duration row only
-                render = function(lastControl)
-                    lastControl = panel:AddSection(GetString(BATTLESCROLLS_OVERVIEW_ENCOUNTER), lastControl)
-                    return panel:AddStatRow(GetString(BATTLESCROLLS_TOOLTIP_DURATION), utils.formatPreciseDuration(encounter.durationMs), lastControl)
-                end,
-            },
-            {
-                id = "damage",
-                priority = damagePriority,
-                displayOrder = 2,
-                condition = hasDamage,
-                height = CalculateSectionHeight(damageRowCount),
-                render = function(lastControl)
-                    return panel:renderDamageOutputSection(
-                        lastControl,
-                        bossDps,
-                        totalDamageSummary.dps,
-                        totalDamageSummary.groupDps,
-                        totalDamageSummary.share,
-                        critRate,
-                        maxHit,
-                        compositionData.directPercent,
-                        compositionData.aoePercent
-                    )
-                end,
-            },
-            {
-                id = "healing",
-                priority = healingPriority,
-                displayOrder = 3,
-                condition = prevalentHealingData ~= nil,
-                height = CalculateSectionHeight(healingRowCount),
-                render = function(lastControl)
-                    return panel:renderHealingSectionCompact(
-                        prevalentHealingLabel, lastControl,
-                        prevalentHealingData.rawHps,
-                        prevalentHealingData.effectiveHps,
-                        prevalentHealingData.overhealPercent,
-                        prevalentHotPercent
-                    )
-                end,
-            },
-            {
-                id = "damageTaken",
-                priority = damageTakenPriority,
-                displayOrder = 4,
-                condition = hasDamageTaken,
-                height = CalculateSectionHeight(damageTakenRowCount),
-                render = function(lastControl)
-                    return panel:renderDamageTakenSection(lastControl,
-                        damageTakenSummary.dtps, damageTakenSummary.total, deathCount)
-                end,
-            },
-        }
+            local dtSection = hasDamageTaken
+                and q2:Section(GetString(BATTLESCROLLS_OVERVIEW_DAMAGE_TAKEN),
+                    q2:StatRow(GetString(BATTLESCROLLS_STAT_DTPS), utils.formatNumber(damageTakenSummary.dtps)),
+                    q2:StatRow(GetString(BATTLESCROLLS_OVERVIEW_TOTAL), utils.formatNumber(damageTakenSummary.total)),
+                    (deathCount and deathCount > 0) and q2:StatRow(GetString(BATTLESCROLLS_STAT_DEATH_COUNT), tostring(deathCount)))
+                or nil
 
-        -- Filter to only sections that should be shown (condition is true)
-        local eligibleSections = {}
-        for _, section in ipairs(sections) do
-            if section.condition then
-                table.insert(eligibleSections, section)
-            end
-        end
+            q2:mountFitted(journal.SECTION_GAP, 0, {
+                { priority = encounterPriority, order = 1, component = encounterSection },
+                { priority = damagePriority, order = 2, component = dmgSection },
+                { priority = healingPriority, order = 3, component = healSection },
+                { priority = damageTakenPriority, order = 4, component = dtSection },
+            })
 
-        -- Get available height for Q2 container
-        local container = panel.q2Container or panel.container
-        local availableHeight = container and container:GetHeight() or 0
+            LibEffect.YieldWithGC():Await()
 
-        -- Select sections by priority order while they fit
-        table.sort(eligibleSections, function(a, b) return a.priority < b.priority end)
-
-        local selectedIds = {}
-        local usedHeight = 0
-        local gapBetweenSections = ROW_GAPS.SECTION_HEADER
-
-        for _, section in ipairs(eligibleSections) do
-            local heightNeeded = section.height
-            if usedHeight > 0 then
-                heightNeeded = heightNeeded + gapBetweenSections
-            end
-            if usedHeight + heightNeeded <= availableHeight or availableHeight == 0 then
-                selectedIds[section.id] = true
-                usedHeight = usedHeight + heightNeeded
-            end
-        end
-
-        -- Render selected sections in display order (each section adds only 3-5 entries, no per-section yield needed)
-        table.sort(eligibleSections, function(a, b) return a.displayOrder < b.displayOrder end)
-
-        local lastControl = nil
-        for _, section in ipairs(eligibleSections) do
-            if selectedIds[section.id] then
-                lastControl = section.render(lastControl)
-            end
-        end
-
-        LibEffect.YieldWithGC():Await()
-
-        -- Q3: Top abilities - role-dependent content
-        local q3Control = nil
-        local maxAbilities = panel:GetMaxAbilities()
-        local healingStats = encounter and encounter.healingStats
-
-        if playerRole == "healer" and healingStats then
-            -- For healers: show top healing abilities
-            local topHealingAbilities = HealingRenderer.extractHealingOutAbilitiesAsync(healingStats.healingOutToGroup, maxAbilities):Await()
-            local selfHealingAbilities = HealingRenderer.extractSelfHealingAbilitiesAsync(healingStats.selfHealing, maxAbilities):Await()
-            -- Merge and sort
-            local allHealingAbilities = {}
-            for _, ability in ipairs(topHealingAbilities) do
-                table.insert(allHealingAbilities, ability)
-            end
-            for _, ability in ipairs(selfHealingAbilities) do
-                local found = false
-                for _, existing in ipairs(allHealingAbilities) do
-                    if existing.name == ability.name then
-                        existing.total = existing.total + ability.total
-                        found = true
-                        break
-                    end
-                end
-                if not found then
-                    table.insert(allHealingAbilities, ability)
-                end
-            end
-            table.sort(allHealingAbilities, function(a, b) return a.total > b.total end)
-            -- Limit to maxAbilities
-            local topAbilities = {}
-            for i = 1, math.min(maxAbilities, #allHealingAbilities) do
-                table.insert(topAbilities, allHealingAbilities[i])
-            end
-
-            if #topAbilities > 0 then
-                q3Control = panel:AddQ3Section(GetString(BATTLESCROLLS_OVERVIEW_TOP_HEALING), q3Control)
-                LibEffect.Yield():Await()
-                local topValue = topAbilities[1].total
-                local totalHealing = (healingOutData and healingOutData.effectiveTotal or 0)
-                    + (selfHealingData and selfHealingData.effectiveTotal or 0)
-                for _, ability in ipairs(topAbilities) do
-                    local abilityData = {
-                        abilityId = ability.abilityId,
-                        name = ability.name,
-                        total = ability.total,
-                        ticks = 0,
-                        critTicks = 0,
-                        maxHit = 0,
-                    }
-                    q3Control = panel:AddAbilityBar(abilityData, topValue, totalHealing, durationS, q3Control)
-                end
-            end
-        elseif playerRole == "tank" and hasDamageTaken then
-            -- For tanks: show top damage taken abilities (what's hurting them most)
-            local topAbilities = DamageRenderer.extractDamageTakenAbilitiesAsync(encounter.damageTakenByUnitId, maxAbilities):Await()
-            if #topAbilities > 0 then
-                q3Control = panel:AddQ3Section(GetString(BATTLESCROLLS_OVERVIEW_TOP_INCOMING), q3Control)
-                LibEffect.Yield():Await()
-                local topValue = topAbilities[1].total
-                for _, ability in ipairs(topAbilities) do
-                    q3Control = panel:AddAbilityBar(ability, topValue, damageTaken, durationS, q3Control)
-                end
-            end
-        else
-            -- For DPS: show top damage abilities
-            local topAbilities = DamageRenderer.extractTopAbilitiesAsync(encounter.damageByUnitId, nil, nil, maxAbilities):Await()
-            if #topAbilities > 0 then
-                q3Control = panel:AddQ3Section(GetString(BATTLESCROLLS_OVERVIEW_TOP_ABILITIES), q3Control)
-                LibEffect.Yield():Await()
-                local topValue = topAbilities[1].total
-                for _, ability in ipairs(topAbilities) do
-                    q3Control = panel:AddAbilityBar(ability, topValue, totalDamage, durationS, q3Control)
-                end
-            end
-        end
-
-        LibEffect.YieldWithGC():Await()
-
-        -- Q4: Role-dependent target/source display
-        local q4Control = nil
-        local maxTargets = panel:GetMaxTargets()
-
-        if playerRole == "healer" and healingStats and healingStats.healingOutToGroup then
-            -- For healers: show healing targets
-            local targets = HealingRenderer.extractHealingTargetBreakdownAsync(healingStats.healingOutToGroup, unitNames, maxTargets):Await()
-            if #targets > 0 then
-                q4Control = panel:AddQ4Section(GetString(BATTLESCROLLS_OVERVIEW_HEALING_TARGETS), q4Control)
-                for _, target in ipairs(targets) do
-                    q4Control = panel:AddTargetRow(target.name, utils.formatTargetHPS(target.total, durationS), q4Control)
-                end
-            end
-        elseif playerRole == "tank" and hasDamageTaken then
-            -- For tanks: show damage sources
-            local sources = DamageRenderer.extractDamageTakenSourcesAsync(encounter.damageTakenByUnitId, unitNames, maxTargets):Await()
-            if #sources > 0 then
-                q4Control = panel:AddQ4Section(GetString(BATTLESCROLLS_OVERVIEW_DAMAGE_SOURCES), q4Control)
-                for _, source in ipairs(sources) do
-                    local dtps = durationS > 0 and (source.total / durationS) or 0
-                    q4Control = panel:AddTargetRow(source.name, string.format("%s DTPS", utils.formatDPS(dtps)), q4Control)
-                end
-            end
-        elseif bossCalc then
-            -- For DPS in boss fights: show bosses
-            local bossUnitIds = encounter.bossesUnits or {}
-            local bossFilter = {}
-            for _, bossId in ipairs(bossUnitIds) do
-                bossFilter[bossId] = true
-            end
-            local bosses = DamageRenderer.extractTargetBreakdownAsync(encounter.damageByUnitId, unitNames, bossFilter, nil, maxTargets):Await()
-            if #bosses > 0 then
-                q4Control = panel:AddQ4Section(GetString(BATTLESCROLLS_OVERVIEW_BOSSES), q4Control)
-                for _, boss in ipairs(bosses) do
-                    q4Control = panel:AddTargetRow(boss.name, utils.formatTargetDPS(boss.total, durationS), q4Control)
-                end
-            end
-        else
-            -- For DPS in non-boss fights: show targets
-            local targets = DamageRenderer.extractTargetBreakdownAsync(encounter.damageByUnitId, unitNames, nil, nil, maxTargets):Await()
-            if #targets > 0 then
-                q4Control = panel:AddQ4Section(GetString(BATTLESCROLLS_OVERVIEW_TARGETS), q4Control)
-                for _, target in ipairs(targets) do
-                    q4Control = panel:AddTargetRow(target.name, utils.formatTargetDPS(target.total, durationS), q4Control)
-                end
-            end
-        end
-    end)
+            -- Q3: Setup data
+            local durationMs = encounter.durationMs or (durationS * 1000)
+            local playerAliveTimeMs = encounter.playerAliveTimeMs or durationMs
+            journal.renderers.setup.renderSetupToQ3(q3, encounter.setup, playerAliveTimeMs)
+        end,
+    }
 end
 
 -- Export to namespace

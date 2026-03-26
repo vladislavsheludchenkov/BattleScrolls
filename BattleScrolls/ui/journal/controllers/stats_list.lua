@@ -14,13 +14,27 @@ if not SemisPlaygroundCheckAccess() then
 end
 
 local journal = BattleScrolls.journal
-local utils = journal.utils
 local renderers = journal.renderers
 local StatsTab = journal.StatsTab
 
 journal.controllers = journal.controllers or {}
 
 local StatsListController = {}
+
+---@type table<number, fun(ctx: table): PanelSpec>
+local panelSpecBuilders = {
+    [StatsTab.OVERVIEW]          = renderers.overview.buildOverviewPanelSpec,
+    [StatsTab.BOSS_DAMAGE_DONE]  = renderers.damage.buildBossDamagePanelSpec,
+    [StatsTab.DAMAGE_DONE]       = renderers.damage.buildDamageDonePanelSpec,
+    [StatsTab.DAMAGE_TAKEN]      = renderers.damage.buildDamageTakenPanelSpec,
+    [StatsTab.HEALING_OUT]       = renderers.healing.buildHealingOutPanelSpec,
+    [StatsTab.SELF_HEALING]      = renderers.healing.buildSelfHealingPanelSpec,
+    [StatsTab.HEALING_IN]        = renderers.healing.buildHealingInPanelSpec,
+    [StatsTab.EFFECTS_PLAYER]    = renderers.effects.buildEffectsPanelSpec,
+    [StatsTab.EFFECTS_BOSS]      = renderers.effects.buildEffectsPanelSpec,
+    [StatsTab.EFFECTS_GROUP]     = renderers.effects.buildEffectsPanelSpec,
+    [StatsTab.SETUP]             = renderers.setup.buildSetupPanelSpec,
+}
 
 -------------------------
 -- Tab Rendering
@@ -33,8 +47,17 @@ local StatsListController = {}
 ---@return Effect
 function StatsListController.renderTab(ctx, selectedTab)
     return LibEffect.Async(function()
-        -- Add overview entry at the top of every tab
-        utils.addOverviewEntry(ctx.list)
+        -- Add overview entry at the top of every tab, with the default panel spec attached
+        local builder = panelSpecBuilders[selectedTab]
+        local panelSpec = builder and builder({
+            arithmancer = ctx.arithmancer,
+            encounter = ctx.encounter,
+            durationS = ctx.durationSec,
+            unitNames = ctx.unitNames,
+            abilityInfo = ctx.abilityInfo,
+            filters = ctx.filters,
+        }) or nil
+        journal.EntryBuilder.addOverviewEntry(ctx.list, selectedTab, panelSpec)
 
         if selectedTab == StatsTab.OVERVIEW then
             renderers.overview.renderOverview(ctx):Await()
@@ -58,6 +81,8 @@ function StatsListController.renderTab(ctx, selectedTab)
             renderers.effects.renderEffectsGroup(ctx):Await()
         elseif selectedTab == StatsTab.GROUP then
             renderers.group.renderGroup(ctx):Await()
+        elseif selectedTab == StatsTab.SETUP then
+            renderers.setup.renderSetup(ctx):Await()
         end
     end)
 end
@@ -150,6 +175,7 @@ function StatsListController.refresh(journalUI)
             durationSec = durationSec,
             arithmancer = journalUI.arithmancer,
             filters = journalUI:GetFiltersForTab(journalUI.selectedTab),
+            journalUI = journalUI,
         }
         StatsListController.renderTab(ctx, journalUI.selectedTab):Await()
 

@@ -166,6 +166,8 @@ function keybinds.initializeKeybindStripDescriptors(journalUI)
                 if groupTable then
                     groupTable:Hide()
                 end
+                -- Deactivate any active horizontal list on the stats list before switching away
+                journalUI:DeactivateSelectedSettingsControl()
                 journalUI.mode = NAVIGATION_MODE.ENCOUNTERS
                 journalUI.pendingTabIndex = journalUI.selectedEncounterTab or ENCOUNTER_TAB.ALL
                 -- Clear encounter-related decoded data when going back
@@ -213,45 +215,31 @@ function keybinds.initializeKeybindStripDescriptors(journalUI)
             keybind = "UI_SHORTCUT_TERTIARY",
             name = function()
                 local targetData = journalUI.statsList:GetTargetData()
-                if targetData and targetData.effectAbilityId then
-                    local favorites = BattleScrolls.storage.savedVariables.settings.favoriteEffects
-                    if favorites[targetData.effectAbilityId] then
-                        return GetString(BATTLESCROLLS_UNFAVORITE_EFFECT)
-                    end
+                if targetData and targetData.isFavorite then
+                    return GetString(BATTLESCROLLS_UNFAVORITE_EFFECT)
                 end
                 return GetString(BATTLESCROLLS_FAVORITE_EFFECT)
             end,
             callback = function()
                 local targetData = journalUI.statsList:GetTargetData()
-                if targetData and targetData.effectAbilityId then
-                    -- Save current index so the list doesn't jump to the top after refresh
-                    journalUI.restoreSelectedIndex = journalUI.statsList:GetSelectedIndex()
-                    local favorites = BattleScrolls.storage.savedVariables.settings.favoriteEffects
-                    if favorites[targetData.effectAbilityId] then
-                        favorites[targetData.effectAbilityId] = nil
-                        PlaySound(SOUNDS.CHAMPION_STAR_STAGE_DOWN)
-                    else
-                        favorites[targetData.effectAbilityId] = true
-                        PlaySound(SOUNDS.CHAMPION_STAR_STAGE_UP)
-                    end
+                if targetData and targetData.onFavoriteToggle then
+                    -- Toggle storage via closure (captures abilityId internally)
+                    targetData.onFavoriteToggle()
+                    local wasFavorite = targetData.isFavorite
+                    targetData.isFavorite = not wasFavorite
+                    PlaySound(wasFavorite and SOUNDS.CHAMPION_STAR_STAGE_DOWN or SOUNDS.CHAMPION_STAR_STAGE_UP)
 
-                    for i = 1, journalUI.statsList:GetNumEntries() do
-                        local entry = journalUI.statsList:GetEntryData(i)
-                        if entry.effectAbilityId then
-                            entry.isFavorite = favorites[entry.effectAbilityId]
-                        end
-                    end
+                    -- Re-run setup on visible controls so the star icon updates in place
+                    journalUI.statsList:RefreshVisible()
 
+                    -- Mark pending so the refresh keybind appears, but don't rebuild the list
                     journalUI.statsRefreshPending = true
-                    journalUI.statsList:Commit()
+                    KEYBIND_STRIP:UpdateKeybindButtonGroup(journalUI.statsKeybindStripDescriptor)
                 end
             end,
             visible = function()
-                if journalUI.selectedTab ~= STATS_TAB.EFFECTS_PLAYER
-                    and journalUI.selectedTab ~= STATS_TAB.EFFECTS_BOSS
-                    and journalUI.selectedTab ~= STATS_TAB.EFFECTS_GROUP then return false end
                 local targetData = journalUI.statsList:GetTargetData()
-                return targetData and targetData.effectAbilityId ~= nil
+                return targetData and targetData.onFavoriteToggle ~= nil
             end,
         },
         {
@@ -278,9 +266,8 @@ function keybinds.initializeKeybindStripDescriptors(journalUI)
                 end
             end,
             visible = function()
-                return journalUI.selectedTab == STATS_TAB.GROUP
-                    and journalUI.statsList:GetTargetData()
-                    and journalUI.statsList:GetTargetData().isOverviewEntry
+                local targetData = journalUI.statsList:GetTargetData()
+                return targetData and targetData.tooltip and targetData.tooltip.type == "groupTable"
             end,
             sound = SOUNDS.GAMEPAD_MENU_FORWARD,
         },
@@ -367,7 +354,7 @@ function keybinds.initializeKeybindStripDescriptors(journalUI)
             local numItems = journalUI.statsList:GetNumItems()
             for i = 1, numItems do
                 local entryData = journalUI.statsList:GetDataForDataIndex(i)
-                if entryData and entryData.groupPlayerName == data.displayName then
+                if entryData and entryData.text == data.displayName then
                     journalUI.statsList:SetSelectedIndexWithoutAnimation(i)
                     break
                 end

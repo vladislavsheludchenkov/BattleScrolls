@@ -6,6 +6,7 @@ BattleScrolls = BattleScrolls or {}
 BattleScrolls.journal = BattleScrolls.journal or {}
 
 local journal = BattleScrolls.journal
+local hList = journal.horizontalList
 
 ---@class BattleScrolls_Journal_SettingsTemplates
 local settingsTemplates = {}
@@ -162,83 +163,16 @@ function settingsTemplates.setupSettingsList(list)
         control:SetAlpha(ZO_GamepadMenuEntryTemplate_GetAlpha(selected))
     end
 
-    -- Custom horizontal list setup for dropdown-style options
-    -- Uses ZO_GamepadHorizontalListRow which has built-in horizontalListObject
-    local function HorizontalListSetup(control, data, selected, _reselectingDuringRebuild, _enabled, _active)
-        control.data = data
-
-        -- Set up the name label (control.label is set by ZO_GamepadHorizontalListRow_Initialize)
-        if control.label then
-            control.label:SetText(data.text or "")
-        end
-
-        -- The template already creates control.horizontalListObject in OnInitialized
-        local horizontalList = control.horizontalListObject
-        if not horizontalList then
-            return
-        end
-
-        -- Clear and populate the list
-        horizontalList:Clear()
-        local currentValue = data.getFunction and data.getFunction() or nil
-        local selectedIndex = 1
-
-        for i, option in ipairs(data.valid) do
-            local entryData = {
-                text = data.valueStrings and data.valueStrings[i] or tostring(option),
-                value = option,
-                parentControl = control,
-            }
-            horizontalList:AddEntry(entryData)
-            if option == currentValue then
-                selectedIndex = i
-            end
-        end
-
-        -- Set up selection changed callback
-        horizontalList:SetOnSelectedDataChangedCallback(function(selectedData, oldData, reselecting)
-            if oldData and not reselecting and selectedData then
-                if data.setFunction then
-                    data.setFunction(selectedData.value)
-                end
-                if data.onChangeFunction then
-                    data.onChangeFunction(selectedData.value)
-                end
-            end
-        end)
-
-        horizontalList:Commit()
-        local ALLOW_EVEN_IF_DISABLED = true
-        local NO_ANIMATION = true
-        horizontalList:SetSelectedDataIndex(selectedIndex, ALLOW_EVEN_IF_DISABLED, NO_ANIMATION)
-        horizontalList:SetActive(selected)
-        horizontalList:SetSelectedFromParent(selected)
-        horizontalList:RefreshVisible(selected)
-
-        -- Handle visual state
-        local color = ZO_GamepadMenuEntryTemplate_GetLabelColor(selected, false)
-        if control.label then
-            control.label:SetColor(color:UnpackRGBA())
-        end
-        control:SetAlpha(ZO_GamepadMenuEntryTemplate_GetAlpha(selected))
-    end
-
-    local function HorizontalListRelease(control)
-        if control.horizontalListObject then
-            control.horizontalListObject:Deactivate()
-        end
-    end
-
     list:AddDataTemplate("ZO_GamepadOptionsCheckboxRow", CheckboxSetup, ZO_GamepadMenuEntryTemplateParametricListFunction, nil, "Checkbox")
     list:AddDataTemplateWithHeader("ZO_GamepadOptionsCheckboxRow", CheckboxSetup, ZO_GamepadMenuEntryTemplateParametricListFunction, nil, "ZO_GamepadOptionsHeaderTemplate", nil, "CheckboxHeader")
     list:AddDataTemplate("ZO_GamepadOptionsSliderRow", SliderSetup, ZO_GamepadMenuEntryTemplateParametricListFunction)
     list:AddDataTemplateWithHeader("ZO_GamepadOptionsSliderRow", SliderSetup, ZO_GamepadMenuEntryTemplateParametricListFunction, nil, "ZO_GamepadOptionsHeaderTemplate", nil, "SliderHeader")
     list:SetDataTemplateReleaseFunction("ZO_GamepadOptionsSliderRow", SliderRelease)
     list:SetDataTemplateWithHeaderReleaseFunction("ZO_GamepadOptionsSliderRow", SliderRelease)
-    list:AddDataTemplate("ZO_GamepadHorizontalListRow", HorizontalListSetup, ZO_GamepadMenuEntryTemplateParametricListFunction)
-    list:AddDataTemplateWithHeader("ZO_GamepadHorizontalListRow", HorizontalListSetup, ZO_GamepadMenuEntryTemplateParametricListFunction, nil, "ZO_GamepadOptionsHeaderTemplate", nil, "HorizontalListHeader")
-    list:SetDataTemplateReleaseFunction("ZO_GamepadHorizontalListRow", HorizontalListRelease)
-    list:SetDataTemplateWithHeaderReleaseFunction("ZO_GamepadHorizontalListRow", HorizontalListRelease)
+    list:AddDataTemplate("ZO_GamepadHorizontalListRow", hList.setup, ZO_GamepadMenuEntryTemplateParametricListFunction)
+    list:AddDataTemplateWithHeader("ZO_GamepadHorizontalListRow", hList.setup, ZO_GamepadMenuEntryTemplateParametricListFunction, nil, "ZO_GamepadOptionsHeaderTemplate", nil, "HorizontalListHeader")
+    list:SetDataTemplateReleaseFunction("ZO_GamepadHorizontalListRow", hList.release)
+    list:SetDataTemplateWithHeaderReleaseFunction("ZO_GamepadHorizontalListRow", hList.release)
     list:AddDataTemplate("ZO_GamepadOptionsLabelRow", LabelSetup, ZO_GamepadMenuEntryTemplateParametricListFunction)
     list:SetNoItemText(GetString(BATTLESCROLLS_LIST_NO_SETTINGS))
 end

@@ -68,6 +68,8 @@ MIT License - see [LICENSE](LICENSE) for details.
 - **Hodor Restyle** by Hyperioxes - the "Bars" group meter design is loosely inspired by this
 - **LibCombat** by Solinur - ideas for solving some combat tracking edge cases (vSS/vCR portal handling)
 - **Area Damage** [ability list](https://github.com/Shienar/AreaDamage) by Shienar - used for AoE vs ST breakdown
+- **PotionMaker** by votan - alchemy trait translations sourced from [PotionMaker lang files](https://github.com/votan73/ESO/tree/master/Addons/PotionMaker/lang)
+- **Dolgubon's Lazy Writ Crafter** by Dolgubon - alchemy effect ID mapping referenced from [Alchemy.lua](https://github.com/Dolgubon/DolgubonsLazyWritCreator)
 
 ---
 

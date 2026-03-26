@@ -63,26 +63,35 @@ local notifyAllCallbacks = function(unitTag, data)
     end
 end
 
----@diagnostic disable-next-line: unused-function, unused-local -- used in phase 2 when sending new format
-local function encodeMetric(x)
-    if x > 1000000 then
-        return 1023 -- corresponds to math.huge
-    elseif x <= 99 then
-        return math.floor(math.max(x, 0))
-    else
-        return 100 + zo_round(922 * math.log(x / 100) / math.log(10000))
+-- Encoding: 0..literalMax are stored exactly, (literalMax+1)..maxVal-1 use log scale, maxVal = overflow sentinel.
+-- literalMax is chosen so that the log step at the boundary is >= 1 (every index decodes to a distinct integer).
+local LOG_CAP = BattleScrolls.constants.huge -- 2 ^ 20
+
+local function makeCodec(numBits, literalMax)
+    local maxVal = 2 ^ numBits - 1
+    local logBase = literalMax + 1
+    local logRange = maxVal - logBase - 1
+    local logFactor = LOG_CAP / logBase
+
+    local function encode(x)
+        if x > LOG_CAP then return maxVal end
+        if x <= literalMax then return math.floor(math.max(x, 0)) end
+        return logBase + zo_round(logRange * math.log(x / logBase) / math.log(logFactor))
     end
+
+    local function decode(i)
+        if i >= maxVal then return math.huge end
+        if i <= literalMax then return i end
+        return zo_round(logBase * logFactor ^ ((i - logBase) / logRange))
+    end
+
+    return encode, decode
 end
 
-local function decodeMetric(i)
-    if i >= 1023 then
-        return math.huge
-    elseif i <= 99 then
-        return i
-    else
-        return zo_round(100 * 10000 ^ ((i - 100) / 922))
-    end
-end
+---@diagnostic disable-next-line: unused-local -- encode used in phase 2 when sending new format
+local encode11, decode11 = makeCodec(11, 255)
+---@diagnostic disable-next-line: unused-local -- encode used in phase 2 when sending new format
+local encode12, decode12 = makeCodec(12, 511)
 
 ---Initialize the DPS sharing protocols with LibGroupBroadcast
 ---Registers legacy protocol (438) and new typed protocols (430 damage, 431 healing)
@@ -109,12 +118,12 @@ function dpsShare:Initialize()
 
     -- Damage protocol (430): encoded allTargetsDPS + optional bossDPS
     local damageProtocol = handler:DeclareProtocol(430, "BattleScrolls_DamageData")
-    damageProtocol:AddField(LGB.CreateNumericField("encodedAllDPS", { minValue = 0, numBits = 10 }))
-    damageProtocol:AddField(LGB.CreateOptionalField(LGB.CreateNumericField("encodedBossDPS", { minValue = 0, numBits = 10 })))
+    damageProtocol:AddField(LGB.CreateNumericField("encodedAllDPS", { minValue = 0, numBits = 11 }))
+    damageProtocol:AddField(LGB.CreateOptionalField(LGB.CreateNumericField("encodedBossDPS", { minValue = 0, numBits = 12 })))
     damageProtocol:OnData(function(unitTag, data)
         if AreUnitsEqual(unitTag, "player") then return end
-        local allTargetsDPS = decodeMetric(data.encodedAllDPS)
-        local bossDPS = data.encodedBossDPS and decodeMetric(data.encodedBossDPS) or nil
+        local allTargetsDPS = decode11(data.encodedAllDPS)
+        local bossDPS = data.encodedBossDPS and decode12(data.encodedBossDPS) or nil
         ---@type DPSShareDamageData
         local typed = { messageType = "damage", allTargetsDPS = allTargetsDPS, bossDPS = bossDPS }
         notifyAllCallbacks(unitTag, typed)
@@ -123,12 +132,12 @@ function dpsShare:Initialize()
 
     -- Healing protocol (431): encoded rawHPS + effectiveHPS
     local healingProtocol = handler:DeclareProtocol(431, "BattleScrolls_HealingData")
-    healingProtocol:AddField(LGB.CreateNumericField("encodedRawHPS", { minValue = 0, numBits = 10 }))
-    healingProtocol:AddField(LGB.CreateNumericField("encodedEffectiveHPS", { minValue = 0, numBits = 10 }))
+    healingProtocol:AddField(LGB.CreateNumericField("encodedRawHPS", { minValue = 0, numBits = 12 }))
+    healingProtocol:AddField(LGB.CreateNumericField("encodedEffectiveHPS", { minValue = 0, numBits = 12 }))
     healingProtocol:OnData(function(unitTag, data)
         if AreUnitsEqual(unitTag, "player") then return end
-        local rawHPS = decodeMetric(data.encodedRawHPS)
-        local effectiveHPS = decodeMetric(data.encodedEffectiveHPS)
+        local rawHPS = decode12(data.encodedRawHPS)
+        local effectiveHPS = decode12(data.encodedEffectiveHPS)
         ---@type DPSShareHealingData
         local typed = { messageType = "healing", rawHPS = rawHPS, effectiveHPS = effectiveHPS }
         notifyAllCallbacks(unitTag, typed)

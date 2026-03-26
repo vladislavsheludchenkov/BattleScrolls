@@ -28,6 +28,137 @@ local function formatMemberDisplayName(displayName)
     return zo_strformat(SI_UNIT_NAME, displayName)
 end
 
+---Helper to append tick stats lines (crit, avg, min, max)
+---@param lines string[] Lines array to append to
+---@param stats CritStats|nil Tick statistics
+---@param indent string|nil Indentation prefix
+function tooltips.appendTickStats(lines, stats, indent)
+    if not stats or stats.ticks == 0 then
+        return
+    end
+    indent = indent or ""
+    local critPercent = stats.critTicks / stats.ticks * 100
+    -- Use rawTotal for avg (includes overkill), falling back to total for old data
+    local rawTotal = stats.rawTotal and stats.rawTotal > 0 and stats.rawTotal or stats.total
+    local avgTick = math.floor(rawTotal / stats.ticks)
+    table.insert(lines, string.format("%s%s: %.1f%% (%d/%d)", indent, GetString(BATTLESCROLLS_TOOLTIP_CRIT), critPercent, stats.critTicks, stats.ticks))
+    table.insert(lines, string.format("%s%s: %s", indent, GetString(BATTLESCROLLS_TOOLTIP_AVG_TICK), ZO_CommaDelimitNumber(avgTick)))
+    table.insert(lines, string.format("%s%s: %s", indent, GetString(BATTLESCROLLS_TOOLTIP_MIN_TICK), ZO_CommaDelimitNumber(stats.minTick)))
+    table.insert(lines, string.format("%s%s: %s", indent, GetString(BATTLESCROLLS_TOOLTIP_MAX_TICK), ZO_CommaDelimitNumber(stats.maxTick)))
+end
+
+---Calculates uptime percentage
+---@param activeTimeMs number
+---@param durationMs number
+---@return number
+function tooltips.calculateUptime(activeTimeMs, durationMs)
+    if durationMs <= 0 then return 0 end
+    return (activeTimeMs / durationMs) * 100
+end
+
+---Formats a member name for display in tooltips
+---@param displayName string The undecorated display name
+---@param isSelf boolean Whether this is the player
+---@return string formattedName
+function tooltips.formatMemberName(displayName, isSelf)
+    if isSelf then
+        return GetString(BATTLESCROLLS_TOOLTIP_YOU)
+    end
+    return zo_strformat(SI_UNIT_NAME, displayName)
+end
+
+---Builds tooltip lines for an effect (player/boss)
+---@param stats table Effect stats
+---@param durationMs number Reference duration
+---@return string[] lines
+function tooltips.buildEffectTooltipLines(stats, durationMs)
+    local peakInstances = stats.peakConcurrentInstances or 1
+    local lines = {}
+
+    if peakInstances > 1 then
+        local avgUptimePercent = tooltips.calculateUptime(stats.totalActiveTimeMs, durationMs * peakInstances)
+        table.insert(lines, string.format("%s: %.1f%%", GetString(BATTLESCROLLS_TOOLTIP_AVG_UPTIME_PER_INSTANCE), avgUptimePercent))
+        table.insert(lines, string.format("%s: %d", GetString(BATTLESCROLLS_TOOLTIP_PEAK_INSTANCES), peakInstances))
+        table.insert(lines, string.format("%s: %d", GetString(BATTLESCROLLS_TOOLTIP_TOTAL_APPLICATIONS), stats.applications))
+    else
+        local uptimePercent = tooltips.calculateUptime(stats.totalActiveTimeMs, durationMs)
+        table.insert(lines, string.format("%s: %.1f%%", GetString(BATTLESCROLLS_TOOLTIP_TOTAL_UPTIME), uptimePercent))
+        table.insert(lines, string.format("%s: %d", GetString(BATTLESCROLLS_TOOLTIP_TOTAL_APPLICATIONS), stats.applications))
+    end
+
+    if stats.playerActiveTimeMs ~= nil then
+        local playerUptimePercent = tooltips.calculateUptime(stats.playerActiveTimeMs, durationMs)
+        if stats.playerActiveTimeMs > 0 or stats.playerApplications > 0 then
+            table.insert(lines, "")
+            table.insert(lines, GetString(BATTLESCROLLS_TOOLTIP_YOUR_CONTRIBUTION) .. ":")
+            table.insert(lines, string.format("  %s: %.1f%%", GetString(BATTLESCROLLS_TOOLTIP_YOUR_UPTIME), playerUptimePercent))
+            table.insert(lines, string.format("  %s: %d", GetString(BATTLESCROLLS_TOOLTIP_YOUR_APPLICATIONS), stats.playerApplications))
+        end
+    end
+
+    if stats.maxStacks > 1 then
+        table.insert(lines, "")
+        local maxStacksPercent = tooltips.calculateUptime(stats.timeAtMaxStacksMs, durationMs)
+        table.insert(lines, string.format("%s: %d", GetString(BATTLESCROLLS_TOOLTIP_MAX_STACKS), stats.maxStacks))
+        table.insert(lines, string.format("%s: %.1f%%", GetString(BATTLESCROLLS_TOOLTIP_TIME_AT_MAX_STACKS), maxStacksPercent))
+        if stats.playerTimeAtMaxStacksMs and stats.playerTimeAtMaxStacksMs > 0 then
+            local playerMaxStacksPercent = tooltips.calculateUptime(stats.playerTimeAtMaxStacksMs, durationMs)
+            table.insert(lines, string.format("%s: %.1f%%", GetString(BATTLESCROLLS_TOOLTIP_YOUR_TIME_AT_MAX), playerMaxStacksPercent))
+        end
+    end
+
+    return lines
+end
+
+---Builds tooltip lines for a group effect
+---@param stats table Aggregated group effect stats
+---@param durationMs number Reference duration
+---@param memberBreakdown table[]|nil Per-member breakdown
+---@return string[] lines
+function tooltips.buildGroupEffectTooltipLines(stats, durationMs, memberBreakdown)
+    local avgActiveTimeMs = stats.totalActiveTimeMs / stats.memberCount
+    local avgUptimePercent = tooltips.calculateUptime(avgActiveTimeMs, durationMs)
+    local avgPlayerActiveTimeMs = stats.playerActiveTimeMs / stats.memberCount
+    local avgPlayerUptimePercent = tooltips.calculateUptime(avgPlayerActiveTimeMs, durationMs)
+
+    local lines = {}
+
+    table.insert(lines, string.format("%s: %.1f%%", GetString(BATTLESCROLLS_TOOLTIP_AVG_UPTIME_PER_MEMBER), avgUptimePercent))
+    table.insert(lines, string.format("%s: %d", GetString(BATTLESCROLLS_TOOLTIP_TOTAL_APPLICATIONS), stats.applications))
+    table.insert(lines, string.format("%s: %d", GetString(BATTLESCROLLS_TOOLTIP_MEMBERS_AFFECTED), stats.memberCount))
+
+    if stats.playerActiveTimeMs > 0 or stats.playerApplications > 0 then
+        table.insert(lines, "")
+        table.insert(lines, GetString(BATTLESCROLLS_TOOLTIP_YOUR_CONTRIBUTION) .. ":")
+        table.insert(lines, string.format("  %s: %.1f%%", GetString(BATTLESCROLLS_TOOLTIP_AVG_UPTIME), avgPlayerUptimePercent))
+        table.insert(lines, string.format("  %s: %d", GetString(BATTLESCROLLS_TOOLTIP_YOUR_APPLICATIONS), stats.playerApplications))
+    end
+
+    if stats.maxStacks > 1 then
+        table.insert(lines, "")
+        table.insert(lines, string.format("%s: %d", GetString(BATTLESCROLLS_TOOLTIP_MAX_STACKS_OBSERVED), stats.maxStacks))
+        local avgTimeAtMaxStacksMs = stats.timeAtMaxStacksMs / stats.memberCount
+        local avgMaxStacksPercent = tooltips.calculateUptime(avgTimeAtMaxStacksMs, durationMs)
+        table.insert(lines, string.format("%s: %.1f%%", GetString(BATTLESCROLLS_TOOLTIP_AVG_TIME_AT_MAX), avgMaxStacksPercent))
+        if stats.playerTimeAtMaxStacksMs > 0 then
+            local avgPlayerTimeAtMaxStacksMs = stats.playerTimeAtMaxStacksMs / stats.memberCount
+            local avgPlayerMaxStacksPercent = tooltips.calculateUptime(avgPlayerTimeAtMaxStacksMs, durationMs)
+            table.insert(lines, string.format("%s: %.1f%%", GetString(BATTLESCROLLS_TOOLTIP_YOUR_AVG_TIME_AT_MAX), avgPlayerMaxStacksPercent))
+        end
+    end
+
+    if memberBreakdown then
+        table.insert(lines, "")
+        table.insert(lines, GetString(BATTLESCROLLS_TOOLTIP_PER_MEMBER) .. ":")
+        for _, member in ipairs(memberBreakdown) do
+            local name = tooltips.formatMemberName(member.displayName, member.isSelf)
+            table.insert(lines, string.format("  %s: %.1f%%", name, member.uptimePercent))
+        end
+    end
+
+    return lines
+end
+
 ---Builds a tooltip for boss target rows showing group damage breakdown
 ---@param unitId number The boss unit ID
 ---@param encounter DecodedEncounter

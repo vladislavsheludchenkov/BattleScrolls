@@ -14,48 +14,6 @@ local journal = BattleScrolls.journal
 local utils = {}
 
 -------------------------
--- List Entry Helpers
--------------------------
-
----Creates a stat entry for the list
----@param list ZO_ParametricScrollList The parametric list
----@param label string Main text
----@param value string|number|nil Value to display as sublabel
----@param icon string|nil Optional icon path
----@param header string|nil Optional header for section grouping
----@param tooltipTitle string|nil Optional tooltip title
----@param tooltipText string|nil Optional tooltip body text
-function utils.addStatEntry(list, label, value, icon, header, tooltipTitle, tooltipText)
-    local entryData = ZO_GamepadEntryData:New(label, icon)
-    entryData:SetIconTintOnSelection(true)
-    if value then
-        entryData:AddSubLabel(tostring(value))
-    end
-    if tooltipTitle then
-        entryData.tooltipTitle = tooltipTitle
-    end
-    if tooltipText then
-        entryData.tooltipText = tooltipText
-    end
-
-    if header then
-        entryData:SetHeader(header)
-        list:AddEntryWithHeader("ZO_GamepadItemSubEntryTemplate", entryData)
-    else
-        list:AddEntry("ZO_GamepadItemSubEntryTemplate", entryData)
-    end
-end
-
----Adds an Overview entry at the top of the stats list
----@param list ZO_ParametricScrollList The parametric list
-function utils.addOverviewEntry(list)
-    local entryData = ZO_GamepadEntryData:New(GetString(BATTLESCROLLS_TAB_OVERVIEW), journal.StatIcons.SUMMARY)
-    entryData:SetIconTintOnSelection(true)
-    entryData.isOverviewEntry = true
-    list:AddEntry("ZO_GamepadItemSubEntryTemplate", entryData)
-end
-
--------------------------
 -- Formatting Helpers
 -------------------------
 
@@ -491,6 +449,56 @@ function utils.calculateHealingTotals(healingData)
         totalReal = totalReal + data.total.real
     end
     return totalRaw, totalReal
+end
+
+-------------------------
+-- Ability Icon Helpers
+-------------------------
+
+---Configures edge/circle frame for an ability icon control.
+---@param edgeFrame Control Backdrop control for square frame
+---@param circleFrame Control Texture control for circle frame
+---@param icon Control Icon texture control (anchor target)
+---@param isPassive boolean Whether the ability is passive
+---@param isUltimate boolean Whether the ability is an ultimate
+local function setupAbilityIconFrame(edgeFrame, circleFrame, icon, isPassive, isUltimate)
+    local style = journal.AbilityIconStyle
+    local frameInset = isUltimate and style.ULT_FRAME_INSET or style.FRAME_INSET
+
+    edgeFrame:ClearAnchors()
+    edgeFrame:SetAnchor(TOPLEFT, icon, TOPLEFT, -frameInset, -frameInset)
+    edgeFrame:SetAnchor(BOTTOMRIGHT, icon, BOTTOMRIGHT, frameInset, frameInset)
+    if isUltimate then
+        edgeFrame:SetEdgeColor(unpack(style.ULT_EDGE_COLOR))
+    else
+        edgeFrame:SetEdgeColor(ZO_NORMAL_TEXT:UnpackRGBA())
+    end
+    edgeFrame:SetHidden(isPassive)
+
+    circleFrame:ClearAnchors()
+    circleFrame:SetAnchor(TOPLEFT, icon, TOPLEFT, -frameInset, -frameInset)
+    circleFrame:SetAnchor(BOTTOMRIGHT, icon, BOTTOMRIGHT, frameInset, frameInset)
+    circleFrame:SetHidden(not isPassive)
+end
+
+---Populates an ability icon row created from BattleScrolls_AbilityIconEntry template.
+---Used by both the overview panel and tooltip to guarantee identical rendering.
+---@param row Control Control with Icon, EdgeFrame, CircleFrame, Name children
+---@param abilityId number
+---@param isUltimate boolean
+function utils.populateAbilityRow(row, abilityId, isUltimate)
+    local icon = row:GetNamedChild("Icon")
+    local edgeFrame = row:GetNamedChild("EdgeFrame")
+    local circleFrame = row:GetNamedChild("CircleFrame")
+    local nameLabel = row:GetNamedChild("Name")
+
+    local abilityIcon = GetAbilityIcon(abilityId)
+    icon:SetTexture(abilityIcon)
+
+    local isPassive = utils.isPassiveIcon(abilityIcon)
+    setupAbilityIconFrame(edgeFrame, circleFrame, icon, isPassive, isUltimate)
+
+    nameLabel:SetText(utils.GetScribeAwareAbilityDisplayName(abilityId))
 end
 
 -- Export to namespace

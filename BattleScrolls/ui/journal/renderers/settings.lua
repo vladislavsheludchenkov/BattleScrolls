@@ -15,6 +15,15 @@ local journal = BattleScrolls.journal
 
 local SettingsRenderer = {}
 
+---Builds a text tooltip descriptor matching the dispatch format used by chronicler
+---@param title string|nil
+---@param text string|nil
+---@return TooltipDescriptor|nil
+local function textTooltip(title, text)
+    if not text then return nil end
+    return { type = "text", title = title or "", text = text }
+end
+
 -------------------------
 -- Section Helpers
 -------------------------
@@ -95,8 +104,7 @@ local function renderDpsMeterPersonalSettings(list, settings, defaults, onRefres
             text = GetString(BATTLESCROLLS_SETTINGS_MODE),
             valid = { "auto", "damage", "healing" },
             valueStrings = { GetString(BATTLESCROLLS_SETTINGS_MODE_AUTO), GetString(BATTLESCROLLS_SETTINGS_MODE_DAMAGE), GetString(BATTLESCROLLS_SETTINGS_MODE_HEALING) },
-            tooltipTitle = currentMode == "auto" and GetString(BATTLESCROLLS_SETTINGS_AUTO_MODE_TITLE) or nil,
-            tooltipText = currentMode == "auto" and GetString(BATTLESCROLLS_SETTINGS_AUTO_MODE_TEXT) or nil,
+            tooltip = currentMode == "auto" and textTooltip(GetString(BATTLESCROLLS_SETTINGS_AUTO_MODE_TITLE), GetString(BATTLESCROLLS_SETTINGS_AUTO_MODE_TEXT)) or nil,
             getFunction = function()
                 return settings and settings.dpsMeterPersonalMode or defaults.dpsMeterPersonalMode
             end,
@@ -148,8 +156,7 @@ local function renderDpsMeterPersonalSettings(list, settings, defaults, onRefres
                     text = settingDef.displayName,
                     valid = settingDef.options,
                     valueStrings = settingDef.optionLabels or settingDef.options,
-                    tooltipTitle = settingDef.tooltipTitle,
-                    tooltipText = settingDef.tooltipText,
+                    tooltip = textTooltip(settingDef.tooltipTitle, settingDef.tooltipText),
                     getFunction = function()
                         return BattleScrolls.dpsMeterDesigns.GetPersonalDesignSetting(currentPersonalDesignId, settingDef.id)
                     end,
@@ -261,8 +268,7 @@ local function renderDpsMeterGroupSettings(list, settings, defaults, onRefresh, 
     local groupEnabledData = {
         text = GetString(BATTLESCROLLS_SETTINGS_ENABLED),
         header = GetString(BATTLESCROLLS_SETTINGS_GROUP_METER),
-        tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_GROUP_METER),
-        tooltipText = GetString(BATTLESCROLLS_SETTINGS_GROUP_METER_TEXT),
+        tooltip = textTooltip(GetString(BATTLESCROLLS_SETTINGS_GROUP_METER), GetString(BATTLESCROLLS_SETTINGS_GROUP_METER_TEXT)),
         getFunction = function()
             return settings and settings.dpsMeterGroupEnabled ~= false
         end,
@@ -298,8 +304,7 @@ local function renderDpsMeterGroupSettings(list, settings, defaults, onRefresh, 
     -- Show Without Group Data toggle (show group meter when only you have data)
     local groupShowSoloData = {
         text = GetString(BATTLESCROLLS_SETTINGS_SHOW_WITHOUT_GROUP_DATA),
-        tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_SHOW_WITHOUT_GROUP_DATA),
-        tooltipText = GetString(BATTLESCROLLS_SETTINGS_SHOW_WITHOUT_GROUP_DATA_TEXT),
+        tooltip = textTooltip(GetString(BATTLESCROLLS_SETTINGS_SHOW_WITHOUT_GROUP_DATA), GetString(BATTLESCROLLS_SETTINGS_SHOW_WITHOUT_GROUP_DATA_TEXT)),
         getFunction = function()
             return settings and settings.dpsMeterGroupShowSolo == true
         end,
@@ -338,8 +343,7 @@ local function renderDpsMeterGroupSettings(list, settings, defaults, onRefresh, 
         text = GetString(BATTLESCROLLS_SETTINGS_DESIGN),
         valid = groupDesignIds,
         valueStrings = groupDesignNames,
-        tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_GROUP_TRACKER_DESIGN),
-        tooltipText = currentGroupDesign and currentGroupDesign.description or nil,
+        tooltip = textTooltip(GetString(BATTLESCROLLS_SETTINGS_GROUP_TRACKER_DESIGN), currentGroupDesign and currentGroupDesign.description or nil),
         getFunction = function()
             return settings and settings.dpsMeterGroupDesign or defaults.dpsMeterGroupDesign
         end,
@@ -364,8 +368,7 @@ local function renderDpsMeterGroupSettings(list, settings, defaults, onRefresh, 
                 text = settingDef.displayName,
                 valid = settingDef.options,
                 valueStrings = settingDef.optionLabels or settingDef.options,
-                tooltipTitle = settingDef.tooltipTitle,
-                tooltipText = settingDef.tooltipText,
+                tooltip = textTooltip(settingDef.tooltipTitle, settingDef.tooltipText),
                 getFunction = function()
                     return BattleScrolls.dpsMeterDesigns.GetGroupDesignSetting(currentGroupDesignId, settingDef.id)
                 end,
@@ -392,8 +395,7 @@ local function renderDpsMeterGroupSettings(list, settings, defaults, onRefresh, 
             text = GetString(BATTLESCROLLS_SETTINGS_POSITION),
             valid = { "below", "above", "separate" },
             valueStrings = { GetString(BATTLESCROLLS_SETTINGS_POSITION_BELOW), GetString(BATTLESCROLLS_SETTINGS_POSITION_ABOVE), GetString(BATTLESCROLLS_SETTINGS_POSITION_SEPARATE) },
-            tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_GROUP_TRACKER_POSITION),
-            tooltipText = GetString(BATTLESCROLLS_SETTINGS_GROUP_TRACKER_POSITION_TEXT),
+            tooltip = textTooltip(GetString(BATTLESCROLLS_SETTINGS_GROUP_TRACKER_POSITION), GetString(BATTLESCROLLS_SETTINGS_GROUP_TRACKER_POSITION_TEXT)),
             getFunction = function()
                 return settings and settings.dpsMeterGroupPosition or defaults.dpsMeterGroupPosition
             end,
@@ -530,8 +532,7 @@ local function renderRecordingSettings(list, settings, defaults, onRefresh)
 
     local recordInstancedData = {
         text = GetString(BATTLESCROLLS_SETTINGS_RECORD_IN_INSTANCED),
-        tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_RECORD_IN_INSTANCED),
-        tooltipText = GetString(BATTLESCROLLS_SETTINGS_RECORD_IN_INSTANCED_TEXT) .. "\n\n" .. GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT),
+        tooltip = textTooltip(GetString(BATTLESCROLLS_SETTINGS_RECORD_IN_INSTANCED), GetString(BATTLESCROLLS_SETTINGS_RECORD_IN_INSTANCED_TEXT) .. "\n\n" .. GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT)),
         getFunction = function()
             return getZonesSet().instanced == true
         end,
@@ -547,8 +548,7 @@ local function renderRecordingSettings(list, settings, defaults, onRefresh)
 
     local recordOverlandData = {
         text = GetString(BATTLESCROLLS_SETTINGS_RECORD_IN_OVERLAND),
-        tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TITLE),
-        tooltipText = GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT),
+        tooltip = textTooltip(GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TITLE), GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT)),
         getFunction = function()
             return getZonesSet().overland == true
         end,
@@ -564,8 +564,7 @@ local function renderRecordingSettings(list, settings, defaults, onRefresh)
 
     local recordHouseData = {
         text = GetString(BATTLESCROLLS_SETTINGS_RECORD_IN_HOUSES),
-        tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TITLE),
-        tooltipText = GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT),
+        tooltip = textTooltip(GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TITLE), GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT)),
         getFunction = function()
             return getZonesSet().house == true
         end,
@@ -581,8 +580,7 @@ local function renderRecordingSettings(list, settings, defaults, onRefresh)
 
     local recordPvPData = {
         text = GetString(BATTLESCROLLS_SETTINGS_RECORD_IN_PVP),
-        tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TITLE),
-        tooltipText = GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT),
+        tooltip = textTooltip(GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TITLE), GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT)),
         getFunction = function()
             return getZonesSet().pvp == true
         end,
@@ -601,8 +599,7 @@ local function renderRecordingSettings(list, settings, defaults, onRefresh)
         local formattedName = zo_strformat("<<1>>", adventureZoneName)
         local recordAdventureZoneData = {
             text = formattedName,
-            tooltipTitle = formattedName,
-            tooltipText = zo_strformat(GetString(BATTLESCROLLS_SETTINGS_RECORD_IN_ADVENTURE_ZONE_TEXT), adventureZoneName),
+            tooltip = textTooltip(formattedName, zo_strformat(GetString(BATTLESCROLLS_SETTINGS_RECORD_IN_ADVENTURE_ZONE_TEXT), adventureZoneName)),
             getFunction = function()
                 if not settings or settings.recordInAdventureZone == nil then
                     return defaults.recordInAdventureZone
@@ -622,8 +619,7 @@ local function renderRecordingSettings(list, settings, defaults, onRefresh)
 
     local recordBossData = {
         text = GetString(BATTLESCROLLS_SETTINGS_RECORD_BOSS_FIGHTS),
-        tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TITLE),
-        tooltipText = GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT),
+        tooltip = textTooltip(GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TITLE), GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT)),
         getFunction = function()
             return getFightsSet().boss == true
         end,
@@ -639,8 +635,7 @@ local function renderRecordingSettings(list, settings, defaults, onRefresh)
 
     local recordTrashData = {
         text = GetString(BATTLESCROLLS_SETTINGS_RECORD_TRASH_FIGHTS),
-        tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_RECORD_TRASH_FIGHTS),
-        tooltipText = GetString(BATTLESCROLLS_SETTINGS_RECORD_TRASH_FIGHTS_TEXT) .. "\n\n" .. GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT),
+        tooltip = textTooltip(GetString(BATTLESCROLLS_SETTINGS_RECORD_TRASH_FIGHTS), GetString(BATTLESCROLLS_SETTINGS_RECORD_TRASH_FIGHTS_TEXT) .. "\n\n" .. GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT)),
         getFunction = function()
             return getFightsSet().trash == true
         end,
@@ -656,8 +651,7 @@ local function renderRecordingSettings(list, settings, defaults, onRefresh)
 
     local recordPlayerData = {
         text = GetString(BATTLESCROLLS_SETTINGS_RECORD_PLAYER_FIGHTS),
-        tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_RECORD_PLAYER_FIGHTS),
-        tooltipText = GetString(BATTLESCROLLS_SETTINGS_RECORD_PLAYER_FIGHTS_TEXT) .. "\n\n" .. GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT),
+        tooltip = textTooltip(GetString(BATTLESCROLLS_SETTINGS_RECORD_PLAYER_FIGHTS), GetString(BATTLESCROLLS_SETTINGS_RECORD_PLAYER_FIGHTS_TEXT) .. "\n\n" .. GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT)),
         getFunction = function()
             return getFightsSet().player == true
         end,
@@ -673,8 +667,7 @@ local function renderRecordingSettings(list, settings, defaults, onRefresh)
 
     local recordDummyData = {
         text = GetString(BATTLESCROLLS_SETTINGS_RECORD_DUMMY_FIGHTS),
-        tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TITLE),
-        tooltipText = GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT),
+        tooltip = textTooltip(GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TITLE), GetString(BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT)),
         getFunction = function()
             return getFightsSet().dummy == true
         end,
@@ -708,14 +701,14 @@ local function renderStorageSettings(list, settings, defaults)
     storageSizeData.text = GetString(BATTLESCROLLS_SETTINGS_HISTORY_SIZE_LIMIT)
     storageSizeData.valid = storageSizePresetKeys
     storageSizeData.valueStrings = storageSizePresetLabels
-    storageSizeData.tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_HISTORY_SIZE_LIMIT_TITLE)
+    storageSizeData.tooltip = { type = "text", title = GetString(BATTLESCROLLS_SETTINGS_HISTORY_SIZE_LIMIT_TITLE), text = "" }
     storageSizeData.refreshTooltipText = function()
         -- Calculate current usage for tooltip
         local currentPreset = BattleScrolls.storage:GetCurrentSizePreset()
         local usagePercent = currentPreset.memoryMB > 0 and (bytes / currentPreset.memoryMB / 1000000 * 100) or 0
         local memoryMB = bytes / 1000000  -- Approximate memory in MB
 
-        storageSizeData.tooltipText = table.concat({
+        storageSizeData.tooltip.text = table.concat({
             GetString(BATTLESCROLLS_SETTINGS_STORAGE_TT_DESC),
             "",
             GetString(BATTLESCROLLS_SETTINGS_STORAGE_TT_NOTE),
@@ -863,8 +856,7 @@ local function renderEffectTrackingSettings(list, settings, _defaults, onRefresh
     if favorites and next(favorites) ~= nil then
         local clearFavoritesData = {
             text = GetString(BATTLESCROLLS_CLEAR_ALL_FAVORITES),
-            tooltipTitle = GetString(BATTLESCROLLS_CLEAR_ALL_FAVORITES),
-            tooltipText = GetString(BATTLESCROLLS_CLEAR_ALL_FAVORITES_TOOLTIP),
+            tooltip = textTooltip(GetString(BATTLESCROLLS_CLEAR_ALL_FAVORITES), GetString(BATTLESCROLLS_CLEAR_ALL_FAVORITES_TOOLTIP)),
             callback = function()
                 BattleScrolls.journal.dialogs.showBasicDialog({
                     title = GetString(BATTLESCROLLS_CLEAR_ALL_FAVORITES),
@@ -917,8 +909,7 @@ local function renderPerformanceSettings(list, settings, defaults, onRefresh, ef
     local asyncSpeedData = {}
     asyncSpeedData.text = GetString(BATTLESCROLLS_SETTINGS_ASYNC_SPEED)
     asyncSpeedData.header = GetString(BATTLESCROLLS_SETTINGS_PERFORMANCE)
-    asyncSpeedData.tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_ASYNC_SPEED_TITLE)
-    asyncSpeedData.tooltipText = GetString(BATTLESCROLLS_SETTINGS_ASYNC_SPEED_TEXT)
+    asyncSpeedData.tooltip = textTooltip(GetString(BATTLESCROLLS_SETTINGS_ASYNC_SPEED_TITLE), GetString(BATTLESCROLLS_SETTINGS_ASYNC_SPEED_TEXT))
     asyncSpeedData.valid = asyncSpeedValues
     asyncSpeedData.valueStrings = asyncSpeedLabels
     asyncSpeedData.getFunction = function()
@@ -950,8 +941,7 @@ local function renderPerformanceSettings(list, settings, defaults, onRefresh, ef
             text = GetString(BATTLESCROLLS_SETTINGS_RECON_PRECISION),
             valid = reconPresetKeys,
             valueStrings = reconPresetLabels,
-            tooltipTitle = GetString(BATTLESCROLLS_SETTINGS_RECON_PRECISION),
-            tooltipText = GetString(BATTLESCROLLS_SETTINGS_RECON_PRECISION_TOOLTIP),
+            tooltip = textTooltip(GetString(BATTLESCROLLS_SETTINGS_RECON_PRECISION), GetString(BATTLESCROLLS_SETTINGS_RECON_PRECISION_TOOLTIP)),
             getFunction = function()
                 return settings and settings.effectReconciliationPreset or defaults.effectReconciliationPreset
             end,

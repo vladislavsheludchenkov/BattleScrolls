@@ -156,6 +156,7 @@ BattleScrolls = BattleScrolls or {}
 ---@field pendingSharedData SharedDataEntry[]|nil Shared encounter data received during combat
 ---@field playerDeathCount number Number of times player died this fight
 ---@field deathRecaps DeathRecapSnapshot[] All captured death recaps (appended on each death)
+---@field playerSetup PlayerSetup|nil
 
 --- @type BattleScrollsState
 local state = {}
@@ -333,6 +334,7 @@ function BattleScrolls.state:Reset()
     self.bossUnitIdRedirects = {}
     self.failedToAssignBossUnitIds = {}
     self.pendingSharedData = nil
+    self.playerSetup = nil
     self.lastDamageDoneMs = 0
     self.playerDeathCount = 0
     self.deathRecaps = {}
@@ -381,6 +383,7 @@ function BattleScrolls.state:Snapshot()
     snapshot.pendingSharedData = self.pendingSharedData
     snapshot.playerDeathCount = self.playerDeathCount
     snapshot.deathRecaps = self.deathRecaps
+    snapshot.playerSetup = self.playerSetup
 
     return snapshot
 end

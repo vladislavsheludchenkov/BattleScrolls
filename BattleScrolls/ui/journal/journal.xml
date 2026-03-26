@@ -21,6 +21,26 @@
             </Controls>
         </Control>
 
+        <!-- Horizontal list row with left-aligned label and icon (matches ZO_GamepadMenuEntryTemplateLowercase34) -->
+        <Control name="BattleScrolls_HorizontalListRow" inherits="ZO_GamepadMenuEntryDimensionsTemplate" virtual="true">
+            <OnInitialized>
+                BattleScrolls_HorizontalListRow_OnInitialized(self)
+            </OnInitialized>
+            <Controls>
+                <Label name="$(parent)Label" inherits="ZO_GamepadMenuEntryLabelTemplateLowercase34"/>
+                <Texture name="$(parent)Icon" inherits="ZO_GamepadMenuEntryIconTemplate">
+                    <Controls>
+                        <Label name="$(parent)StackCount" inherits="ZO_GamepadMenuEntryStackCountTemplate"/>
+                    </Controls>
+                </Texture>
+                <Control name="$(parent)HorizontalList" inherits="ZO_GamepadHorizontalListTemplate">
+                    <Dimensions y="28"/>
+                    <Anchor point="TOPLEFT" relativeTo="$(parent)Label" relativePoint="BOTTOMLEFT"/>
+                    <Anchor point="TOPRIGHT" relativeTo="$(parent)Label" relativePoint="BOTTOMRIGHT"/>
+                </Control>
+            </Controls>
+        </Control>
+
         <!-- Label-value row template for overview panel (used in Q2 and Q4) -->
         <!-- Label widths and row height are set dynamically in Lua -->
         <Control name="BattleScrolls_OverviewStatRow" virtual="true">
@@ -312,6 +332,68 @@
             </Controls>
         </Control>
 
+        <!-- Champion discipline header for tooltip (matches armory style) -->
+        <Control name="BattleScrolls_ChampionDisciplineHeader" virtual="true">
+            <Dimensions y="30"/>
+            <Controls>
+                <Label name="$(parent)Label" font="ZoFontGamepad27" modifyTextType="UPPERCASE"
+                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL"
+                       maxLineCount="1" wrapMode="ELLIPSIS" verticalAlignment="BOTTOM">
+                    <Anchor point="BOTTOMLEFT" offsetY="-2"/>
+                </Label>
+            </Controls>
+        </Control>
+
+        <!-- Champion skill row for tooltip (matches armory style) -->
+        <Control name="BattleScrolls_ChampionSkillRow" virtual="true">
+            <Dimensions y="40"/>
+            <Controls>
+                <Texture name="$(parent)Icon" pixelRoundingEnabled="false">
+                    <Anchor point="LEFT"/>
+                    <Dimensions x="40" y="40"/>
+                </Texture>
+                <Label name="$(parent)Label" font="ZoFontGamepad34" modifyTextType="NONE"
+                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_SELECTED"
+                       maxLineCount="1" wrapMode="ELLIPSIS" verticalAlignment="CENTER">
+                    <Anchor point="LEFT" relativeTo="$(parent)Icon" relativePoint="RIGHT" offsetX="16"/>
+                    <Anchor point="RIGHT"/>
+                    <Dimensions y="40"/>
+                </Label>
+            </Controls>
+        </Control>
+
+        <!-- Ability icon + name row for setup bars (shared by overview panel and tooltips).
+             All styling is in the template so both contexts render identically. -->
+        <Control name="BattleScrolls_AbilityIconEntry" virtual="true">
+            <Dimensions y="54"/>
+            <Controls>
+                <Texture name="$(parent)Icon" pixelRoundingEnabled="false" tier="HIGH">
+                    <Anchor point="LEFT" offsetX="4"/>
+                    <Dimensions x="46" y="46"/>
+                </Texture>
+                <Backdrop name="$(parent)EdgeFrame" tier="HIGH"
+                          edgeColor="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL"
+                          centerColor="00000000" pixelRoundingEnabled="false" hidden="true">
+                    <Anchor point="TOPLEFT" relativeTo="$(parent)Icon" offsetX="-4" offsetY="-4"/>
+                    <Anchor point="BOTTOMRIGHT" relativeTo="$(parent)Icon" offsetX="4" offsetY="4"/>
+                    <Edge file="EsoUI/Art/Miscellaneous/Gamepad/edgeframeGamepadBorder.dds" edgeFileWidth="128" edgeFileHeight="16"/>
+                </Backdrop>
+                <Texture name="$(parent)CircleFrame" tier="HIGH" pixelRoundingEnabled="false"
+                         textureFile="EsoUI/Art/Miscellaneous/Gamepad/gp_passiveFrame_64.dds"
+                         color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" hidden="true">
+                    <Anchor point="TOPLEFT" relativeTo="$(parent)Icon" offsetX="-4" offsetY="-4"/>
+                    <Anchor point="BOTTOMRIGHT" relativeTo="$(parent)Icon" offsetX="4" offsetY="4"/>
+                </Texture>
+                <Label name="$(parent)Name" font="ZoFontGamepad34"
+                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_SELECTED"
+                       verticalAlignment="CENTER">
+                    <Anchor point="LEFT" offsetX="68"/>
+                    <Anchor point="RIGHT"/>
+                    <Dimensions y="54"/>
+                </Label>
+            </Controls>
+        </Control>
+
         <!-- Death attack row for group Q3 - icon + ability name + damage value.
              Icon LEFT offset set in Lua to reserve space for killing blow skull. -->
         <Control name="BattleScrolls_DeathAttackRow" virtual="true">
@@ -508,7 +590,7 @@
                         <!-- Q2 Container - Summary stats (left column, wider, scrollable) -->
                         <Control name="$(parent)Q2Container" inherits="ZO_ScrollContainer_Gamepad">
                             <Dimensions x="300"/>
-                            <Anchor point="TOPLEFT" offsetX="50" offsetY="90"/>
+                            <Anchor point="TOPLEFT" offsetX="50" offsetY="54"/>
                             <Anchor point="BOTTOMLEFT" offsetX="50" offsetY="-10"/>
                             <Controls>
                                 <Control name="$(parent)ScrollChild" override="true" resizeToFitConstrains="Y">
@@ -520,7 +602,7 @@
                         <!-- NOTE: Must be defined before Q3 so Q3's anchor to Q4 resolves correctly -->
                         <Control name="$(parent)Q4Container" inherits="ZO_ScrollContainer_Gamepad">
                             <Dimensions x="300"/>
-                            <Anchor point="TOPRIGHT" offsetX="-40" offsetY="90"/>
+                            <Anchor point="TOPRIGHT" offsetX="-40" offsetY="54"/>
                             <Anchor point="BOTTOMRIGHT" offsetX="-40" offsetY="-10"/>
                             <Controls>
                                 <Control name="$(parent)ScrollChild" override="true" resizeToFitConstrains="Y">

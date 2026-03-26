@@ -3,8 +3,8 @@
 -- Post-combat encounter data sharing via LibGroupBroadcast
 --
 -- Defines the protocol format for sharing combat stats with
--- group members after each fight. Uses LGB protocol 436
--- (send + receive) and 437 (receive only, for forward compat).
+-- group members after each fight. Uses LGB protocol 437
+-- (with optional setupHash) and 436 (legacy, receive only).
 -----------------------------------------------------------
 
 if not SemisPlaygroundCheckAccess() then
@@ -14,8 +14,8 @@ end
 BattleScrolls = BattleScrolls or {}
 
 ---@class EncounterShare
----@field protocol Protocol|nil LibGroupBroadcast encounter share protocol instance (436)
----@field newProtocol Protocol|nil LibGroupBroadcast protocol 437 instance (receive only)
+---@field protocol Protocol|nil LibGroupBroadcast encounter share protocol instance (437, or 436 fallback)
+---@field legacyProtocol Protocol|nil LibGroupBroadcast legacy protocol instance (436, receive only)
 local encounterShare = {}
 BattleScrolls.encounterShare = encounterShare
 
@@ -161,6 +161,7 @@ local function onReceive(unitTag, data)
         aliveTimeMs = data.playerAliveTimeMs,
         topDamageTakenAbilities = data.topDamageTakenAbilities or {},
         deaths = deaths,
+        setupHash = data.setupHash, -- nil for protocol 436 senders
     }
 
     notifyAllCallbacks(unitTag, sharedData)
@@ -173,7 +174,8 @@ end
 ---Send pre-built SharedEncounterData via LGB
 ---@param sharedData SharedEncounterData The encounter data to send
 ---@param timestampS number The encounter timestamp (for wire format)
-function encounterShare:send(sharedData, timestampS)
+---@param setupHash number|nil Optional 16-bit setup hash (protocol 437)
+function encounterShare:send(sharedData, timestampS, setupHash)
     if not encounterShare.protocol then
         return
     end
@@ -232,7 +234,11 @@ function encounterShare:send(sharedData, timestampS)
         playerAliveTimeMs = sharedData.aliveTimeMs,
         topDamageTakenAbilities = sharedData.topDamageTakenAbilities,
         deaths = wireDeaths,
+        setupHash = setupHash,
     }
+
+    -- Store setupHash on sharedData for local callbacks
+    sharedData.setupHash = setupHash
 
     if IsUnitGrouped("player") then
         encounterShare.protocol:Send(payload)
@@ -352,14 +358,14 @@ function encounterShare:Initialize()
         return
     end
 
-    -- Protocol 436 (send + receive): main encounter share protocol
-    local shareProtocol = handler:DeclareProtocol(436, "BattleScrolls_EncounterShare")
-    addEncounterFields(shareProtocol, LGB)
-    shareProtocol:OnData(onReceive)
-    shareProtocol:Finalize({ isRelevantInCombat = false, replaceQueuedMessages = false })
-    encounterShare.protocol = shareProtocol
+    -- Protocol 436 (legacy, receive only): backward compatibility for old clients
+    local legacyProtocol = handler:DeclareProtocol(436, "BattleScrolls_EncounterShare")
+    addEncounterFields(legacyProtocol, LGB)
+    legacyProtocol:OnData(onReceive)
+    legacyProtocol:Finalize({ isRelevantInCombat = false, replaceQueuedMessages = false })
+    encounterShare.legacyProtocol = legacyProtocol
 
-    -- Protocol 437 (receive only): forward compat with newer clients that append setupHash
+    -- Protocol 437 (new, send + receive): same fields + optional setupHash at the end
     local newProtocol = handler:DeclareProtocol(437, "BattleScrolls_EncounterShareV2")
     addEncounterFields(newProtocol, LGB)
     newProtocol:AddField(LGB.CreateOptionalField(
@@ -367,7 +373,7 @@ function encounterShare:Initialize()
     ))
     newProtocol:OnData(onReceive)
     newProtocol:Finalize({ isRelevantInCombat = false, replaceQueuedMessages = false })
-    encounterShare.newProtocol = newProtocol
+    encounterShare.protocol = newProtocol
 
     -- BattleScrolls.log.Info("EncounterShare: initialized")
 end

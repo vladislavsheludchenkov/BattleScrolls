@@ -15,6 +15,9 @@ local utils = journal.utils
 local StatIcons = journal.StatIcons
 local FilterConstants = journal.FilterConstants
 local tooltips = journal.tooltips
+local EntryBuilder = journal.EntryBuilder
+
+local ROW_CONTENT = journal.ROW_CONTENT
 
 local HealingRenderer = {}
 
@@ -25,8 +28,57 @@ local YIELD_INTERVAL = 20
 local SELF_UNIT_ID = FilterConstants.SELF_UNIT_ID
 
 -------------------------
+-- Panel Section Builders
+-------------------------
+
+---@param col ColumnBuilder
+---@param sectionLabel string|nil
+---@param rawHps number
+---@param effectiveHps number
+---@param total number
+---@return Control|nil
+local function buildHealingSummary(col, sectionLabel, rawHps, effectiveHps, total)
+    return col:Section(sectionLabel or GetString(BATTLESCROLLS_OVERVIEW_SUMMARY),
+        col:StatRow(GetString(BATTLESCROLLS_HEALING_RAW_HPS), utils.formatNumber(rawHps)),
+        col:StatRow(GetString(BATTLESCROLLS_HEALING_EFFECTIVE_HPS), utils.formatNumber(effectiveHps)),
+        col:StatRow(GetString(BATTLESCROLLS_OVERVIEW_TOTAL), utils.formatNumber(total))
+    )
+end
+
+---@param col ColumnBuilder
+---@param hotPercent number|nil
+---@param directPercent number|nil
+---@return Control|nil
+local function buildHealingComposition(col, hotPercent, directPercent)
+    return col:Section(GetString(BATTLESCROLLS_OVERVIEW_COMPOSITION),
+        hotPercent and col:StatRow(GetString(BATTLESCROLLS_DELIVERY_HOT), utils.formatPercent(hotPercent)),
+        directPercent and col:StatRow(GetString(BATTLESCROLLS_DELIVERY_DIRECT), utils.formatPercent(directPercent))
+    )
+end
+
+---@param col ColumnBuilder
+---@param critRate number
+---@param maxHeal number
+---@return Control|nil
+local function buildHealingQuality(col, critRate, maxHeal)
+    return col:Section(GetString(BATTLESCROLLS_OVERVIEW_QUALITY),
+        critRate > 0 and col:StatRow(GetString(BATTLESCROLLS_OVERVIEW_CRIT_RATE), utils.formatPercent(critRate)),
+        maxHeal > 0 and col:StatRow(GetString(BATTLESCROLLS_OVERVIEW_MAX_HEAL), utils.formatNumber(maxHeal))
+    )
+end
+
+-------------------------
 -- Healing Display Helpers
 -------------------------
+
+---Builds a text tooltip descriptor from title and text, or nil if no title
+---@param ttTitle string|nil
+---@param ttText string|nil
+---@return TooltipDescriptor|nil
+local function textTooltip(ttTitle, ttText)
+    if not ttTitle then return nil end
+    return { type = "text", title = ttTitle, text = ttText or "" }
+end
 
 ---Displays healing summary (raw, effective, overheal)
 ---@param list any
@@ -45,11 +97,35 @@ local function displayHealingSummary(list, totalRaw, totalReal, durationSec, raw
     local overhealAmount = totalRaw - totalReal
     local overhealPercent = totalRaw > 0 and (overhealAmount / totalRaw * 100) or 0
 
-    utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_RAW_HEALING), ZO_CommaDelimitNumber(totalRaw), StatIcons.HEALING, GetString(BATTLESCROLLS_STAT_SUMMARY))
-    utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_RAW_HPS), ZO_CommaDelimitNumber(math.floor(totalRaw / durationSec)), StatIcons.HPS, nil, rawHpsTtTitle, rawHpsTtText)
-    utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_EFFECTIVE_HEALING), ZO_CommaDelimitNumber(totalReal), StatIcons.HEALING)
-    utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_EFFECTIVE_HPS), ZO_CommaDelimitNumber(math.floor(totalReal / durationSec)), StatIcons.HPS, nil, effHpsTtTitle, effHpsTtText)
-    utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_OVERHEAL), string.format("%s (%.1f%%)", ZO_CommaDelimitNumber(overhealAmount), overhealPercent), StatIcons.OVERHEAL, nil, overhealTtTitle, overhealTtText)
+    EntryBuilder.addEntry(list, {
+        label = GetString(BATTLESCROLLS_STAT_RAW_HEALING),
+        sublabel = ZO_CommaDelimitNumber(totalRaw),
+        icon = StatIcons.HEALING,
+        header = GetString(BATTLESCROLLS_STAT_SUMMARY),
+    })
+    EntryBuilder.addEntry(list, {
+        label = GetString(BATTLESCROLLS_STAT_RAW_HPS),
+        sublabel = ZO_CommaDelimitNumber(math.floor(totalRaw / durationSec)),
+        icon = StatIcons.HPS,
+        tooltip = textTooltip(rawHpsTtTitle, rawHpsTtText),
+    })
+    EntryBuilder.addEntry(list, {
+        label = GetString(BATTLESCROLLS_STAT_EFFECTIVE_HEALING),
+        sublabel = ZO_CommaDelimitNumber(totalReal),
+        icon = StatIcons.HEALING,
+    })
+    EntryBuilder.addEntry(list, {
+        label = GetString(BATTLESCROLLS_STAT_EFFECTIVE_HPS),
+        sublabel = ZO_CommaDelimitNumber(math.floor(totalReal / durationSec)),
+        icon = StatIcons.HPS,
+        tooltip = textTooltip(effHpsTtTitle, effHpsTtText),
+    })
+    EntryBuilder.addEntry(list, {
+        label = GetString(BATTLESCROLLS_STAT_OVERHEAL),
+        sublabel = string.format("%s (%.1f%%)", ZO_CommaDelimitNumber(overhealAmount), overhealPercent),
+        icon = StatIcons.OVERHEAL,
+        tooltip = textTooltip(overhealTtTitle, overhealTtText),
+    })
 end
 
 ---Displays unit breakdown with special handling for Self unit ID
@@ -81,12 +157,12 @@ local function displayHealingUnitBreakdownWithSelf(list, unitData, total, durati
         end
         local valueStr = utils.formatHealingWithPercent(entry.damage, total, durationSec)
 
-        if isFirst then
-            utils.addStatEntry(list, unitName, valueStr, nil, headerText)
-            isFirst = false
-        else
-            utils.addStatEntry(list, unitName, valueStr)
-        end
+        EntryBuilder.addEntry(list, {
+            label = unitName,
+            sublabel = valueStr,
+            header = isFirst and headerText or nil,
+        })
+        isFirst = false
     end
 end
 
@@ -104,8 +180,17 @@ local function displayHotVsDirectBreakdown(list, byHotVsDirect, total, healingFi
         local hotPercent = total > 0 and (hotHealing / total * 100) or 0
         local directPercent = total > 0 and (directHealing / total * 100) or 0
 
-        utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_DIRECT_HEALING), string.format("%s (%.1f%%)", ZO_CommaDelimitNumber(directHealing), directPercent), StatIcons.DIRECT_HEAL, headerText)
-        utils.addStatEntry(list, GetString(BATTLESCROLLS_STAT_HEALING_OVER_TIME), string.format("%s (%.1f%%)", ZO_CommaDelimitNumber(hotHealing), hotPercent), StatIcons.HOT)
+        EntryBuilder.addEntry(list, {
+            label = GetString(BATTLESCROLLS_STAT_DIRECT_HEALING),
+            sublabel = string.format("%s (%.1f%%)", ZO_CommaDelimitNumber(directHealing), directPercent),
+            icon = StatIcons.DIRECT_HEAL,
+            header = headerText,
+        })
+        EntryBuilder.addEntry(list, {
+            label = GetString(BATTLESCROLLS_STAT_HEALING_OVER_TIME),
+            sublabel = string.format("%s (%.1f%%)", ZO_CommaDelimitNumber(hotHealing), hotPercent),
+            icon = StatIcons.HOT,
+        })
     end
 end
 
@@ -390,6 +475,42 @@ end
 -- Ability Breakdown Display
 -------------------------
 
+---Builds tooltip text from critStats for an ability entry
+---@param critStats table|nil {total, ticks, critTicks, minTick, maxTick}
+---@param name string Ability name for tooltip title
+---@return TooltipDescriptor|nil
+local function buildAbilityTooltip(critStats, name)
+    local lines = {}
+    tooltips.appendTickStats(lines, critStats)
+    if #lines > 0 then
+        return { type = "text", title = name, text = table.concat(lines, "\n") }
+    end
+    return nil
+end
+
+---Builds tooltip for an ability with breakdown (multiple ability IDs sharing the same name)
+---@param breakdown table {baseName, totalHealing, entries: {displayName, healing, abilityId, critStats}[]}
+---@param critStats table Aggregated critStats for the group
+---@return TooltipDescriptor|nil
+local function buildBreakdownTooltip(breakdown, critStats)
+    local lines = {}
+    tooltips.appendTickStats(lines, critStats)
+    if breakdown.entries and #breakdown.entries > 1 then
+        if #lines > 0 then
+            table.insert(lines, "")
+        end
+        for _, be in ipairs(breakdown.entries) do
+            local pct = breakdown.totalHealing > 0 and (be.healing / breakdown.totalHealing * 100) or 0
+            table.insert(lines, string.format("%s: %s (%.1f%%)", be.displayName, ZO_CommaDelimitNumber(be.healing), pct))
+            tooltips.appendTickStats(lines, be.critStats, "  ")
+        end
+    end
+    if #lines > 0 then
+        return { type = "text", title = breakdown.baseName, text = table.concat(lines, "\n") }
+    end
+    return nil
+end
+
 ---Core function to display healing ability breakdown (async with yields)
 ---Groups by ability name, shows breakdown in tooltip when multiple ability IDs share the same name
 ---@param list any
@@ -559,36 +680,22 @@ local function displayHealingAbilityBreakdownCoreAsync(list, byAbilityId, total,
             local abilityIcon = GetAbilityIcon(merged.abilityId)
             local valueStr = utils.formatHealingWithPercent(merged.totalHealing, total, durationSec)
 
-            local entryData = ZO_GamepadEntryData:New(merged.abilityName, abilityIcon)
-            entryData.iconFile = abilityIcon  -- Store for frame type detection
-            entryData:SetIconTintOnSelection(true)
-            entryData:AddSubLabel(valueStr)
-            entryData.critStats = merged.critStats
-
+            local tt
             if merged.breakdown then
-                entryData.abilityBreakdown = {
-                    baseName = merged.breakdown.baseName,
-                    totalDamage = merged.breakdown.totalHealing,
-                    critStats = merged.critStats,
-                    entries = {}
-                }
-                for _, be in ipairs(merged.breakdown.entries) do
-                    table.insert(entryData.abilityBreakdown.entries, {
-                        displayName = be.displayName,
-                        damage = be.healing,
-                        abilityId = be.abilityId,
-                        critStats = be.critStats,
-                    })
-                end
+                tt = buildBreakdownTooltip(merged.breakdown, merged.critStats)
+            else
+                tt = buildAbilityTooltip(merged.critStats, merged.abilityName)
             end
 
-            if isFirst then
-                entryData:SetHeader(headerText)
-                list:AddEntryWithHeader("BattleScrolls_AbilityEntryTemplate", entryData)
-                isFirst = false
-            else
-                list:AddEntry("BattleScrolls_AbilityEntryTemplate", entryData)
-            end
+            EntryBuilder.addEntry(list, {
+                label = merged.abilityName,
+                sublabel = valueStr,
+                icon = abilityIcon,
+                frame = true,
+                header = isFirst and headerText or nil,
+                tooltip = tt,
+            })
+            isFirst = false
 
             if i % YIELD_INTERVAL == 0 then
                 LibEffect.Yield():Await()
@@ -1053,296 +1160,336 @@ end
 -- Overview Panel Refresh Functions
 -------------------------
 
----Refreshes the overview panel for Healing Out tab
----@param panel BattleScrolls_Journal_OverviewPanel The overview panel
----@param ctx { arithmancer: table, encounter: table, durationS: number, unitNames: table, filters: table }
----@return Effect<nil>
-function HealingRenderer.refreshPanelForHealingOut(panel, ctx)
-    return LibEffect.Async(function()
-        local lastControl = nil
-        local filters = ctx.filters or {}
-        local targetFilter = filters.targetFilter
-        local encounter = ctx.encounter
-        local durationS = ctx.durationS
-        local unitNames = ctx.unitNames
-        local arithmancer = ctx.arithmancer
-        local abilityInfo = ctx.abilityInfo or encounter.abilityInfo or {}
+---Builds Q3 ability bars section using ColumnBuilder
+---@param col3 ColumnBuilder
+---@param topAbilities { abilityId: number, name: string, total: number }[]
+---@param rawTotal number Total raw healing for share calculation
+---@param durationS number Fight duration
+---@param sectionTitle string Section header text
+---@return Control|nil
+local function buildQ3AbilityBars(col3, topAbilities, rawTotal, durationS, sectionTitle)
+    if #topAbilities == 0 then return nil end
+    local bars = {}
+    local topValue = topAbilities[1].total
+    for _, ability in ipairs(topAbilities) do
+        table.insert(bars, col3:AbilityBar(ability, topValue, rawTotal, durationS))
+    end
+    return col3:Section(sectionTitle, bars)
+end
 
-        -- Create filtered arithmancer for summaries and quality
-        local Arithmancer = BattleScrolls.arithmancer
-        local healingStats = encounter.healingStats
-        local calc = targetFilter
-            and Arithmancer:Make(encounter, abilityInfo, { targetFilter = targetFilter })
-            or arithmancer
-        local filteredHealingOut = calc:filteredHealingOutTable()
-        local selfHealing = healingStats and healingStats.selfHealing
-        local includeSelf = not targetFilter or targetFilter[SELF_UNIT_ID] == true
-        local rawTotal = 0  -- For Q3 ability bars (raw-based)
+---Builds Q4 target/source rows section using ColumnBuilder
+---@param col4 ColumnBuilder
+---@param items { name: string, total: number }[]
+---@param durationS number Fight duration
+---@param sectionTitle string Section header text
+---@return Control|nil
+local function buildQ4TargetRows(col4, items, durationS, sectionTitle)
+    if #items == 0 then return nil end
+    local rows = {}
+    for _, item in ipairs(items) do
+        table.insert(rows, col4:StatRow(item.name, utils.formatTargetHPS(item.total, durationS)))
+    end
+    return col4:Section(sectionTitle, rows)
+end
 
-        -- Q2: Summary - returns {rawHps, effectiveHps, total, rawTotal, overhealPercent}
-        local summaryData = calc:getHealingOutSummary()
-        rawTotal = summaryData.rawTotal
-        lastControl = panel:renderHealingSummarySection(nil, lastControl,
-            summaryData.rawHps, summaryData.effectiveHps, summaryData.total)
-        LibEffect.Yield():Await()
+---Computes HoT vs Direct composition data for panel display
+---@param filteredData table|nil Filtered healing data
+---@param selfHealing table|nil Self-healing data
+---@param includeSelf boolean Whether to include self-healing
+---@param abilityInfo table<number, AbilityInfo> Ability metadata
+---@return number|nil hotPercent
+---@return number|nil directPercent
+local function computeHotDirectPercents(filteredData, selfHealing, includeSelf, abilityInfo)
+    if not filteredData and not (includeSelf and selfHealing) then
+        return nil, nil
+    end
+    local hotVsDirect
+    if filteredData then
+        hotVsDirect = aggregateHotVsDirectAcrossUnits(filteredData, abilityInfo)
+    else
+        hotVsDirect = { hot = { raw = 0, real = 0 }, direct = { raw = 0, real = 0 } }
+    end
+    if includeSelf and selfHealing then
+        addSelfToHotVsDirect(hotVsDirect, selfHealing, abilityInfo)
+    end
+    local totalRaw = (hotVsDirect.hot.raw or 0) + (hotVsDirect.direct.raw or 0)
+    if totalRaw <= 0 then return nil, nil end
+    local hotPercent = hotVsDirect.hot.raw / totalRaw * 100
+    local directPercent = hotVsDirect.direct.raw / totalRaw * 100
+    if hotPercent <= 5 or directPercent <= 5 then return nil, nil end
+    return hotPercent, directPercent
+end
 
-        -- Overheal %
-        lastControl = panel:renderOverhealRow(lastControl, summaryData.overhealPercent)
-        LibEffect.Yield():Await()
+---Builds the panel spec for Healing Out tab
+---@param ctx { arithmancer: table, encounter: table, durationS: number, unitNames: table, filters: table, abilityInfo: table }
+---@return PanelSpec
+function HealingRenderer.buildHealingOutPanelSpec(ctx)
+    return {
+        layout = "three-column",
+        build = function(q2, q3, q4)
+            local filters = ctx.filters or {}
+            local targetFilter = filters.targetFilter
+            local encounter = ctx.encounter
+            local durationS = ctx.durationS
+            local unitNames = ctx.unitNames
+            local arithmancer = ctx.arithmancer
+            local abilityInfo = ctx.abilityInfo or encounter.abilityInfo or {}
 
-        -- Composition section (HoT vs Direct)
-        if filteredHealingOut or (includeSelf and selfHealing) then
-            local hotVsDirect = aggregateHotVsDirectAcrossUnits(filteredHealingOut, abilityInfo)
-            if includeSelf and selfHealing then
-                addSelfToHotVsDirect(hotVsDirect, selfHealing, abilityInfo)
+            -- Create filtered arithmancer for summaries and quality
+            local Arithmancer = BattleScrolls.arithmancer
+            local healingStats = encounter.healingStats
+            local calc = targetFilter
+                and Arithmancer:Make(encounter, abilityInfo, { targetFilter = targetFilter })
+                or arithmancer
+            local filteredHealingOut = calc:filteredHealingOutTable()
+            local selfHealing = healingStats and healingStats.selfHealing
+            local includeSelf = not targetFilter or targetFilter[SELF_UNIT_ID] == true
+
+            -- Q2: Build sections using ColumnBuilder
+            local summaryData = calc:getHealingOutSummary()
+            local rawTotal = summaryData.rawTotal
+            local summarySection = buildHealingSummary(q2, nil,
+                summaryData.rawHps, summaryData.effectiveHps, summaryData.total)
+            LibEffect.Yield():Await()
+
+            -- Overheal % as a stat row inside its own section
+            local overhealSection = q2:Section(GetString(BATTLESCROLLS_HEALING_OVERHEAL),
+                q2:StatRow(GetString(BATTLESCROLLS_HEALING_OVERHEAL), utils.formatPercent(summaryData.overhealPercent)))
+            LibEffect.Yield():Await()
+
+            -- Composition section (HoT vs Direct)
+            local hotPercent, directPercent = computeHotDirectPercents(filteredHealingOut, selfHealing, includeSelf, abilityInfo)
+            local compositionSection = buildHealingComposition(q2, hotPercent, directPercent)
+            LibEffect.Yield():Await()
+
+            -- Quality section (Crit Rate, Max Heal)
+            local qualityData = calc:getHealingOutQuality()
+            local qualitySection
+            if qualityData.critRate > 0 or qualityData.maxHeal > 0 then
+                qualitySection = buildHealingQuality(q2, qualityData.critRate, qualityData.maxHeal)
             end
+
+            q2:mount(journal.SECTION_GAP, 0, summarySection, overhealSection, compositionSection, qualitySection)
+            LibEffect.YieldWithGC():Await()
+
+            -- Q3: Top healing abilities
+            local hasGroupData = filteredHealingOut ~= nil
+            local hasSelfData = includeSelf and selfHealing
+            if hasGroupData or hasSelfData then
+                local maxAbilities = q3:maxItems(ROW_CONTENT.ABILITY_BAR, 10)
+                local groupAbilities = hasGroupData and HealingRenderer.extractHealingOutAbilitiesAsync(filteredHealingOut, maxAbilities):Await() or {}
+                local selfAbilities = hasSelfData and HealingRenderer.extractSelfHealingAbilitiesAsync(selfHealing, maxAbilities):Await() or {}
+                local topAbilities = mergeAbilityArrays(groupAbilities, selfAbilities, maxAbilities)
+                local q3Section = buildQ3AbilityBars(q3, topAbilities, rawTotal, durationS, GetString(BATTLESCROLLS_OVERVIEW_TOP_ABILITIES))
+                if q3Section then
+                    q3:mount(journal.SECTION_GAP, journal.Q3_INSET, q3Section)
+                end
+            end
+
+            LibEffect.YieldWithGC():Await()
+
+            -- Q4: Targets healed with HPS
+            if hasGroupData or hasSelfData then
+                local maxTargets = q4:maxItems(ROW_CONTENT.STAT_ROW, 10)
+                local targets = hasGroupData and HealingRenderer.extractHealingTargetBreakdownAsync(filteredHealingOut, unitNames, maxTargets):Await() or {}
+                -- Add self-healing as a target if included
+                if hasSelfData and selfHealing.total and selfHealing.total.raw and selfHealing.total.raw > 0 then
+                    local selfName = BattleScrolls.utils.GetUndecoratedDisplayName()
+                    table.insert(targets, { unitId = SELF_UNIT_ID, name = selfName, total = selfHealing.total.raw })
+                    table.sort(targets, function(a, b) return a.total > b.total end)
+                    while #targets > maxTargets do
+                        table.remove(targets)
+                    end
+                end
+                local q4Section = buildQ4TargetRows(q4, targets, durationS, GetString(BATTLESCROLLS_OVERVIEW_TARGETS_HEALED))
+                if q4Section then
+                    q4:mount(journal.SECTION_GAP, journal.Q3_INSET, q4Section)
+                end
+            end
+        end,
+    }
+end
+
+---Builds the panel spec for Self Healing tab
+---@param ctx { arithmancer: table, encounter: table, durationS: number, unitNames: table, abilityInfo: table }
+---@return PanelSpec
+function HealingRenderer.buildSelfHealingPanelSpec(ctx)
+    return {
+        layout = "three-column",
+        ---@diagnostic disable-next-line: unused-local -- self-healing doesn't use Q4
+        build = function(q2, q3, q4)
+            local encounter = ctx.encounter
+            local durationS = ctx.durationS
+            local arithmancer = ctx.arithmancer
+            local abilityInfo = ctx.abilityInfo or encounter.abilityInfo or {}
+
+            local healingStats = encounter and encounter.healingStats
+            local selfHealing = healingStats and healingStats.selfHealing
+            if not selfHealing then return end
+
+            -- Q2: Build sections using ColumnBuilder
+            local summaryData = arithmancer:getSelfHealingSummary()
+            local rawTotal = summaryData.rawTotal
+            local summarySection = buildHealingSummary(q2, nil,
+                summaryData.rawHps, summaryData.effectiveHps, summaryData.total)
+            LibEffect.Yield():Await()
+
+            -- Overheal %
+            local overhealSection = q2:Section(GetString(BATTLESCROLLS_HEALING_OVERHEAL),
+                q2:StatRow(GetString(BATTLESCROLLS_HEALING_OVERHEAL), utils.formatPercent(summaryData.overhealPercent)))
+            LibEffect.Yield():Await()
+
+            -- Composition section (HoT vs Direct)
+            local Arithmancer = BattleScrolls.arithmancer
+            local hotVsDirect = Arithmancer.ComputeByHotVsDirect(selfHealing, abilityInfo)
             local totalRaw = (hotVsDirect.hot.raw or 0) + (hotVsDirect.direct.raw or 0)
+            local compositionSection
             if totalRaw > 0 then
                 local hotPercent = hotVsDirect.hot.raw / totalRaw * 100
                 local directPercent = hotVsDirect.direct.raw / totalRaw * 100
-                -- Only show if meaningful split
                 if hotPercent > 5 and directPercent > 5 then
-                    lastControl = panel:renderHealingCompositionSection(lastControl, hotPercent, directPercent)
+                    compositionSection = buildHealingComposition(q2, hotPercent, directPercent)
                 end
             end
-        end
-        LibEffect.Yield():Await()
+            LibEffect.Yield():Await()
 
-        -- Quality section (Crit Rate, Max Heal)
-        local qualityData = calc:getHealingOutQuality()
-        if qualityData.critRate > 0 or qualityData.maxHeal > 0 then
-            lastControl = panel:renderHealingQualitySection(lastControl, qualityData.critRate, qualityData.maxHeal)
-        end
-        LibEffect.YieldWithGC():Await()
-
-        -- Q3: Top healing abilities (using filtered data + self if included)
-        local q3Control = nil
-        local hasGroupData = filteredHealingOut ~= nil
-        local hasSelfData = includeSelf and selfHealing
-        if hasGroupData or hasSelfData then
-            local maxAbilities = panel:GetMaxAbilities()
-            local groupAbilities = hasGroupData and HealingRenderer.extractHealingOutAbilitiesAsync(filteredHealingOut, maxAbilities):Await() or {}
-            local selfAbilities = hasSelfData and HealingRenderer.extractSelfHealingAbilitiesAsync(selfHealing, maxAbilities):Await() or {}
-            local topAbilities = mergeAbilityArrays(groupAbilities, selfAbilities, maxAbilities)
-            if #topAbilities > 0 then
-                q3Control = panel:AddQ3Section(GetString(BATTLESCROLLS_OVERVIEW_TOP_ABILITIES), q3Control)
-                local topValue = topAbilities[1].total
-                for _, ability in ipairs(topAbilities) do
-                    q3Control = panel:AddAbilityBar(ability, topValue, rawTotal, durationS, q3Control)
-                end
+            -- Quality section (Crit Rate, Max Heal)
+            local qualityData = arithmancer:getSelfHealingQuality()
+            local qualitySection
+            if qualityData.critRate > 0 or qualityData.maxHeal > 0 then
+                qualitySection = buildHealingQuality(q2, qualityData.critRate, qualityData.maxHeal)
             end
-        end
 
-        LibEffect.YieldWithGC():Await()
+            q2:mount(journal.SECTION_GAP, 0, summarySection, overhealSection, compositionSection, qualitySection)
+            LibEffect.YieldWithGC():Await()
 
-        -- Q4: Targets healed with HPS (using filtered data + self if included)
-        local q4Control = nil
-        if hasGroupData or hasSelfData then
-            local maxTargets = panel:GetMaxTargets()
-            local targets = hasGroupData and HealingRenderer.extractHealingTargetBreakdownAsync(filteredHealingOut, unitNames, maxTargets):Await() or {}
-            -- Add self-healing as a target if included
-            if hasSelfData and selfHealing.total and selfHealing.total.raw and selfHealing.total.raw > 0 then
-                local selfName = BattleScrolls.utils.GetUndecoratedDisplayName()
-                table.insert(targets, { unitId = SELF_UNIT_ID, name = selfName, total = selfHealing.total.raw })
-                table.sort(targets, function(a, b) return a.total > b.total end)
-                -- Limit to maxTargets
-                while #targets > maxTargets do
-                    table.remove(targets)
-                end
+            -- Q3: Top self-healing abilities
+            local maxAbilities = q3:maxItems(ROW_CONTENT.ABILITY_BAR, 10)
+            local topAbilities = HealingRenderer.extractSelfHealingAbilitiesAsync(selfHealing, maxAbilities):Await()
+            local q3Section = buildQ3AbilityBars(q3, topAbilities, rawTotal, durationS, GetString(BATTLESCROLLS_OVERVIEW_TOP_ABILITIES))
+            if q3Section then
+                q3:mount(journal.SECTION_GAP, journal.Q3_INSET, q3Section)
             end
-            if #targets > 0 then
-                q4Control = panel:AddQ4Section(GetString(BATTLESCROLLS_OVERVIEW_TARGETS_HEALED), q4Control)
-                for _, target in ipairs(targets) do
-                    q4Control = panel:AddTargetRow(target.name, utils.formatTargetHPS(target.total, durationS), q4Control)
-                end
-            end
-        end
-    end)
+
+            -- Q4: Left empty for self-healing (all healing is to self)
+        end,
+    }
 end
 
----Refreshes the overview panel for Self Healing tab
----@param panel BattleScrolls_Journal_OverviewPanel The overview panel
----@param ctx { arithmancer: table, encounter: table, durationS: number, unitNames: table }
----@return Effect<nil>
-function HealingRenderer.refreshPanelForSelfHealing(panel, ctx)
-    return LibEffect.Async(function()
-        local lastControl = nil
-        local encounter = ctx.encounter
-        local durationS = ctx.durationS
-        local arithmancer = ctx.arithmancer
-        local abilityInfo = ctx.abilityInfo or encounter.abilityInfo or {}
+---Builds the panel spec for Healing In tab
+---@param ctx { arithmancer: table, encounter: table, durationS: number, unitNames: table, filters: table, abilityInfo: table }
+---@return PanelSpec
+function HealingRenderer.buildHealingInPanelSpec(ctx)
+    return {
+        layout = "three-column",
+        build = function(q2, q3, q4)
+            local filters = ctx.filters or {}
+            local sourceFilter = filters.sourceFilter
+            local encounter = ctx.encounter
+            local durationS = ctx.durationS
+            local unitNames = ctx.unitNames
+            local arithmancer = ctx.arithmancer
+            local abilityInfo = ctx.abilityInfo or encounter.abilityInfo or {}
 
-        local healingStats = encounter and encounter.healingStats
-        local selfHealing = healingStats and healingStats.selfHealing
-        if not selfHealing then return end
-
-        -- Q2: Summary - returns {rawHps, effectiveHps, total, rawTotal, overhealPercent}
-        local summaryData = arithmancer:getSelfHealingSummary()
-        local rawTotal = summaryData.rawTotal  -- Keep for Q3 ability bars
-        lastControl = panel:renderHealingSummarySection(nil, lastControl,
-            summaryData.rawHps, summaryData.effectiveHps, summaryData.total)
-        LibEffect.Yield():Await()
-
-        -- Overheal %
-        lastControl = panel:renderOverhealRow(lastControl, summaryData.overhealPercent)
-        LibEffect.Yield():Await()
-
-        -- Composition section (HoT vs Direct)
-        local Arithmancer = BattleScrolls.arithmancer
-        local hotVsDirect = Arithmancer.ComputeByHotVsDirect(selfHealing, abilityInfo)
-        local totalRaw = (hotVsDirect.hot.raw or 0) + (hotVsDirect.direct.raw or 0)
-        if totalRaw > 0 then
-            local hotPercent = hotVsDirect.hot.raw / totalRaw * 100
-            local directPercent = hotVsDirect.direct.raw / totalRaw * 100
-            -- Only show if meaningful split
-            if hotPercent > 5 and directPercent > 5 then
-                lastControl = panel:renderHealingCompositionSection(lastControl, hotPercent, directPercent)
+            local Arithmancer = BattleScrolls.arithmancer
+            local healingStats = encounter.healingStats
+            if not healingStats then
+                return
             end
-        end
-        LibEffect.Yield():Await()
 
-        -- Quality section (Crit Rate, Max Heal)
-        local qualityData = arithmancer:getSelfHealingQuality()
-        if qualityData.critRate > 0 or qualityData.maxHeal > 0 then
-            lastControl = panel:renderHealingQualitySection(lastControl, qualityData.critRate, qualityData.maxHeal)
-        end
-        LibEffect.YieldWithGC():Await()
+            -- Create filtered arithmancer for summaries and quality
+            local calc = sourceFilter
+                and Arithmancer:Make(encounter, abilityInfo, { sourceFilter = sourceFilter })
+                or arithmancer
+            local filteredHealingIn = calc:filteredHealingInTable()
+            local selfHealing = healingStats.selfHealing
+            local includeSelf = not sourceFilter or sourceFilter[SELF_UNIT_ID] == true
 
-        -- Q3: Top self-healing abilities
-        local q3Control = nil
-        local maxAbilities = panel:GetMaxAbilities()
-        local topAbilities = HealingRenderer.extractSelfHealingAbilitiesAsync(selfHealing, maxAbilities):Await()
-        if #topAbilities > 0 then
-            q3Control = panel:AddQ3Section(GetString(BATTLESCROLLS_OVERVIEW_TOP_ABILITIES), q3Control)
-            local topValue = topAbilities[1].total
-            for _, ability in ipairs(topAbilities) do
-                q3Control = panel:AddAbilityBar(ability, topValue, rawTotal, durationS, q3Control)
-            end
-        end
+            -- Q2: Build sections using ColumnBuilder
+            local summaryData = calc:getHealingInSummary()
+            local rawTotal = summaryData.rawTotal
+            local summarySection = buildHealingSummary(q2, nil,
+                summaryData.rawHps, summaryData.effectiveHps, summaryData.total)
+            LibEffect.Yield():Await()
 
-        -- Q4: Left empty for self-healing (all healing is to self)
-    end)
-end
+            -- Overheal %
+            local overhealSection = q2:Section(GetString(BATTLESCROLLS_HEALING_OVERHEAL),
+                q2:StatRow(GetString(BATTLESCROLLS_HEALING_OVERHEAL), utils.formatPercent(summaryData.overhealPercent)))
+            LibEffect.Yield():Await()
 
----Refreshes the overview panel for Healing In tab
----@param panel BattleScrolls_Journal_OverviewPanel The overview panel
----@param ctx { arithmancer: table, encounter: table, durationS: number, unitNames: table, filters: table }
----@return Effect<nil>
-function HealingRenderer.refreshPanelForHealingIn(panel, ctx)
-    return LibEffect.Async(function()
-        local lastControl = nil
-        local filters = ctx.filters or {}
-        local sourceFilter = filters.sourceFilter
-        local encounter = ctx.encounter
-        local durationS = ctx.durationS
-        local unitNames = ctx.unitNames
-        local arithmancer = ctx.arithmancer
-        local abilityInfo = ctx.abilityInfo or encounter.abilityInfo or {}
-
-        local Arithmancer = BattleScrolls.arithmancer
-        local healingStats = encounter.healingStats
-        if not healingStats then
-            return
-        end
-
-        -- Create filtered arithmancer for summaries and quality
-        local calc = sourceFilter
-            and Arithmancer:Make(encounter, abilityInfo, { sourceFilter = sourceFilter })
-            or arithmancer
-        local filteredHealingIn = calc:filteredHealingInTable()
-        local selfHealing = healingStats.selfHealing
-        local includeSelf = not sourceFilter or sourceFilter[SELF_UNIT_ID] == true
-        local rawTotal = 0  -- For Q3 ability bars
-
-        -- Q2: Summary - returns {rawHps, effectiveHps, total, rawTotal, overhealPercent}
-        local summaryData = calc:getHealingInSummary()
-        rawTotal = summaryData.rawTotal
-        lastControl = panel:renderHealingSummarySection(nil, lastControl,
-            summaryData.rawHps, summaryData.effectiveHps, summaryData.total)
-        LibEffect.Yield():Await()
-
-        -- Overheal %
-        lastControl = panel:renderOverhealRow(lastControl, summaryData.overhealPercent)
-        LibEffect.Yield():Await()
-
-        -- Composition section (HoT vs Direct)
-        -- Note: For healing in, we use HealingDone structure (byAbilityId) + self-healing if included
-        local hasGroupData = filteredHealingIn ~= nil
-        local hasSelfData = includeSelf and selfHealing
-        if hasGroupData or hasSelfData then
-            local totalHot, totalDirect = 0, 0
-            if hasGroupData then
-                for _, sourceData in pairs(filteredHealingIn) do
-                    local hotVsDirect = Arithmancer.ComputeByHotVsDirect(sourceData, abilityInfo)
-                    totalHot = totalHot + (hotVsDirect.hot and hotVsDirect.hot.raw or 0)
-                    totalDirect = totalDirect + (hotVsDirect.direct and hotVsDirect.direct.raw or 0)
+            -- Composition section (HoT vs Direct)
+            local hasGroupData = filteredHealingIn ~= nil
+            local hasSelfData = includeSelf and selfHealing
+            local compositionSection
+            if hasGroupData or hasSelfData then
+                local totalHot, totalDirect = 0, 0
+                if hasGroupData then
+                    for _, sourceData in pairs(filteredHealingIn) do
+                        local hotVsDirect = Arithmancer.ComputeByHotVsDirect(sourceData, abilityInfo)
+                        totalHot = totalHot + (hotVsDirect.hot and hotVsDirect.hot.raw or 0)
+                        totalDirect = totalDirect + (hotVsDirect.direct and hotVsDirect.direct.raw or 0)
+                    end
+                end
+                if hasSelfData then
+                    local selfHotVsDirect = Arithmancer.ComputeByHotVsDirect(selfHealing, abilityInfo)
+                    totalHot = totalHot + (selfHotVsDirect.hot and selfHotVsDirect.hot.raw or 0)
+                    totalDirect = totalDirect + (selfHotVsDirect.direct and selfHotVsDirect.direct.raw or 0)
+                end
+                local totalRaw = totalHot + totalDirect
+                if totalRaw > 0 then
+                    local hotPercent = totalHot / totalRaw * 100
+                    local directPercent = totalDirect / totalRaw * 100
+                    if hotPercent > 5 and directPercent > 5 then
+                        compositionSection = buildHealingComposition(q2, hotPercent, directPercent)
+                    end
                 end
             end
-            if hasSelfData then
-                local selfHotVsDirect = Arithmancer.ComputeByHotVsDirect(selfHealing, abilityInfo)
-                totalHot = totalHot + (selfHotVsDirect.hot and selfHotVsDirect.hot.raw or 0)
-                totalDirect = totalDirect + (selfHotVsDirect.direct and selfHotVsDirect.direct.raw or 0)
+            LibEffect.Yield():Await()
+
+            -- Quality section (Crit Rate, Max Heal)
+            local qualityData = calc:getHealingInQuality()
+            local qualitySection
+            if qualityData.critRate > 0 or qualityData.maxHeal > 0 then
+                qualitySection = buildHealingQuality(q2, qualityData.critRate, qualityData.maxHeal)
             end
-            local totalRaw = totalHot + totalDirect
-            if totalRaw > 0 then
-                local hotPercent = totalHot / totalRaw * 100
-                local directPercent = totalDirect / totalRaw * 100
-                -- Only show if meaningful split
-                if hotPercent > 5 and directPercent > 5 then
-                    lastControl = panel:renderHealingCompositionSection(lastControl, hotPercent, directPercent)
+
+            q2:mount(journal.SECTION_GAP, 0, summarySection, overhealSection, compositionSection, qualitySection)
+            LibEffect.YieldWithGC():Await()
+
+            -- Q3: Top incoming healing abilities
+            if hasGroupData or hasSelfData then
+                local maxAbilities = q3:maxItems(ROW_CONTENT.ABILITY_BAR, 10)
+                local groupAbilities = hasGroupData and HealingRenderer.extractHealingInAbilitiesAsync(filteredHealingIn, maxAbilities):Await() or {}
+                local selfAbilities = hasSelfData and HealingRenderer.extractSelfHealingAbilitiesAsync(selfHealing, maxAbilities):Await() or {}
+                local topAbilities = mergeAbilityArrays(groupAbilities, selfAbilities, maxAbilities)
+                local q3Section = buildQ3AbilityBars(q3, topAbilities, rawTotal, durationS, GetString(BATTLESCROLLS_OVERVIEW_TOP_ABILITIES))
+                if q3Section then
+                    q3:mount(journal.SECTION_GAP, journal.Q3_INSET, q3Section)
                 end
             end
-        end
-        LibEffect.Yield():Await()
 
-        -- Quality section (Crit Rate, Max Heal)
-        local qualityData = calc:getHealingInQuality()
-        if qualityData.critRate > 0 or qualityData.maxHeal > 0 then
-            lastControl = panel:renderHealingQualitySection(lastControl, qualityData.critRate, qualityData.maxHeal)
-        end
-        LibEffect.YieldWithGC():Await()
+            LibEffect.YieldWithGC():Await()
 
-        -- Q3: Top incoming healing abilities (using filtered data + self if included)
-        local q3Control = nil
-        if hasGroupData or hasSelfData then
-            local maxAbilities = panel:GetMaxAbilities()
-            local groupAbilities = hasGroupData and HealingRenderer.extractHealingInAbilitiesAsync(filteredHealingIn, maxAbilities):Await() or {}
-            local selfAbilities = hasSelfData and HealingRenderer.extractSelfHealingAbilitiesAsync(selfHealing, maxAbilities):Await() or {}
-            local topAbilities = mergeAbilityArrays(groupAbilities, selfAbilities, maxAbilities)
-            if #topAbilities > 0 then
-                q3Control = panel:AddQ3Section(GetString(BATTLESCROLLS_OVERVIEW_TOP_ABILITIES), q3Control)
-                local topValue = topAbilities[1].total
-                for _, ability in ipairs(topAbilities) do
-                    q3Control = panel:AddAbilityBar(ability, topValue, rawTotal, durationS, q3Control)
+            -- Q4: Healers who healed you with HPS
+            if hasGroupData or hasSelfData then
+                local maxTargets = q4:maxItems(ROW_CONTENT.STAT_ROW, 10)
+                local healers = hasGroupData and HealingRenderer.extractHealingSourceBreakdownAsync(filteredHealingIn, unitNames, maxTargets):Await() or {}
+                -- Add self-healing as a healer source if included
+                if hasSelfData and selfHealing.total and selfHealing.total.raw and selfHealing.total.raw > 0 then
+                    local selfName = BattleScrolls.utils.GetUndecoratedDisplayName()
+                    table.insert(healers, { unitId = SELF_UNIT_ID, name = selfName, total = selfHealing.total.raw })
+                    table.sort(healers, function(a, b) return a.total > b.total end)
+                    while #healers > maxTargets do
+                        table.remove(healers)
+                    end
+                end
+                local q4Section = buildQ4TargetRows(q4, healers, durationS, GetString(BATTLESCROLLS_OVERVIEW_HEALERS))
+                if q4Section then
+                    q4:mount(journal.SECTION_GAP, journal.Q3_INSET, q4Section)
                 end
             end
-        end
-
-        LibEffect.YieldWithGC():Await()
-
-        -- Q4: Healers who healed you with HPS (using filtered data + self if included)
-        local q4Control = nil
-        if hasGroupData or hasSelfData then
-            local maxTargets = panel:GetMaxTargets()
-            local healers = hasGroupData and HealingRenderer.extractHealingSourceBreakdownAsync(filteredHealingIn, unitNames, maxTargets):Await() or {}
-            -- Add self-healing as a healer source if included
-            if hasSelfData and selfHealing.total and selfHealing.total.raw and selfHealing.total.raw > 0 then
-                local selfName = BattleScrolls.utils.GetUndecoratedDisplayName()
-                table.insert(healers, { unitId = SELF_UNIT_ID, name = selfName, total = selfHealing.total.raw })
-                table.sort(healers, function(a, b) return a.total > b.total end)
-                -- Limit to maxTargets
-                while #healers > maxTargets do
-                    table.remove(healers)
-                end
-            end
-            if #healers > 0 then
-                q4Control = panel:AddQ4Section(GetString(BATTLESCROLLS_OVERVIEW_HEALERS), q4Control)
-                for _, healer in ipairs(healers) do
-                    q4Control = panel:AddTargetRow(healer.name, utils.formatTargetHPS(healer.total, durationS), q4Control)
-                end
-            end
-        end
-    end)
+        end,
+    }
 end
 
 -- Export to namespace

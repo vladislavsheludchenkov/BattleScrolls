@@ -617,6 +617,78 @@ local strings = {
     [BATTLESCROLLS_GROUP_COL_TOTAL] = "Gesamt",
     [BATTLESCROLLS_GROUP_COL_CRIT] = "Krit",
     [BATTLESCROLLS_GROUP_COL_ALIVE] = "Über\nlebt",
+
+    -------------------------
+    -- Setup Tab
+    -------------------------
+    [BATTLESCROLLS_TAB_BUILD] = "Zusammenstellung",
+    [BATTLESCROLLS_SETUP_ABILITIES] = "Fähigkeiten",
+    [BATTLESCROLLS_SETUP_FRONT_BAR] = "Primärleiste",
+    [BATTLESCROLLS_SETUP_BACK_BAR] = "Reserveleiste",
+    [BATTLESCROLLS_SETUP_GEAR_SETS] = "Ausrüstungssets",
+    [BATTLESCROLLS_SETUP_EQUIPMENT] = "Ausrüstung",
+    [BATTLESCROLLS_SETUP_POISONS] = "Gifte",
+    [BATTLESCROLLS_SETUP_CHARACTER] = "Charakter",
+    [BATTLESCROLLS_SETUP_CLASS_SKILLS] = "Klassen-Fertigkeitslinien",
+    [BATTLESCROLLS_SETUP_MUNDUS] = "Mundus",
+    [BATTLESCROLLS_SETUP_FOOD] = "Nahrung",
+    [BATTLESCROLLS_WEAPON_GREATSWORD] = "Großschwert",
+    [BATTLESCROLLS_WEAPON_BATTLE_AXE] = "Streitaxt",
+    [BATTLESCROLLS_WEAPON_MAUL] = "Streitkolben",
+
+    -------------------------
+    -- Food Buff Descriptions
+    -------------------------
+    [BATTLESCROLLS_FOOD_MAX_HEALTH] = "Maximale Gesundheit",
+    [BATTLESCROLLS_FOOD_MAX_MAGICKA] = "Maximale Magicka",
+    [BATTLESCROLLS_FOOD_MAX_STAMINA] = "Maximale Ausdauer",
+    [BATTLESCROLLS_FOOD_MAX_HEALTH_MAGICKA] = "Maximale Gesundheit und Magicka",
+    [BATTLESCROLLS_FOOD_MAX_HEALTH_STAMINA] = "Maximale Gesundheit und Ausdauer",
+    [BATTLESCROLLS_FOOD_MAX_MAGICKA_STAMINA] = "Maximale Magicka und Ausdauer",
+    [BATTLESCROLLS_FOOD_MAX_TRISTAT] = "Maximale Gesundheit, Magicka und Ausdauer",
+    [BATTLESCROLLS_FOOD_HEALTH_RECOVERY] = "Gesundheitsregeneration",
+    [BATTLESCROLLS_FOOD_MAGICKA_RECOVERY] = "Magickaregeneration",
+    [BATTLESCROLLS_FOOD_STAMINA_RECOVERY] = "Ausdauerregeneration",
+    [BATTLESCROLLS_FOOD_HEALTH_MAGICKA_RECOVERY] = "Gesundheits- und Magickaregeneration",
+    [BATTLESCROLLS_FOOD_HEALTH_STAMINA_RECOVERY] = "Gesundheits- und Ausdauerregeneration",
+    [BATTLESCROLLS_FOOD_MAGICKA_STAMINA_RECOVERY] = "Magicka- und Ausdauerregeneration",
+    [BATTLESCROLLS_FOOD_RECOVERY_TRISTAT] = "Gesundheits-, Magicka- und Ausdauerregeneration",
+
+    -------------------------
+    -- Alchemy Traits
+    -------------------------
+    [BATTLESCROLLS_ALCHEMY_TRAIT1] = "Leben wiederherstellen",
+    [BATTLESCROLLS_ALCHEMY_TRAIT2] = "Lebensverwüstung",
+    [BATTLESCROLLS_ALCHEMY_TRAIT3] = "Magicka wiederherstellen",
+    [BATTLESCROLLS_ALCHEMY_TRAIT4] = "Magickaverwüstung",
+    [BATTLESCROLLS_ALCHEMY_TRAIT5] = "Ausdauer wiederherstellen",
+    [BATTLESCROLLS_ALCHEMY_TRAIT6] = "Ausdauerverwüstung",
+    [BATTLESCROLLS_ALCHEMY_TRAIT7] = "Erhöht Magieresistenz",
+    [BATTLESCROLLS_ALCHEMY_TRAIT8] = "Bruch",
+    [BATTLESCROLLS_ALCHEMY_TRAIT9] = "Erhöht Rüstung",
+    [BATTLESCROLLS_ALCHEMY_TRAIT10] = "Fraktur",
+    [BATTLESCROLLS_ALCHEMY_TRAIT11] = "Erhöht Magiekraft",
+    [BATTLESCROLLS_ALCHEMY_TRAIT12] = "Feigheit",
+    [BATTLESCROLLS_ALCHEMY_TRAIT13] = "Erhöht Waffenkraft",
+    [BATTLESCROLLS_ALCHEMY_TRAIT14] = "Versehren",
+    [BATTLESCROLLS_ALCHEMY_TRAIT15] = "Kritische Magietreffer",
+    [BATTLESCROLLS_ALCHEMY_TRAIT16] = "Ungewissheit",
+    [BATTLESCROLLS_ALCHEMY_TRAIT17] = "Kritische Waffentreffer",
+    [BATTLESCROLLS_ALCHEMY_TRAIT18] = "Schwäche",
+    [BATTLESCROLLS_ALCHEMY_TRAIT19] = "Sicherer Stand",
+    [BATTLESCROLLS_ALCHEMY_TRAIT20] = "Einfangen",
+    [BATTLESCROLLS_ALCHEMY_TRAIT21] = "Detektion",
+    [BATTLESCROLLS_ALCHEMY_TRAIT22] = "Unsichtbarkeit",
+    [BATTLESCROLLS_ALCHEMY_TRAIT23] = "Tempo",
+    [BATTLESCROLLS_ALCHEMY_TRAIT24] = "Einschränken",
+    [BATTLESCROLLS_ALCHEMY_TRAIT25] = "Schutz",
+    [BATTLESCROLLS_ALCHEMY_TRAIT26] = "Verwundbarkeit",
+    [BATTLESCROLLS_ALCHEMY_TRAIT27] = "Beständige Heilung",
+    [BATTLESCROLLS_ALCHEMY_TRAIT28] = "Langsame Lebensverwüstung",
+    [BATTLESCROLLS_ALCHEMY_TRAIT29] = "Vitalität",
+    [BATTLESCROLLS_ALCHEMY_TRAIT30] = "Schänden",
+    [BATTLESCROLLS_ALCHEMY_TRAIT31] = "Heldentum",
+    [BATTLESCROLLS_ALCHEMY_TRAIT32] = "Scheu",
 }
 
 -- Register translations

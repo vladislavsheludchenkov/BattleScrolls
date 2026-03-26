@@ -300,9 +300,11 @@ local function matchShare(unitTag, sharedData)
     }
 
     -- Apply match
+    local matched = false
     if bestType == "live" then
         state.pendingSharedData = state.pendingSharedData or {}
         table.insert(state.pendingSharedData, entry)
+        matched = true
         -- BattleScrolls.log.Debug(function()
         --     return string.format("EncounterShare: matched %s to live combat", displayName)
         -- end)
@@ -314,10 +316,19 @@ local function matchShare(unitTag, sharedData)
     elseif bestTarget then
         bestTarget.sharedData = bestTarget.sharedData or {}
         table.insert(bestTarget.sharedData, entry)
+        matched = true
         -- BattleScrolls.log.Debug(function()
         --     return string.format("EncounterShare: matched %s to %s encounter (ts=%d)",
         --         displayName, bestType, bestTarget.timestampS or bestTarget.startS)
         -- end)
+    end
+
+    -- Request full setup only if the share was matched to a real encounter
+    if matched and sharedData.setupHash then
+        local setupShareModule = BattleScrolls.setupShare
+        if setupShareModule then
+            setupShareModule:onEncounterHashReceived(displayName, sharedData.setupHash)
+        end
     end
 end
 
@@ -567,6 +578,11 @@ function scribe:ImportEncounterFromStateAsync()
             encounter.deaths = { deathCount = deathCount, recaps = recaps }
         end
 
+        encounter.setup = capturedState.playerSetup
+        if encounter.setup and capturedState.effectsOnPlayer then
+            BattleScrolls.setupCapture.finalizeEffectData(encounter.setup, capturedState.effectsOnPlayer)
+        end
+
         local bossTagSeqByUnitId = nil
         if capturedState.isBossFight then
             bossTagSeqByUnitId = {}
@@ -579,10 +595,23 @@ function scribe:ImportEncounterFromStateAsync()
             encounter.bossTagSeqByUnitId = bossTagSeqByUnitId
         end
 
+        -- Compute setup hash for sharing (before send, after setup finalization)
+        local setupHash = nil
+        if encounter.setup then
+            local setupShareModule = BattleScrolls.setupShare
+            if setupShareModule then
+                local compact = setupShareModule.convertToCompact(encounter.setup)
+                setupHash = setupShareModule.computeHash(compact)
+                setupShareModule:cacheLocalSetup(setupHash, compact)
+                local localName = BattleScrolls.utils.GetUndecoratedDisplayName()
+                setupShareModule:storeSetup(localName, setupHash, compact)
+            end
+        end
+
         -- Send encounter data to group members (always, regardless of recording settings)
         local arithmancer = BattleScrolls.arithmancer:Make(encounter, capturedState.abilityInfo)
         local sharedData = arithmancer:buildSharedEncounterData()
-        BattleScrolls.encounterShare:send(sharedData, encounter.timestampS)
+        BattleScrolls.encounterShare:send(sharedData, encounter.timestampS, setupHash)
 
         -- Check recording settings (sharing already happened above)
         local settings = BattleScrolls.storage.savedVariables.settings

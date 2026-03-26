@@ -619,6 +619,78 @@ local strings = {
     [BATTLESCROLLS_GROUP_COL_TOTAL] = "Всего",
     [BATTLESCROLLS_GROUP_COL_CRIT] = "Крит",
     [BATTLESCROLLS_GROUP_COL_ALIVE] = "Жив",
+
+    -------------------------
+    -- Setup Tab
+    -------------------------
+    [BATTLESCROLLS_TAB_BUILD] = "Сборка",
+    [BATTLESCROLLS_SETUP_ABILITIES] = "Способности",
+    [BATTLESCROLLS_SETUP_FRONT_BAR] = "Основная панель",
+    [BATTLESCROLLS_SETUP_BACK_BAR] = "Вторая панель",
+    [BATTLESCROLLS_SETUP_GEAR_SETS] = "Наборы снаряжения",
+    [BATTLESCROLLS_SETUP_EQUIPMENT] = "Снаряжение",
+    [BATTLESCROLLS_SETUP_POISONS] = "Яды",
+    [BATTLESCROLLS_SETUP_CHARACTER] = "Персонаж",
+    [BATTLESCROLLS_SETUP_CLASS_SKILLS] = "Классовые навыки",
+    [BATTLESCROLLS_SETUP_MUNDUS] = "Мундус",
+    [BATTLESCROLLS_SETUP_FOOD] = "Еда",
+    [BATTLESCROLLS_WEAPON_GREATSWORD] = "Двуручный меч",
+    [BATTLESCROLLS_WEAPON_BATTLE_AXE] = "Секира",
+    [BATTLESCROLLS_WEAPON_MAUL] = "Палица",
+
+    -------------------------
+    -- Food Buff Descriptions
+    -------------------------
+    [BATTLESCROLLS_FOOD_MAX_HEALTH] = "Максимальное здоровье",
+    [BATTLESCROLLS_FOOD_MAX_MAGICKA] = "Максимальная магия",
+    [BATTLESCROLLS_FOOD_MAX_STAMINA] = "Максимальный запас сил",
+    [BATTLESCROLLS_FOOD_MAX_HEALTH_MAGICKA] = "Максимальные здоровье и магия",
+    [BATTLESCROLLS_FOOD_MAX_HEALTH_STAMINA] = "Максимальные здоровье и запас сил",
+    [BATTLESCROLLS_FOOD_MAX_MAGICKA_STAMINA] = "Максимальные магия и запас сил",
+    [BATTLESCROLLS_FOOD_MAX_TRISTAT] = "Максимальные здоровье, магия и запас сил",
+    [BATTLESCROLLS_FOOD_HEALTH_RECOVERY] = "Восстановление здоровья",
+    [BATTLESCROLLS_FOOD_MAGICKA_RECOVERY] = "Восстановление магии",
+    [BATTLESCROLLS_FOOD_STAMINA_RECOVERY] = "Восстановление запаса сил",
+    [BATTLESCROLLS_FOOD_HEALTH_MAGICKA_RECOVERY] = "Восстановление здоровья и магии",
+    [BATTLESCROLLS_FOOD_HEALTH_STAMINA_RECOVERY] = "Восстановление здоровья и запаса сил",
+    [BATTLESCROLLS_FOOD_MAGICKA_STAMINA_RECOVERY] = "Восстановление магии и запаса сил",
+    [BATTLESCROLLS_FOOD_RECOVERY_TRISTAT] = "Восстановление здоровья, магии и запаса сил",
+
+    -------------------------
+    -- Alchemy Traits
+    -------------------------
+    [BATTLESCROLLS_ALCHEMY_TRAIT1] = "Восстановление здоровья",
+    [BATTLESCROLLS_ALCHEMY_TRAIT2] = "Опустошение здоровья",
+    [BATTLESCROLLS_ALCHEMY_TRAIT3] = "Восстановление магии",
+    [BATTLESCROLLS_ALCHEMY_TRAIT4] = "Опустошение магии",
+    [BATTLESCROLLS_ALCHEMY_TRAIT5] = "Восстановление запаса сил",
+    [BATTLESCROLLS_ALCHEMY_TRAIT6] = "Опустошение запаса сил",
+    [BATTLESCROLLS_ALCHEMY_TRAIT7] = "Увеличение магической сопротивляемости",
+    [BATTLESCROLLS_ALCHEMY_TRAIT8] = "Прорыв",
+    [BATTLESCROLLS_ALCHEMY_TRAIT9] = "Увеличение показателя брони",
+    [BATTLESCROLLS_ALCHEMY_TRAIT10] = "Перелом",
+    [BATTLESCROLLS_ALCHEMY_TRAIT11] = "Увеличение силы заклинаний",
+    [BATTLESCROLLS_ALCHEMY_TRAIT12] = "Трусость",
+    [BATTLESCROLLS_ALCHEMY_TRAIT13] = "Увеличение силы оружия",
+    [BATTLESCROLLS_ALCHEMY_TRAIT14] = "Травма",
+    [BATTLESCROLLS_ALCHEMY_TRAIT15] = "Крит. рейтинг заклинаний",
+    [BATTLESCROLLS_ALCHEMY_TRAIT16] = "Неуверенность",
+    [BATTLESCROLLS_ALCHEMY_TRAIT17] = "Крит. рейтинг оружия",
+    [BATTLESCROLLS_ALCHEMY_TRAIT18] = "Бессилие",
+    [BATTLESCROLLS_ALCHEMY_TRAIT19] = "Неудержимость",
+    [BATTLESCROLLS_ALCHEMY_TRAIT20] = "Захват",
+    [BATTLESCROLLS_ALCHEMY_TRAIT21] = "Обнаружение",
+    [BATTLESCROLLS_ALCHEMY_TRAIT22] = "Невидимость",
+    [BATTLESCROLLS_ALCHEMY_TRAIT23] = "Скорость",
+    [BATTLESCROLLS_ALCHEMY_TRAIT24] = "Замедление",
+    [BATTLESCROLLS_ALCHEMY_TRAIT25] = "Защита",
+    [BATTLESCROLLS_ALCHEMY_TRAIT26] = "Уязвимость",
+    [BATTLESCROLLS_ALCHEMY_TRAIT27] = "Длительное исцеление",
+    [BATTLESCROLLS_ALCHEMY_TRAIT28] = "Постепенное опустошение здоровья",
+    [BATTLESCROLLS_ALCHEMY_TRAIT29] = "Живучесть",
+    [BATTLESCROLLS_ALCHEMY_TRAIT30] = "Осквернение",
+    [BATTLESCROLLS_ALCHEMY_TRAIT31] = "Героизм",
+    [BATTLESCROLLS_ALCHEMY_TRAIT32] = "Трусливость",
 }
 
 BS_STRINGS = strings

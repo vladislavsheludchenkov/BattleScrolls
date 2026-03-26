@@ -12,7 +12,12 @@ end
 
 local journal = BattleScrolls.journal
 local utils = journal.utils
+local tooltips = journal.tooltips
+local EntryBuilder = journal.EntryBuilder
 local FilterConstants = journal.FilterConstants
+local ROW_CONTENT = journal.ROW_CONTENT
+local SECTION_GAP = journal.SECTION_GAP
+local Q3_INSET = journal.Q3_INSET
 
 local EffectsRenderer = {}
 
@@ -136,28 +141,29 @@ local function displayEffectEntriesAsync(list, sortedEffects, durationMs, header
             local abilityName = utils.getAbilityDisplayName(entry.abilityId)
             local abilityIcon = GetAbilityIcon(entry.abilityId)
             local valueStr = formatValueFn(entry.stats, durationMs)
+            local isFavorite = favorites[entry.abilityId] or false
 
-            local entryData = ZO_GamepadEntryData:New(abilityName, abilityIcon)
-            entryData.iconFile = abilityIcon
-            entryData:SetIconTintOnSelection(true)
-            entryData:AddSubLabel(valueStr)
-            entryData.effectAbilityId = entry.abilityId
-            entryData.isFavorite = favorites[entry.abilityId] or false
-            -- Store raw data for lazy tooltip building
-            entryData.effectTooltipData = {
-                type = "effect",
-                title = abilityName,
-                stats = entry.stats,
-                durationMs = durationMs,
-            }
+            local lines = tooltips.buildEffectTooltipLines(entry.stats, durationMs)
 
-            if isFirst then
-                entryData:SetHeader(headerText)
-                list:AddEntryWithHeader("BattleScrolls_AbilityEntryTemplate", entryData)
-                isFirst = false
-            else
-                list:AddEntry("BattleScrolls_AbilityEntryTemplate", entryData)
-            end
+            EntryBuilder.addEntry(list, {
+                label = abilityName,
+                sublabel = valueStr,
+                icon = abilityIcon,
+                frame = true,
+                header = isFirst and headerText or nil,
+                tooltip = { type = "text", title = abilityName, text = table.concat(lines, "\n") },
+                isFavorite = isFavorite,
+                onFavoriteToggle = function()
+                    local favs = BattleScrolls.storage.savedVariables.settings.favoriteEffects
+                    if favs[entry.abilityId] then
+                        favs[entry.abilityId] = nil
+                    else
+                        favs[entry.abilityId] = true
+                    end
+                end,
+            })
+
+            isFirst = false
 
             if i % YIELD_INTERVAL == 0 then
                 LibEffect.Yield():Await()
@@ -548,28 +554,29 @@ function EffectsRenderer.renderEffectsGroup(ctx)
             local abilityName = utils.getAbilityDisplayName(entry.abilityId)
             local abilityIcon = GetAbilityIcon(entry.abilityId)
             local valueStr = formatGroupEffectValueBrief(entry.avgUptimePercent, entry.stats.memberCount, entry.avgPlayerUptimePercent)
+            local isFavorite = favorites[entry.abilityId] or false
 
-            local entryData = ZO_GamepadEntryData:New(abilityName, abilityIcon)
-            entryData.iconFile = abilityIcon
-            entryData:SetIconTintOnSelection(true)
-            entryData:AddSubLabel(valueStr)
-            entryData.effectAbilityId = entry.abilityId
-            entryData.isFavorite = favorites[entry.abilityId] or false
-            entryData.effectTooltipData = {
-                type = "group",
-                title = abilityName,
-                stats = entry.stats,
-                durationMs = entry.avgEffectiveAliveTimeMs,
-                memberBreakdown = entry.memberBreakdown,
-            }
+            local lines = tooltips.buildGroupEffectTooltipLines(entry.stats, entry.avgEffectiveAliveTimeMs, entry.memberBreakdown)
 
-            if isFirst then
-                entryData:SetHeader(GetString(BATTLESCROLLS_HEADER_BUFFS_ON_GROUP))
-                list:AddEntryWithHeader("BattleScrolls_AbilityEntryTemplate", entryData)
-                isFirst = false
-            else
-                list:AddEntry("BattleScrolls_AbilityEntryTemplate", entryData)
-            end
+            EntryBuilder.addEntry(list, {
+                label = abilityName,
+                sublabel = valueStr,
+                icon = abilityIcon,
+                frame = true,
+                header = isFirst and GetString(BATTLESCROLLS_HEADER_BUFFS_ON_GROUP) or nil,
+                tooltip = { type = "text", title = abilityName, text = table.concat(lines, "\n") },
+                isFavorite = isFavorite,
+                onFavoriteToggle = function()
+                    local favs = BattleScrolls.storage.savedVariables.settings.favoriteEffects
+                    if favs[entry.abilityId] then
+                        favs[entry.abilityId] = nil
+                    else
+                        favs[entry.abilityId] = true
+                    end
+                end,
+            })
+
+            isFirst = false
 
             if i % YIELD_INTERVAL == 0 then
                 LibEffect.Yield():Await()
@@ -586,295 +593,296 @@ end
 local UPTIME_THRESHOLD_GAPS = 95     -- First pass: show effects with gaps (< 95%)
 local UPTIME_THRESHOLD_IMPERFECT = 100 -- Second pass: show non-perfect effects (< 100%)
 
----Refreshes the overview panel for Effects tab
+---Builds a PanelSpec for the Effects tab overview panel
 ---Q2: Player buffs (< 95% uptime)
----Q3: Group buffs (sorted by uptime × members)
+---Q3: Group buffs (sorted by uptime x members)
 ---Q4: Boss debuffs (combined across all bosses)
----@param panel BattleScrolls_Journal_OverviewPanel The overview panel
 ---@param ctx { arithmancer: table, encounter: table, durationS: number, unitNames: table, filters: table }
----@return Effect<nil>
-function EffectsRenderer.refreshPanelForEffects(panel, ctx)
-    return LibEffect.Async(function()
-        local lastControl = nil
-        local encounter = ctx.encounter
-        local durationS = ctx.durationS
-        local durationMs = encounter.durationMs or (durationS * 1000)
-        local filters = ctx.filters or {}
-        local groupFilter = filters.groupFilter
+---@return PanelSpec
+function EffectsRenderer.buildEffectsPanelSpec(ctx)
+    return {
+        layout = "three-column",
+        build = function(q2, q3, q4)
+            local encounter = ctx.encounter
+            local durationS = ctx.durationS
+            local durationMs = encounter.durationMs or (durationS * 1000)
+            local filters = ctx.filters or {}
+            local groupFilter = filters.groupFilter
 
-        if durationMs <= 0 then
-            return
-        end
-
-        -- Player alive time (stored separately from unit alive times)
-        local playerAliveTimeMs = encounter.playerAliveTimeMs or durationMs
-
-        ---Collect effects with progressive filtering:
-        ---1. First try: effects with uptime < 95% (showing gaps)
-        ---2. Second try: effects with uptime < 100% (anything not perfect)
-        ---3. Fallback: all effects (when all are at 100%)
-        ---@param effectsTable table|nil Effects data
-        ---@param effectType number|nil Filter by effect type (BUFF_EFFECT_TYPE_BUFF, etc)
-        ---@param referenceDurationMs number Duration for uptime calculation
-        ---@return table[] effects Sorted effects array (descending by uptime)
-        local function collectEffectsWithFallback(effectsTable, effectType, referenceDurationMs)
-            if not effectsTable or ZO_IsTableEmpty(effectsTable) then
-                return {}
+            if durationMs <= 0 then
+                return
             end
 
-            local favorites = getFavorites()
+            -- Player alive time (stored separately from unit alive times)
+            local playerAliveTimeMs = encounter.playerAliveTimeMs or durationMs
 
-            -- First pass: collect all effects of the specified type with their uptimes
-            local allEffects = {}
-            local favoriteEffects = {}
-            for abilityId, stats in pairs(effectsTable) do
-                if stats.effectType == effectType or effectType == nil then
-                    local peakInstances = stats.peakConcurrentInstances or 1
-                    local effectiveDurationMs = referenceDurationMs * peakInstances
-                    local uptime = effectiveDurationMs > 0 and (stats.totalActiveTimeMs / effectiveDurationMs) * 100 or 0
-                    local entry = {
-                        abilityId = abilityId,
-                        uptime = uptime,
-                        stats = stats,
-                        isFavorite = favorites[abilityId] or false,
+            ---Collect effects with progressive filtering:
+            ---1. First try: effects with uptime < 95% (showing gaps)
+            ---2. Second try: effects with uptime < 100% (anything not perfect)
+            ---3. Fallback: all effects (when all are at 100%)
+            ---@param effectsTable table|nil Effects data
+            ---@param effectType number|nil Filter by effect type (BUFF_EFFECT_TYPE_BUFF, etc)
+            ---@param referenceDurationMs number Duration for uptime calculation
+            ---@return table[] effects Sorted effects array (descending by uptime)
+            local function collectEffectsWithFallback(effectsTable, effectType, referenceDurationMs)
+                if not effectsTable or ZO_IsTableEmpty(effectsTable) then
+                    return {}
+                end
+
+                local favorites = getFavorites()
+
+                -- First pass: collect all effects of the specified type with their uptimes
+                local allEffects = {}
+                for abilityId, stats in pairs(effectsTable) do
+                    if stats.effectType == effectType or effectType == nil then
+                        local peakInstances = stats.peakConcurrentInstances or 1
+                        local effectiveDurationMs = referenceDurationMs * peakInstances
+                        local uptime = effectiveDurationMs > 0 and (stats.totalActiveTimeMs / effectiveDurationMs) * 100 or 0
+                        local entry = {
+                            abilityId = abilityId,
+                            uptime = uptime,
+                            stats = stats,
+                            isFavorite = favorites[abilityId] or false,
+                        }
+                        table.insert(allEffects, entry)
+                    end
+                end
+
+                if #allEffects == 0 then
+                    return {}
+                end
+
+                -- Sort by favorites first, then uptime descending
+                table.sort(allEffects, function(a, b)
+                    if a.isFavorite ~= b.isFavorite then return a.isFavorite end
+                    if a.uptime ~= b.uptime then return a.uptime > b.uptime end
+                    return a.abilityId < b.abilityId
+                end)
+
+                -- Try progressive thresholds, but always include favorites regardless of threshold
+                local gapEffects = {}     -- < 95%
+                local imperfectEffects = {} -- < 100%
+
+                for _, effect in ipairs(allEffects) do
+                    if effect.isFavorite or effect.uptime < UPTIME_THRESHOLD_IMPERFECT then
+                        table.insert(imperfectEffects, effect)
+                    end
+                    if effect.isFavorite or effect.uptime < UPTIME_THRESHOLD_GAPS then
+                        table.insert(gapEffects, effect)
+                    end
+                end
+
+                -- Return based on what we found (prefer showing gaps, then imperfect, then all)
+                -- If only favorites matched a threshold, still use that result
+                if #gapEffects > 0 then
+                    return gapEffects
+                end
+                if #imperfectEffects > 0 then
+                    return imperfectEffects
+                end
+                return allEffects
+            end
+
+            -- Q2: Player buffs (with icons, no bar for narrow space)
+            local playerBuffs = collectEffectsWithFallback(
+                encounter.effectsOnPlayer, BUFF_EFFECT_TYPE_BUFF, playerAliveTimeMs)
+            local maxQ2Effects = q2:maxItems(ROW_CONTENT.EFFECT_ROW, 10)
+
+            if #playerBuffs > 0 then
+                local effectRows = {}
+                for i = 1, math.min(maxQ2Effects, #playerBuffs) do
+                    local effect = playerBuffs[i]
+                    local stats = effect.stats
+                    local effectStats = {
+                        applications = stats.applications,
+                        maxStacks = stats.maxStacks,
+                        peakInstances = stats.peakConcurrentInstances,
                     }
-                    table.insert(allEffects, entry)
-                    if favorites[abilityId] then
-                        table.insert(favoriteEffects, entry)
+                    effectRows[#effectRows + 1] = q2:EffectRow(effect.abilityId, effect.uptime, effectStats, effect.isFavorite)
+                end
+                local q2Section = q2:Section(GetString(BATTLESCROLLS_OVERVIEW_KEY_BUFFS), unpack(effectRows))
+                q2:mount(SECTION_GAP, 0, q2Section)
+            else
+                -- No player buff effects recorded at all
+                local noEffectsRow = q2:StatRow(GetString(BATTLESCROLLS_OVERVIEW_NO_EFFECTS), "")
+                local q2Section = q2:Section(GetString(BATTLESCROLLS_OVERVIEW_KEY_BUFFS), noEffectsRow)
+                q2:mount(SECTION_GAP, 0, q2Section)
+            end
+
+            LibEffect.YieldWithGC():Await()
+
+            -- Detect if only self is selected (solo mode) - skip group buffs to avoid duplication with Q2
+            local hasGroupEffects = encounter.effectsOnGroup and not ZO_IsTableEmpty(encounter.effectsOnGroup)
+            local hasPlayerEffects = encounter.effectsOnPlayer and not ZO_IsTableEmpty(encounter.effectsOnPlayer)
+            local includeSelf = hasPlayerEffects and (not groupFilter or groupFilter[SELF_DISPLAY_NAME] == true)
+
+            local onlySelfInGroup = includeSelf
+            if onlySelfInGroup and hasGroupEffects then
+                for displayName in pairs(encounter.effectsOnGroup) do
+                    if not groupFilter or groupFilter[displayName] == true then
+                        onlySelfInGroup = false
+                        break
                     end
                 end
             end
 
-            if #allEffects == 0 then
-                return {}
-            end
-
-            -- Sort by favorites first, then uptime descending
-            table.sort(allEffects, function(a, b)
-                if a.isFavorite ~= b.isFavorite then return a.isFavorite end
-                if a.uptime ~= b.uptime then return a.uptime > b.uptime end
-                return a.abilityId < b.abilityId
-            end)
-
-            -- Try progressive thresholds, but always include favorites regardless of threshold
-            local gapEffects = {}     -- < 95%
-            local imperfectEffects = {} -- < 100%
-
-            for _, effect in ipairs(allEffects) do
-                if effect.isFavorite or effect.uptime < UPTIME_THRESHOLD_IMPERFECT then
-                    table.insert(imperfectEffects, effect)
+            ---Collect aggregated effects with progressive filtering (for group/boss data)
+            ---@param aggregatedData table<number, table> Aggregated effect data keyed by abilityId
+            ---@param computeUptime function(agg): number Function to compute uptime from aggregation
+            ---@param buildEntry function(abilityId, agg, avgUptime): table Function to build result entry
+            ---@return table[] effects Sorted effects array
+            local function collectAggregatedWithFallback(aggregatedData, computeUptime, buildEntry)
+                if not aggregatedData or ZO_IsTableEmpty(aggregatedData) then
+                    return {}
                 end
-                if effect.isFavorite or effect.uptime < UPTIME_THRESHOLD_GAPS then
-                    table.insert(gapEffects, effect)
+
+                local favorites = getFavorites()
+                local allEffects = {}
+                for abilityId, agg in pairs(aggregatedData) do
+                    local avgUptime = computeUptime(agg)
+                    local entry = buildEntry(abilityId, agg, avgUptime)
+                    entry.isFavorite = favorites[abilityId] or false
+                    table.insert(allEffects, entry)
                 end
-            end
 
-            -- Return based on what we found (prefer showing gaps, then imperfect, then all)
-            -- If only favorites matched a threshold, still use that result
-            if #gapEffects > 0 then
-                return gapEffects
-            end
-            if #imperfectEffects > 0 then
-                return imperfectEffects
-            end
-            return allEffects
-        end
-
-        -- Q2: Player buffs (with icons, no bar for narrow space)
-        local playerBuffs = collectEffectsWithFallback(
-            encounter.effectsOnPlayer, BUFF_EFFECT_TYPE_BUFF, playerAliveTimeMs)
-        local maxQ2Effects = panel:GetMaxQ2EffectRows(0)  -- No prior content used
-
-        if #playerBuffs > 0 then
-            lastControl = panel:AddSection(GetString(BATTLESCROLLS_OVERVIEW_KEY_BUFFS), lastControl)
-
-            for i = 1, math.min(maxQ2Effects, #playerBuffs) do
-                local effect = playerBuffs[i]
-                local stats = effect.stats
-                local effectStats = {
-                    applications = stats.applications,
-                    maxStacks = stats.maxStacks,
-                    peakInstances = stats.peakConcurrentInstances,
-                }
-                lastControl = panel:AddQ2EffectRow(effect.abilityId, effect.uptime, lastControl, effectStats, effect.isFavorite)
-            end
-        else
-            -- No player buff effects recorded at all
-            lastControl = panel:AddSection(GetString(BATTLESCROLLS_OVERVIEW_KEY_BUFFS), lastControl)
-            lastControl = panel:AddStatRow(GetString(BATTLESCROLLS_OVERVIEW_NO_EFFECTS), "", lastControl)
-        end
-
-        LibEffect.YieldWithGC():Await()
-
-        -- Detect if only self is selected (solo mode) - skip group buffs to avoid duplication with Q2
-        local hasGroupEffects = encounter.effectsOnGroup and not ZO_IsTableEmpty(encounter.effectsOnGroup)
-        local hasPlayerEffects = encounter.effectsOnPlayer and not ZO_IsTableEmpty(encounter.effectsOnPlayer)
-        local includeSelf = hasPlayerEffects and (not groupFilter or groupFilter[SELF_DISPLAY_NAME] == true)
-
-        local onlySelfInGroup = includeSelf
-        if onlySelfInGroup and hasGroupEffects then
-            for displayName in pairs(encounter.effectsOnGroup) do
-                if not groupFilter or groupFilter[displayName] == true then
-                    onlySelfInGroup = false
-                    break
+                if #allEffects == 0 then
+                    return {}
                 end
-            end
-        end
 
-        ---Collect aggregated effects with progressive filtering (for group/boss data)
-        ---@param aggregatedData table<number, table> Aggregated effect data keyed by abilityId
-        ---@param computeUptime function(agg): number Function to compute uptime from aggregation
-        ---@param buildEntry function(abilityId, agg, avgUptime): table Function to build result entry
-        ---@return table[] effects Sorted effects array
-        local function collectAggregatedWithFallback(aggregatedData, computeUptime, buildEntry)
-            if not aggregatedData or ZO_IsTableEmpty(aggregatedData) then
-                return {}
-            end
+                -- Sort by favorites first, then score (if present) descending, otherwise avgUptime descending
+                table.sort(allEffects, function(a, b)
+                    if a.isFavorite ~= b.isFavorite then return a.isFavorite end
+                    if a.score and b.score and a.score ~= b.score then
+                        return a.score > b.score
+                    end
+                    if a.avgUptime ~= b.avgUptime then return a.avgUptime > b.avgUptime end
+                    return a.abilityId < b.abilityId
+                end)
 
-            local favorites = getFavorites()
-            local allEffects = {}
-            for abilityId, agg in pairs(aggregatedData) do
-                local avgUptime = computeUptime(agg)
-                local entry = buildEntry(abilityId, agg, avgUptime)
-                entry.isFavorite = favorites[abilityId] or false
-                table.insert(allEffects, entry)
-            end
+                -- Try progressive thresholds, but always include favorites regardless of threshold
+                local gapEffects = {}     -- < 95%
+                local imperfectEffects = {} -- < 100%
 
-            if #allEffects == 0 then
-                return {}
-            end
-
-            -- Sort by favorites first, then score (if present) descending, otherwise avgUptime descending
-            table.sort(allEffects, function(a, b)
-                if a.isFavorite ~= b.isFavorite then return a.isFavorite end
-                if a.score and b.score and a.score ~= b.score then
-                    return a.score > b.score
+                for _, effect in ipairs(allEffects) do
+                    if effect.isFavorite or effect.avgUptime < UPTIME_THRESHOLD_IMPERFECT then
+                        table.insert(imperfectEffects, effect)
+                    end
+                    if effect.isFavorite or effect.avgUptime < UPTIME_THRESHOLD_GAPS then
+                        table.insert(gapEffects, effect)
+                    end
                 end
-                if a.avgUptime ~= b.avgUptime then return a.avgUptime > b.avgUptime end
-                return a.abilityId < b.abilityId
-            end)
 
-            -- Try progressive thresholds, but always include favorites regardless of threshold
-            local gapEffects = {}     -- < 95%
-            local imperfectEffects = {} -- < 100%
-
-            for _, effect in ipairs(allEffects) do
-                if effect.isFavorite or effect.avgUptime < UPTIME_THRESHOLD_IMPERFECT then
-                    table.insert(imperfectEffects, effect)
+                -- Return based on what we found (prefer showing gaps, then imperfect, then all)
+                if #gapEffects > 0 then
+                    return gapEffects
                 end
-                if effect.isFavorite or effect.avgUptime < UPTIME_THRESHOLD_GAPS then
-                    table.insert(gapEffects, effect)
+                if #imperfectEffects > 0 then
+                    return imperfectEffects
                 end
+                return allEffects
             end
 
-            -- Return based on what we found (prefer showing gaps, then imperfect, then all)
-            if #gapEffects > 0 then
-                return gapEffects
-            end
-            if #imperfectEffects > 0 then
-                return imperfectEffects
-            end
-            return allEffects
-        end
+            -- Compute group buffs using shared helper (skip if solo mode)
+            local groupScores = {}
+            if not onlySelfInGroup then
+                local groupAggregated = aggregateGroupBuffs(encounter, durationMs, groupFilter)
 
-        -- Compute group buffs using shared helper (skip if solo mode)
-        local groupScores = {}
-        if not onlySelfInGroup then
-            local groupAggregated = aggregateGroupBuffs(encounter, durationMs, groupFilter)
+                groupScores = collectAggregatedWithFallback(
+                    groupAggregated,
+                    computeGroupBuffAvgUptime,
+                    function(abilityId, agg, avgUptime)
+                        return {
+                            abilityId = abilityId,
+                            score = avgUptime * agg.memberCount, -- for sorting
+                            avgUptime = avgUptime,
+                            memberCount = agg.memberCount,
+                            applications = agg.applications,
+                            maxStacks = agg.maxStacks,
+                        }
+                    end
+                )
+            end
 
-            groupScores = collectAggregatedWithFallback(
-                groupAggregated,
-                computeGroupBuffAvgUptime,
+            LibEffect.YieldWithGC():Await()
+
+            -- Compute boss debuffs using shared helper
+            local bossAggregated = aggregateBossDebuffs(encounter, durationMs)
+
+            local bossDebuffs = collectAggregatedWithFallback(
+                bossAggregated,
+                computeBossDebuffAvgUptime,
                 function(abilityId, agg, avgUptime)
                     return {
                         abilityId = abilityId,
-                        score = avgUptime * agg.memberCount, -- for sorting
                         avgUptime = avgUptime,
-                        memberCount = agg.memberCount,
+                        bossCount = agg.bossCount,
                         applications = agg.applications,
+                        playerPercent = computeBossDebuffPlayerPercent(agg),
                         maxStacks = agg.maxStacks,
                     }
                 end
             )
-        end
 
-        LibEffect.YieldWithGC():Await()
+            -- Q3: Group buffs OR boss debuffs (if no group buffs)
+            local maxQ3Effects = q3:maxItems(ROW_CONTENT.EFFECT_BAR, 10)
 
-        -- Compute boss debuffs using shared helper
-        local bossAggregated = aggregateBossDebuffs(encounter, durationMs)
-
-        local bossDebuffs = collectAggregatedWithFallback(
-            bossAggregated,
-            computeBossDebuffAvgUptime,
-            function(abilityId, agg, avgUptime)
-                return {
-                    abilityId = abilityId,
-                    avgUptime = avgUptime,
-                    bossCount = agg.bossCount,
-                    applications = agg.applications,
-                    playerPercent = computeBossDebuffPlayerPercent(agg),
-                    maxStacks = agg.maxStacks,
-                }
-            end
-        )
-
-        -- Q3: Group buffs OR boss debuffs (if no group buffs)
-        local q3Control = nil
-        local maxQ3Effects = panel:GetMaxEffectBars(panel.q3Container)
-
-        if #groupScores > 0 then
-            -- Show group buffs in Q3
-            q3Control = panel:AddQ3Section(GetString(BATTLESCROLLS_OVERVIEW_GROUP_BUFFS), q3Control)
-
-            for i = 1, math.min(maxQ3Effects, #groupScores) do
-                local effect = groupScores[i]
-                local effectStats = {
-                    suffix = string.format("(%d)", effect.memberCount),
-                    applications = effect.applications,
-                    maxStacks = effect.maxStacks,
-                }
-                q3Control = panel:AddEffectBar(effect.abilityId, effect.avgUptime, q3Control, effectStats, effect.isFavorite)
-            end
-        elseif #bossDebuffs > 0 then
-            -- No group buffs - show boss debuffs in Q3 (wider space, with bar)
-            q3Control = panel:AddQ3Section(GetString(BATTLESCROLLS_OVERVIEW_BOSS_DEBUFFS), q3Control)
-
-            for i = 1, math.min(maxQ3Effects, #bossDebuffs) do
-                local effect = bossDebuffs[i]
-                local effectStats = {
-                    applications = effect.applications,
-                    playerPercent = effect.playerPercent,
-                    maxStacks = effect.maxStacks,
-                }
-                if effect.bossCount > 1 then
-                    effectStats.suffix = string.format("(%d)", effect.bossCount)
+            if #groupScores > 0 then
+                -- Show group buffs in Q3
+                local bars = {}
+                for i = 1, math.min(maxQ3Effects, #groupScores) do
+                    local effect = groupScores[i]
+                    local effectStats = {
+                        suffix = string.format("(%d)", effect.memberCount),
+                        applications = effect.applications,
+                        maxStacks = effect.maxStacks,
+                    }
+                    bars[#bars + 1] = q3:EffectBar(effect.abilityId, effect.avgUptime, effectStats, effect.isFavorite)
                 end
-                q3Control = panel:AddEffectBar(effect.abilityId, effect.avgUptime, q3Control, effectStats, effect.isFavorite)
-            end
-        end
-
-        LibEffect.YieldWithGC():Await()
-
-        -- Q4: Boss debuffs (only if group buffs shown in Q3, otherwise already in Q3)
-        local q4Control = nil
-        if #groupScores > 0 and #bossDebuffs > 0 then
-            local maxQ4Effects = panel:GetMaxEffectRows()
-            q4Control = panel:AddQ4Section(GetString(BATTLESCROLLS_OVERVIEW_BOSS_DEBUFFS), q4Control)
-
-            for i = 1, math.min(maxQ4Effects, #bossDebuffs) do
-                local effect = bossDebuffs[i]
-                local effectStats = {
-                    applications = effect.applications,
-                    playerPercent = effect.playerPercent,
-                    maxStacks = effect.maxStacks,
-                }
-                if effect.bossCount > 1 then
-                    effectStats.suffix = string.format("(%d)", effect.bossCount)
+                local q3Section = q3:Section(GetString(BATTLESCROLLS_OVERVIEW_GROUP_BUFFS), unpack(bars))
+                q3:mount(SECTION_GAP, Q3_INSET, q3Section)
+            elseif #bossDebuffs > 0 then
+                -- No group buffs - show boss debuffs in Q3 (wider space, with bar)
+                local bars = {}
+                for i = 1, math.min(maxQ3Effects, #bossDebuffs) do
+                    local effect = bossDebuffs[i]
+                    local effectStats = {
+                        applications = effect.applications,
+                        playerPercent = effect.playerPercent,
+                        maxStacks = effect.maxStacks,
+                    }
+                    if effect.bossCount > 1 then
+                        effectStats.suffix = string.format("(%d)", effect.bossCount)
+                    end
+                    bars[#bars + 1] = q3:EffectBar(effect.abilityId, effect.avgUptime, effectStats, effect.isFavorite)
                 end
-                q4Control = panel:AddEffectRow(effect.abilityId, effect.avgUptime, q4Control, effectStats, effect.isFavorite)
+                local q3Section = q3:Section(GetString(BATTLESCROLLS_OVERVIEW_BOSS_DEBUFFS), unpack(bars))
+                q3:mount(SECTION_GAP, Q3_INSET, q3Section)
             end
-        end
-    end)
+
+            LibEffect.YieldWithGC():Await()
+
+            -- Q4: Boss debuffs (only if group buffs shown in Q3, otherwise already in Q3)
+            if #groupScores > 0 and #bossDebuffs > 0 then
+                local maxQ4Effects = q4:maxItems(ROW_CONTENT.EFFECT_ROW, 10)
+
+                local rows = {}
+                for i = 1, math.min(maxQ4Effects, #bossDebuffs) do
+                    local effect = bossDebuffs[i]
+                    local effectStats = {
+                        applications = effect.applications,
+                        playerPercent = effect.playerPercent,
+                        maxStacks = effect.maxStacks,
+                    }
+                    if effect.bossCount > 1 then
+                        effectStats.suffix = string.format("(%d)", effect.bossCount)
+                    end
+                    rows[#rows + 1] = q4:EffectRow(effect.abilityId, effect.avgUptime, effectStats, effect.isFavorite)
+                end
+                local q4Section = q4:Section(GetString(BATTLESCROLLS_OVERVIEW_BOSS_DEBUFFS), unpack(rows))
+                q4:mount(SECTION_GAP, Q3_INSET, q4Section)
+            end
+        end,
+    }
 end
 
 -- Export to namespace

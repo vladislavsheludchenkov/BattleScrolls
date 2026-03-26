@@ -39,6 +39,8 @@ combat/deathrecap.lua
 combat/state.lua
 combat/scribe.lua
 combat/ticker.lua
+combat/setup.lua
+combat/setup_analysis.lua
 
 ; Storage domain
 storage/bitcodec.lua
@@ -50,6 +52,7 @@ network/lgb.lua
 network/dpsshare.lua
 network/dpssender.lua
 network/encountershare.lua
+network/setupshare.lua
 
 ; Entry point
 main.lua
@@ -71,14 +74,19 @@ ui/meter/meter.xml
 ; UI - Journal (types and utils load first, then renderers, then controllers)
 ui/journal/types.lua
 ui/journal/utils.lua
+ui/journal/control_pool.lua
+ui/journal/component_factory.lua
+ui/journal/entry_builder.lua
 ui/journal/tooltips.lua
 ui/journal/renderers/damage.lua
 ui/journal/renderers/healing.lua
 ui/journal/renderers/effects.lua
 ui/journal/renderers/group.lua
+ui/journal/renderers/setup.lua
 ui/journal/renderers/overview.lua
 ui/journal/renderers/settings.lua
 ui/journal/keybinds.lua
+ui/journal/horizontal_list.lua
 ui/journal/settings_templates.lua
 ui/journal/controllers/stats_list.lua
 ui/journal/controllers/instance_list.lua
@@ -96,6 +104,9 @@ ui/journal/dialogs.xml
 ; UI - Onboarding
 ui/onboarding/onboarding.lua
 ui/onboarding/onboarding.xml
+
+; UI - Character Stats integration
+ui/character/character_stats.lua
 
 # This Add-on is not created by, affiliated with, or sponsored by, ZeniMax Media Inc. or its affiliates.
 # The Elder Scrolls® and related logos are registered trademarks or trademarks of ZeniMax Media Inc. in the United States

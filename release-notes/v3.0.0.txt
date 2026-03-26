@@ -1,0 +1,6 @@
+Build tracking
+
+- Each fight now records the build and displays it on the new Build tab, so you can go back and see exactly what you were running
+- Overview tab now also displays most of your build for easier parse bragging
+- Character menu now includes high-level overview of your build at a glance
+- Group tab has been also updated to record setups of other players who use Battle Scrolls in your group

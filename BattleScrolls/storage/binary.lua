@@ -12,7 +12,7 @@ BattleScrolls = BattleScrolls or {}
 local binaryStorage = {}
 BattleScrolls.binaryStorage = binaryStorage
 
-local CURRENT_VERSION = 8
+local CURRENT_VERSION = 11
 
 -- Import BitEncoder/BitDecoder from bitcodec module
 local BitEncoder = BattleScrolls.bitcodec.BitEncoder
@@ -73,7 +73,22 @@ local BITS = {
 
     -- Death attack count (3 bits = up to 6 attacks per recap)
     DEATH_ATTACK_COUNT = 3,
+
+    -- Setup encoding (v9+)
+    CHAMPION_SKILL_ID = 16,
+    DISCIPLINE_ID = 8,
+    CHAMPION_COUNT = 6,
+    SCRIPT_ID = 16,
+    CRAFTED_ABILITY_ID = 16,
+
+    RACE_ID = 8,
+    CLASS_ID = 8,
+    SKILL_LINE_ID = 16,
+    MUNDUS_COUNT = 2,
+    FOOD_COUNT = 2,
 }
+
+local EQUIP_SLOT_COUNT = 14
 
 -- Number of encoded items (breakdowns, healing breakdowns, effect stats, etc.)
 -- between yield checkpoints. Each item averages ~8-10 writeUInt calls, but the
@@ -102,6 +117,30 @@ local function flushProgress(progress)
         progress.count = 0
         LibEffect.YieldWithGC():Await()
     end
+end
+
+---Writes a count value clamped to the max representable value for the bit width.
+---Returns the clamped count for use as a loop bound.
+---@param encoder BitEncoder
+---@param count number
+---@param bits number
+---@return number clampedCount
+local function writeCount(encoder, count, bits)
+    local maxVal = BitLShift(1, bits) - 1
+    if count > maxVal then count = maxVal end
+    encoder:writeUInt(count, bits)
+    return count
+end
+
+---Counts entries in a hash table, writes the clamped count, returns the clamped count.
+---@param encoder BitEncoder
+---@param tbl table
+---@param bits number
+---@return number clampedCount
+local function writeTableCount(encoder, tbl, bits)
+    local count = 0
+    for _ in pairs(tbl) do count = count + 1 end
+    return writeCount(encoder, count, bits)
 end
 
 
@@ -227,29 +266,29 @@ end
 ---@param damageMap table<number, table<number, DamageDone|DamageByAbility>>|nil Nested: sourceId -> targetId -> damage
 ---@param progress EncodeProgress
 local function writeDamageMap(encoder, damageMap, progress)
-    -- Count sources
-    local sourceCount = 0
-    for _ in pairs(damageMap or {}) do sourceCount = sourceCount + 1 end
-    encoder:writeUInt(sourceCount, BITS.MAP_COUNT)
+    local sourceCount = writeTableCount(encoder, damageMap or {}, BITS.MAP_COUNT)
 
+    local sourcesWritten = 0
     for sourceId, byTarget in pairs(damageMap or {}) do
+        if sourcesWritten >= sourceCount then break end
+        sourcesWritten = sourcesWritten + 1
         encoder:writeUInt(sourceId, BITS.UNIT_ID)
 
-        -- Count targets
-        local targetCount = 0
-        for _ in pairs(byTarget) do targetCount = targetCount + 1 end
-        encoder:writeUInt(targetCount, BITS.MAP_COUNT)
+        local targetCount = writeTableCount(encoder, byTarget, BITS.MAP_COUNT)
 
+        local targetsWritten = 0
         for targetId, damageDone in pairs(byTarget) do
+            if targetsWritten >= targetCount then break end
+            targetsWritten = targetsWritten + 1
             encoder:writeUInt(targetId, BITS.UNIT_ID)
 
-            -- Count abilities (damageDone.byAbilityId or damageDone itself if already decoded format)
             local byAbility = damageDone.byAbilityId or damageDone
-            local abilityCount = 0
-            for _ in pairs(byAbility) do abilityCount = abilityCount + 1 end
-            encoder:writeUInt(abilityCount, BITS.MAP_COUNT)
+            local abilityCount = writeTableCount(encoder, byAbility, BITS.MAP_COUNT)
 
+            local abilitiesWritten = 0
             for abilityId, breakdown in pairs(byAbility) do
+                if abilitiesWritten >= abilityCount then break end
+                abilitiesWritten = abilitiesWritten + 1
                 encoder:writeUInt(abilityId, BITS.ABILITY_ID)
                 writeDamageBreakdown(encoder, breakdown)
                 countAndMaybeYield(progress)
@@ -297,19 +336,20 @@ local function writeHealingDoneDiffSource(encoder, healing, progress)
     writeHealingTotals(encoder, healing.total)
     -- v6+: byHotVsDirect computed on-demand from byAbilityId + abilityInfo
 
-    -- bySourceUnitIdByAbilityId
-    local sourceCount = 0
-    for _ in pairs(healing.bySourceUnitIdByAbilityId or {}) do sourceCount = sourceCount + 1 end
-    encoder:writeUInt(sourceCount, BITS.MAP_COUNT)
+    local sourceCount = writeTableCount(encoder, healing.bySourceUnitIdByAbilityId or {}, BITS.MAP_COUNT)
 
+    local sourcesWritten = 0
     for sourceId, byAbility in pairs(healing.bySourceUnitIdByAbilityId or {}) do
+        if sourcesWritten >= sourceCount then break end
+        sourcesWritten = sourcesWritten + 1
         encoder:writeUInt(sourceId, BITS.UNIT_ID)
 
-        local abilityCount = 0
-        for _ in pairs(byAbility) do abilityCount = abilityCount + 1 end
-        encoder:writeUInt(abilityCount, BITS.MAP_COUNT)
+        local abilityCount = writeTableCount(encoder, byAbility, BITS.MAP_COUNT)
 
+        local abilitiesWritten = 0
         for abilityId, breakdown in pairs(byAbility) do
+            if abilitiesWritten >= abilityCount then break end
+            abilitiesWritten = abilitiesWritten + 1
             encoder:writeUInt(abilityId, BITS.ABILITY_ID)
             writeHealingBreakdown(encoder, breakdown)
             countAndMaybeYield(progress)
@@ -349,11 +389,12 @@ local function writeHealingDone(encoder, healing, progress)
     writeHealingTotals(encoder, healing.total)
     -- v6+: byHotVsDirect computed on-demand from byAbilityId + abilityInfo
 
-    local abilityCount = 0
-    for _ in pairs(healing.byAbilityId or {}) do abilityCount = abilityCount + 1 end
-    encoder:writeUInt(abilityCount, BITS.MAP_COUNT)
+    local abilityCount = writeTableCount(encoder, healing.byAbilityId or {}, BITS.MAP_COUNT)
 
+    local abilitiesWritten = 0
     for abilityId, breakdown in pairs(healing.byAbilityId or {}) do
+        if abilitiesWritten >= abilityCount then break end
+        abilitiesWritten = abilitiesWritten + 1
         encoder:writeUInt(abilityId, BITS.ABILITY_ID)
         writeHealingBreakdown(encoder, breakdown)
         countAndMaybeYield(progress)
@@ -386,21 +427,23 @@ local function writeHealingStats(encoder, healingStats, progress)
     writeHealingDoneDiffSource(encoder, healingStats.selfHealing, progress)
 
     -- healingOutToGroup
-    local outCount = 0
-    for _ in pairs(healingStats.healingOutToGroup or {}) do outCount = outCount + 1 end
-    encoder:writeUInt(outCount, BITS.MAP_COUNT)
+    local outCount = writeTableCount(encoder, healingStats.healingOutToGroup or {}, BITS.MAP_COUNT)
 
+    local outWritten = 0
     for targetId, healing in pairs(healingStats.healingOutToGroup or {}) do
+        if outWritten >= outCount then break end
+        outWritten = outWritten + 1
         encoder:writeUInt(targetId, BITS.UNIT_ID)
         writeHealingDoneDiffSource(encoder, healing, progress)
     end
 
     -- healingInFromGroup
-    local inCount = 0
-    for _ in pairs(healingStats.healingInFromGroup or {}) do inCount = inCount + 1 end
-    encoder:writeUInt(inCount, BITS.MAP_COUNT)
+    local inCount = writeTableCount(encoder, healingStats.healingInFromGroup or {}, BITS.MAP_COUNT)
 
+    local inWritten = 0
     for sourceId, healing in pairs(healingStats.healingInFromGroup or {}) do
+        if inWritten >= inCount then break end
+        inWritten = inWritten + 1
         encoder:writeUInt(sourceId, BITS.UNIT_ID)
         writeHealingDone(encoder, healing, progress)
     end
@@ -439,18 +482,21 @@ end
 ---@param encoder BitEncoder
 ---@param procs ProcData[]
 local function writeProcs(encoder, procs)
-    encoder:writeUInt(#(procs or {}), BITS.MAP_COUNT)
+    procs = procs or {}
+    local procCount = writeCount(encoder, #procs, BITS.MAP_COUNT)
 
-    for _, proc in ipairs(procs or {}) do
+    for i = 1, procCount do
+        local proc = procs[i]
         encoder:writeUInt(proc.abilityId, BITS.ABILITY_ID)
         encoder:writeUInt(proc.totalProcs or 0, BITS.COUNT)
         encoder:writeUInt(proc.meanIntervalMs or 0, BITS.INTERVAL_MS)
         encoder:writeUInt(proc.medianIntervalMs or 0, BITS.INTERVAL_MS)
 
-        encoder:writeUInt(#(proc.procsByEnemy or {}), BITS.MAP_COUNT)
-        for _, enemy in ipairs(proc.procsByEnemy or {}) do
-            encoder:writeUInt(enemy.unitId, BITS.UNIT_ID)
-            encoder:writeUInt(enemy.procCount or 0, BITS.COUNT)
+        local enemies = proc.procsByEnemy or {}
+        local enemyCount = writeCount(encoder, #enemies, BITS.MAP_COUNT)
+        for j = 1, enemyCount do
+            encoder:writeUInt(enemies[j].unitId, BITS.UNIT_ID)
+            encoder:writeUInt(enemies[j].procCount or 0, BITS.COUNT)
         end
     end
 end
@@ -494,11 +540,12 @@ end
 ---@param effectsOnPlayer table<number, EffectStats>|nil
 ---@param progress EncodeProgress
 local function writeEffectsOnPlayer(encoder, effectsOnPlayer, progress)
-    local count = 0
-    for _ in pairs(effectsOnPlayer or {}) do count = count + 1 end
-    encoder:writeUInt(count, BITS.MAP_COUNT)
+    local count = writeTableCount(encoder, effectsOnPlayer or {}, BITS.MAP_COUNT)
 
+    local written = 0
     for abilityId, stats in pairs(effectsOnPlayer or {}) do
+        if written >= count then break end
+        written = written + 1
         encoder:writeUInt(abilityId, BITS.ABILITY_ID)
         writeEffectStats(encoder, stats)
         countAndMaybeYield(progress)
@@ -526,18 +573,20 @@ end
 ---@param effectsOnBosses table<string, table<number, EffectStats>>|nil
 ---@param progress EncodeProgress
 local function writeEffectsOnBosses(encoder, effectsOnBosses, progress)
-    local unitCount = 0
-    for _ in pairs(effectsOnBosses or {}) do unitCount = unitCount + 1 end
-    encoder:writeUInt(unitCount, BITS.MAP_COUNT)
+    local unitCount = writeTableCount(encoder, effectsOnBosses or {}, BITS.MAP_COUNT)
 
+    local unitsWritten = 0
     for unitTag, byAbility in pairs(effectsOnBosses or {}) do
+        if unitsWritten >= unitCount then break end
+        unitsWritten = unitsWritten + 1
         encoder:writeString(unitTag)
 
-        local abilityCount = 0
-        for _ in pairs(byAbility) do abilityCount = abilityCount + 1 end
-        encoder:writeUInt(abilityCount, BITS.MAP_COUNT)
+        local abilityCount = writeTableCount(encoder, byAbility, BITS.MAP_COUNT)
 
+        local abilitiesWritten = 0
         for abilityId, stats in pairs(byAbility) do
+            if abilitiesWritten >= abilityCount then break end
+            abilitiesWritten = abilitiesWritten + 1
             encoder:writeUInt(abilityId, BITS.ABILITY_ID)
             writeEffectStats(encoder, stats)
             countAndMaybeYield(progress)
@@ -572,18 +621,20 @@ end
 ---@param effectsOnGroup table<string, table<number, EffectStats>>|nil
 ---@param progress EncodeProgress
 local function writeEffectsOnGroup(encoder, effectsOnGroup, progress)
-    local memberCount = 0
-    for _ in pairs(effectsOnGroup or {}) do memberCount = memberCount + 1 end
-    encoder:writeUInt(memberCount, BITS.MAP_COUNT)
+    local memberCount = writeTableCount(encoder, effectsOnGroup or {}, BITS.MAP_COUNT)
 
+    local membersWritten = 0
     for displayName, byAbility in pairs(effectsOnGroup or {}) do
+        if membersWritten >= memberCount then break end
+        membersWritten = membersWritten + 1
         encoder:writeString(displayName)
 
-        local abilityCount = 0
-        for _ in pairs(byAbility) do abilityCount = abilityCount + 1 end
-        encoder:writeUInt(abilityCount, BITS.MAP_COUNT)
+        local abilityCount = writeTableCount(encoder, byAbility, BITS.MAP_COUNT)
 
+        local abilitiesWritten = 0
         for abilityId, stats in pairs(byAbility) do
+            if abilitiesWritten >= abilityCount then break end
+            abilitiesWritten = abilitiesWritten + 1
             encoder:writeUInt(abilityId, BITS.ABILITY_ID)
             writeEffectStats(encoder, stats)
             countAndMaybeYield(progress)
@@ -621,11 +672,12 @@ end
 ---@param encoder BitEncoder
 ---@param bossNames table<string, string>|nil
 local function writeBossNames(encoder, bossNames)
-    local count = 0
-    for _ in pairs(bossNames or {}) do count = count + 1 end
-    encoder:writeUInt(count, BITS.MAP_COUNT)
+    local count = writeTableCount(encoder, bossNames or {}, BITS.MAP_COUNT)
 
+    local written = 0
     for unitTag, name in pairs(bossNames or {}) do
+        if written >= count then break end
+        written = written + 1
         encoder:writeString(unitTag)
         encoder:writeString(name)
     end
@@ -651,11 +703,12 @@ end
 ---@param encoder BitEncoder
 ---@param unitAliveTimeMs table<string, number>|nil
 local function writeUnitAliveTimes(encoder, unitAliveTimeMs)
-    local count = 0
-    for _ in pairs(unitAliveTimeMs or {}) do count = count + 1 end
-    encoder:writeUInt(count, BITS.MAP_COUNT)
+    local count = writeTableCount(encoder, unitAliveTimeMs or {}, BITS.MAP_COUNT)
 
+    local written = 0
     for unitKey, timeMs in pairs(unitAliveTimeMs or {}) do
+        if written >= count then break end
+        written = written + 1
         encoder:writeString(unitKey)
         encoder:writeUInt(timeMs, BITS.TIME_MS)
     end
@@ -683,11 +736,12 @@ end
 ---@param progress EncodeProgress
 local function writeUnitNames(encoder, unitNames, progress)
     unitNames = unitNames or {}
-    local count = 0
-    for _ in pairs(unitNames) do count = count + 1 end
-    encoder:writeUInt(count, BITS.MAP_COUNT)
+    local count = writeTableCount(encoder, unitNames, BITS.MAP_COUNT)
 
+    local written = 0
     for unitId, name in pairs(unitNames) do
+        if written >= count then break end
+        written = written + 1
         encoder:writeUInt(unitId, BITS.UNIT_ID)
         encoder:writeString(name)
         countAndMaybeYield(progress)
@@ -720,10 +774,10 @@ end
 local function writeDeathRecap(encoder, recap)
     encoder:writeUInt(recap.timeOffsetMs or 0, BITS.TIME_MS)
     local attacks = recap.attacks or {}
-    encoder:writeUInt(#attacks, BITS.DEATH_ATTACK_COUNT)
-    for _, attack in ipairs(attacks) do
-        encoder:writeUInt(attack.abilityId, BITS.ABILITY_ID)
-        encoder:writeUInt(attack.damage, BITS.TICK_VALUE)
+    local attackCount = writeCount(encoder, #attacks, BITS.DEATH_ATTACK_COUNT)
+    for i = 1, attackCount do
+        encoder:writeUInt(attacks[i].abilityId, BITS.ABILITY_ID)
+        encoder:writeUInt(attacks[i].damage, BITS.TICK_VALUE)
     end
 end
 
@@ -754,9 +808,9 @@ local function writeDeaths(encoder, deaths)
     encoder:writeBit(true)
     encoder:writeUInt(deaths.deathCount, BITS.MAP_COUNT)
     local recaps = deaths.recaps or {}
-    encoder:writeUInt(#recaps, BITS.MAP_COUNT)
-    for _, recap in ipairs(recaps) do
-        writeDeathRecap(encoder, recap)
+    local recapCount = writeCount(encoder, #recaps, BITS.MAP_COUNT)
+    for i = 1, recapCount do
+        writeDeathRecap(encoder, recaps[i])
     end
 end
 
@@ -774,6 +828,241 @@ local function readDeaths(decoder)
         recaps[#recaps + 1] = readDeathRecap(decoder)
     end
     return { deathCount = deathCount, recaps = recaps }
+end
+
+-- =============================================================================
+-- SETUP ENCODING (v9+)
+-- =============================================================================
+
+---Writes an ability bar (array of PlayerSetupAbility) to the encoder.
+---@param encoder BitEncoder
+---@param bar PlayerSetupAbility[]
+local function writeAbilityBar(encoder, bar)
+    for i = 1, 6 do
+        local ability = bar[i] or {}
+        encoder:writeUInt(ability.abilityId or 0, BITS.ABILITY_ID)
+        local isCrafted = ability.craftedAbilityId ~= nil
+        encoder:writeBit(isCrafted)
+        if isCrafted then
+            encoder:writeUInt(ability.craftedAbilityId, BITS.CRAFTED_ABILITY_ID)
+            local scripts = ability.scriptIds or {}
+            encoder:writeUInt(scripts[1] or 0, BITS.SCRIPT_ID)
+            encoder:writeUInt(scripts[2] or 0, BITS.SCRIPT_ID)
+            encoder:writeUInt(scripts[3] or 0, BITS.SCRIPT_ID)
+        end
+    end
+end
+
+---Reads an ability bar (6 slots) from the decoder.
+---@param decoder BitDecoder
+---@return PlayerSetupAbility[]
+local function readAbilityBar(decoder)
+    local bar = {}
+    for _ = 1, 6 do
+        local abilityId = decoder:readUInt(BITS.ABILITY_ID)
+        local isCrafted = decoder:readBit()
+        ---@type PlayerSetupAbility
+        local ability
+        if isCrafted then
+            local craftedAbilityId = decoder:readUInt(BITS.CRAFTED_ABILITY_ID)
+            local s1 = decoder:readUInt(BITS.SCRIPT_ID)
+            local s2 = decoder:readUInt(BITS.SCRIPT_ID)
+            local s3 = decoder:readUInt(BITS.SCRIPT_ID)
+            ability = {
+                abilityId = abilityId,
+                craftedAbilityId = craftedAbilityId,
+                scriptIds = { s1, s2, s3 },
+            }
+        else
+            ability = { abilityId = abilityId }
+        end
+        bar[#bar + 1] = ability
+    end
+    return bar
+end
+
+local function writeSetup(encoder, setup)
+    -- Abilities: 12 slots (6 front + 6 back)
+    writeAbilityBar(encoder, setup.abilities.front)
+    writeAbilityBar(encoder, setup.abilities.back)
+
+    -- Champion: variable-length
+    local champion = setup.champion or {}
+    local championCount = writeCount(encoder, #champion, BITS.CHAMPION_COUNT)
+    for i = 1, championCount do
+        encoder:writeUInt(champion[i].skillId, BITS.CHAMPION_SKILL_ID)
+        encoder:writeUInt(champion[i].disciplineId, BITS.DISCIPLINE_ID)
+    end
+
+    -- Equipment: 14 fixed slots as item link strings (no poison)
+    local equipSlots = setup.equipSlots or {}
+    for i = 1, EQUIP_SLOT_COUNT do
+        local link = equipSlots[i]
+        if link and link ~= "" then
+            encoder:writeBit(true)
+            encoder:writeString(link)
+        else
+            encoder:writeBit(false)
+        end
+    end
+
+    -- Bar disabled flags (bar swap locked)
+    encoder:writeBit(setup.frontBarDisabled or false)
+    encoder:writeBit(setup.backBarDisabled or false)
+
+    -- Poisons: 2 slots (front, back) as item link strings (v11+)
+    if setup.frontPoison then
+        encoder:writeBit(true)
+        encoder:writeString(setup.frontPoison.itemLink)
+    else
+        encoder:writeBit(false)
+    end
+    if setup.backPoison then
+        encoder:writeBit(true)
+        encoder:writeString(setup.backPoison.itemLink)
+    else
+        encoder:writeBit(false)
+    end
+
+    -- Race, class, skill lines, mundus, food
+    encoder:writeUInt(setup.raceId or 0, BITS.RACE_ID)
+    encoder:writeUInt(setup.classId or 0, BITS.CLASS_ID)
+
+    local classSkillLineIds = setup.classSkillLineIds or {}
+    for i = 1, 3 do
+        encoder:writeUInt(classSkillLineIds[i] or 0, BITS.SKILL_LINE_ID)
+    end
+
+    local mundus = setup.mundusAbilityIds or {}
+    local mundusCount = writeCount(encoder, #mundus, BITS.MUNDUS_COUNT)
+    for i = 1, mundusCount do
+        encoder:writeUInt(mundus[i], BITS.ABILITY_ID)
+    end
+
+    local foods = setup.foods or {}
+    local foodCount = writeCount(encoder, #foods, BITS.FOOD_COUNT)
+    for i = 1, foodCount do
+        encoder:writeUInt(foods[i].abilityId, BITS.ABILITY_ID)
+        if foods[i].uptimeMs then
+            encoder:writeBit(true)
+            encoder:writeUInt(foods[i].uptimeMs, BITS.TIME_MS)
+        else
+            encoder:writeBit(false)
+        end
+    end
+
+    -- v10+: werewolf bar
+    if setup.werewolfAbilities then
+        encoder:writeBit(true)
+        encoder:writeBit(setup.werewolfEntireFight or false)
+        writeAbilityBar(encoder, setup.werewolfAbilities)
+    else
+        encoder:writeBit(false)
+    end
+end
+
+---Reads a PlayerSetup from decoder
+---@param decoder BitDecoder
+---@param version number Binary format version
+---@return PlayerSetup
+local function readSetup(decoder, version)
+    -- Abilities: 12 slots (6 front + 6 back)
+    local front = readAbilityBar(decoder)
+    local back = readAbilityBar(decoder)
+
+    -- Champion
+    local championCount = decoder:readUInt(BITS.CHAMPION_COUNT)
+    local champion = {}
+    for _ = 1, championCount do
+        champion[#champion + 1] = {
+            skillId = decoder:readUInt(BITS.CHAMPION_SKILL_ID),
+            disciplineId = decoder:readUInt(BITS.DISCIPLINE_ID),
+        }
+    end
+
+    -- Equipment: 14 fixed slots as item link strings
+    local equipSlots = {}
+    for i = 1, EQUIP_SLOT_COUNT do
+        if decoder:readBit() then
+            equipSlots[i] = decoder:readString()
+        else
+            equipSlots[i] = false
+        end
+    end
+
+    -- Bar disabled flags (bar swap locked)
+    local frontBarDisabled = decoder:readBit()
+    local backBarDisabled = decoder:readBit()
+
+    -- Poisons: v11+ stores item link strings, v10 stored ability IDs (decoded as nil)
+    local frontPoison = nil
+    local backPoison = nil
+    if version >= 11 then
+        if decoder:readBit() then
+            frontPoison = { itemLink = decoder:readString() }
+        end
+        if decoder:readBit() then
+            backPoison = { itemLink = decoder:readString() }
+        end
+    else
+        -- v10: consume old format (bit + uint) but discard
+        if decoder:readBit() then decoder:readUInt(BITS.ABILITY_ID) end
+        if decoder:readBit() then decoder:readUInt(BITS.ABILITY_ID) end
+    end
+
+    ---@type PlayerSetup
+    local result = {
+        abilities = { front = front, back = back },
+        champion = champion,
+        equipSlots = equipSlots,
+        frontBarDisabled = frontBarDisabled,
+        backBarDisabled = backBarDisabled,
+        frontPoison = frontPoison,
+        backPoison = backPoison,
+    }
+
+    -- Race, class, skill lines, mundus, food
+    result.raceId = decoder:readUInt(BITS.RACE_ID)
+    result.classId = decoder:readUInt(BITS.CLASS_ID)
+
+    local classSkillLineIds = {}
+    for i = 1, 3 do
+        classSkillLineIds[i] = decoder:readUInt(BITS.SKILL_LINE_ID)
+    end
+    result.classSkillLineIds = classSkillLineIds
+
+    local mundusCount = decoder:readUInt(BITS.MUNDUS_COUNT)
+    if mundusCount > 0 then
+        local mundus = {}
+        for _ = 1, mundusCount do
+            mundus[#mundus + 1] = decoder:readUInt(BITS.ABILITY_ID)
+        end
+        result.mundusAbilityIds = mundus
+    end
+
+    local foodCount = decoder:readUInt(BITS.FOOD_COUNT)
+    if foodCount > 0 then
+        local foods = {}
+        for _ = 1, foodCount do
+            local abilityId = decoder:readUInt(BITS.ABILITY_ID)
+            local hasUptime = decoder:readBit()
+            ---@type PlayerSetupFood
+            local food = { abilityId = abilityId }
+            if hasUptime then
+                food.uptimeMs = decoder:readUInt(BITS.TIME_MS)
+            end
+            foods[#foods + 1] = food
+        end
+        result.foods = foods
+    end
+
+    -- v10+: werewolf bar
+    if version >= 10 and decoder:readBit() then
+        result.werewolfEntireFight = decoder:readBit()
+        result.werewolfAbilities = readAbilityBar(decoder)
+    end
+
+    return result
 end
 
 -- =============================================================================
@@ -816,6 +1105,8 @@ function binaryStorage.encodeEncounterAsync(encounter)
         writeUnitAliveTimes(encoder, encounter.unitAliveTimeMs)
         writeUnitNames(encoder, encounter.unitNames, progress)
         writeDeaths(encoder, encounter.deaths)
+        -- v9+: player setup
+        writeSetup(encoder, encounter.setup)
         flushProgress(progress)
 
         local chunks = encoder:finish()
@@ -845,8 +1136,8 @@ end
 function binaryStorage.decodeEncounterAsync(binaryEncounter)
     return LibEffect.Async(function()
         local _v = binaryEncounter._v
-        if _v ~= 7 and _v ~= 8 then
-            error("Invalid binary encounter version: " .. tostring(_v) .. " (expected 7 or 8)")
+        if _v < 7 or _v > 11 then
+            error("Invalid binary encounter version: " .. tostring(_v) .. " (expected 7-11)")
         end
 
         local decoder = BitDecoder.new(binaryEncounter._data)
@@ -898,6 +1189,11 @@ function binaryStorage.decodeEncounterAsync(binaryEncounter)
         -- v8+: death recap data
         if _v >= 8 then
             result.deaths = readDeaths(decoder)
+        end
+
+        -- v9+: player setup
+        if _v >= 9 then
+            result.setup = readSetup(decoder, _v)
         end
 
         return result
@@ -954,22 +1250,24 @@ function binaryStorage.encodeInstanceFieldsAsync(abilityInfo)
         local progress = { count = 0 }
 
         abilityInfo = abilityInfo or {}
-        local count = 0
-        for _ in pairs(abilityInfo) do count = count + 1 end
-        encoder:writeUInt(count, BITS.MAP_COUNT)
+        local count = writeTableCount(encoder, abilityInfo, BITS.MAP_COUNT)
 
+        local written = 0
         for abilityId, info in pairs(abilityInfo) do
+            if written >= count then break end
+            written = written + 1
             encoder:writeUInt(abilityId, BITS.ABILITY_ID)
 
             local overTimeOrDirect = info.overTimeOrDirect or {}
             encoder:writeBit(overTimeOrDirect.overTime)
             encoder:writeBit(overTimeOrDirect.direct)
 
-            local typeCount = 0
-            for _ in pairs(info.damageTypes or {}) do typeCount = typeCount + 1 end
-            encoder:writeUInt(typeCount, 4)
+            local typeCount = writeTableCount(encoder, info.damageTypes or {}, 4)
 
+            local typesWritten = 0
             for damageType in pairs(info.damageTypes or {}) do
+                if typesWritten >= typeCount then break end
+                typesWritten = typesWritten + 1
                 encoder:writeUInt(damageType, BITS_DAMAGE_TYPE)
             end
 

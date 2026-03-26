@@ -38,137 +38,6 @@ function chronicler.onTargetChanged(journalUI, selectedData)
     chronicler.refreshTooltip(journalUI, selectedData)
 end
 
----Helper to append tick stats lines (crit, avg, min, max)
----@param lines string[] Lines array to append to
----@param stats CritStats|nil Tick statistics
----@param indent string|nil Indentation prefix
-local function appendTickStats(lines, stats, indent)
-    if not stats or stats.ticks == 0 then
-        return
-    end
-    indent = indent or ""
-    local critPercent = stats.critTicks / stats.ticks * 100
-    -- Use rawTotal for avg (includes overkill), falling back to total for old data
-    local rawTotal = stats.rawTotal and stats.rawTotal > 0 and stats.rawTotal or stats.total
-    local avgTick = math.floor(rawTotal / stats.ticks)
-    table.insert(lines, string.format("%s%s: %.1f%% (%d/%d)", indent, GetString(BATTLESCROLLS_TOOLTIP_CRIT), critPercent, stats.critTicks, stats.ticks))
-    table.insert(lines, string.format("%s%s: %s", indent, GetString(BATTLESCROLLS_TOOLTIP_AVG_TICK), ZO_CommaDelimitNumber(avgTick)))
-    table.insert(lines, string.format("%s%s: %s", indent, GetString(BATTLESCROLLS_TOOLTIP_MIN_TICK), ZO_CommaDelimitNumber(stats.minTick)))
-    table.insert(lines, string.format("%s%s: %s", indent, GetString(BATTLESCROLLS_TOOLTIP_MAX_TICK), ZO_CommaDelimitNumber(stats.maxTick)))
-end
-
----Calculates uptime percentage
----@param activeTimeMs number
----@param durationMs number
----@return number
-local function calculateUptime(activeTimeMs, durationMs)
-    if durationMs <= 0 then return 0 end
-    return (activeTimeMs / durationMs) * 100
-end
-
----Formats a member name for display in tooltips
----@param displayName string The undecorated display name
----@param isSelf boolean Whether this is the player
----@return string formattedName
-local function formatMemberName(displayName, isSelf)
-    if isSelf then
-        return GetString(BATTLESCROLLS_TOOLTIP_YOU)
-    end
-    return zo_strformat(SI_UNIT_NAME, displayName)
-end
-
----Builds tooltip lines for an effect (player/boss)
----@param stats table Effect stats
----@param durationMs number Reference duration
----@return string[] lines
-local function buildEffectTooltipLines(stats, durationMs)
-    local peakInstances = stats.peakConcurrentInstances or 1
-    local lines = {}
-
-    if peakInstances > 1 then
-        local avgUptimePercent = calculateUptime(stats.totalActiveTimeMs, durationMs * peakInstances)
-        table.insert(lines, string.format("%s: %.1f%%", GetString(BATTLESCROLLS_TOOLTIP_AVG_UPTIME_PER_INSTANCE), avgUptimePercent))
-        table.insert(lines, string.format("%s: %d", GetString(BATTLESCROLLS_TOOLTIP_PEAK_INSTANCES), peakInstances))
-        table.insert(lines, string.format("%s: %d", GetString(BATTLESCROLLS_TOOLTIP_TOTAL_APPLICATIONS), stats.applications))
-    else
-        local uptimePercent = calculateUptime(stats.totalActiveTimeMs, durationMs)
-        table.insert(lines, string.format("%s: %.1f%%", GetString(BATTLESCROLLS_TOOLTIP_TOTAL_UPTIME), uptimePercent))
-        table.insert(lines, string.format("%s: %d", GetString(BATTLESCROLLS_TOOLTIP_TOTAL_APPLICATIONS), stats.applications))
-    end
-
-    if stats.playerActiveTimeMs ~= nil then
-        local playerUptimePercent = calculateUptime(stats.playerActiveTimeMs, durationMs)
-        if stats.playerActiveTimeMs > 0 or stats.playerApplications > 0 then
-            table.insert(lines, "")
-            table.insert(lines, GetString(BATTLESCROLLS_TOOLTIP_YOUR_CONTRIBUTION) .. ":")
-            table.insert(lines, string.format("  %s: %.1f%%", GetString(BATTLESCROLLS_TOOLTIP_YOUR_UPTIME), playerUptimePercent))
-            table.insert(lines, string.format("  %s: %d", GetString(BATTLESCROLLS_TOOLTIP_YOUR_APPLICATIONS), stats.playerApplications))
-        end
-    end
-
-    if stats.maxStacks > 1 then
-        table.insert(lines, "")
-        local maxStacksPercent = calculateUptime(stats.timeAtMaxStacksMs, durationMs)
-        table.insert(lines, string.format("%s: %d", GetString(BATTLESCROLLS_TOOLTIP_MAX_STACKS), stats.maxStacks))
-        table.insert(lines, string.format("%s: %.1f%%", GetString(BATTLESCROLLS_TOOLTIP_TIME_AT_MAX_STACKS), maxStacksPercent))
-        if stats.playerTimeAtMaxStacksMs and stats.playerTimeAtMaxStacksMs > 0 then
-            local playerMaxStacksPercent = calculateUptime(stats.playerTimeAtMaxStacksMs, durationMs)
-            table.insert(lines, string.format("%s: %.1f%%", GetString(BATTLESCROLLS_TOOLTIP_YOUR_TIME_AT_MAX), playerMaxStacksPercent))
-        end
-    end
-
-    return lines
-end
-
----Builds tooltip lines for a group effect
----@param stats table Aggregated group effect stats
----@param durationMs number Reference duration
----@param memberBreakdown table[]|nil Per-member breakdown
----@return string[] lines
-local function buildGroupEffectTooltipLines(stats, durationMs, memberBreakdown)
-    local avgActiveTimeMs = stats.totalActiveTimeMs / stats.memberCount
-    local avgUptimePercent = calculateUptime(avgActiveTimeMs, durationMs)
-    local avgPlayerActiveTimeMs = stats.playerActiveTimeMs / stats.memberCount
-    local avgPlayerUptimePercent = calculateUptime(avgPlayerActiveTimeMs, durationMs)
-
-    local lines = {}
-
-    table.insert(lines, string.format("%s: %.1f%%", GetString(BATTLESCROLLS_TOOLTIP_AVG_UPTIME_PER_MEMBER), avgUptimePercent))
-    table.insert(lines, string.format("%s: %d", GetString(BATTLESCROLLS_TOOLTIP_TOTAL_APPLICATIONS), stats.applications))
-    table.insert(lines, string.format("%s: %d", GetString(BATTLESCROLLS_TOOLTIP_MEMBERS_AFFECTED), stats.memberCount))
-
-    if stats.playerActiveTimeMs > 0 or stats.playerApplications > 0 then
-        table.insert(lines, "")
-        table.insert(lines, GetString(BATTLESCROLLS_TOOLTIP_YOUR_CONTRIBUTION) .. ":")
-        table.insert(lines, string.format("  %s: %.1f%%", GetString(BATTLESCROLLS_TOOLTIP_AVG_UPTIME), avgPlayerUptimePercent))
-        table.insert(lines, string.format("  %s: %d", GetString(BATTLESCROLLS_TOOLTIP_YOUR_APPLICATIONS), stats.playerApplications))
-    end
-
-    if stats.maxStacks > 1 then
-        table.insert(lines, "")
-        table.insert(lines, string.format("%s: %d", GetString(BATTLESCROLLS_TOOLTIP_MAX_STACKS_OBSERVED), stats.maxStacks))
-        local avgTimeAtMaxStacksMs = stats.timeAtMaxStacksMs / stats.memberCount
-        local avgMaxStacksPercent = calculateUptime(avgTimeAtMaxStacksMs, durationMs)
-        table.insert(lines, string.format("%s: %.1f%%", GetString(BATTLESCROLLS_TOOLTIP_AVG_TIME_AT_MAX), avgMaxStacksPercent))
-        if stats.playerTimeAtMaxStacksMs > 0 then
-            local avgPlayerTimeAtMaxStacksMs = stats.playerTimeAtMaxStacksMs / stats.memberCount
-            local avgPlayerMaxStacksPercent = calculateUptime(avgPlayerTimeAtMaxStacksMs, durationMs)
-            table.insert(lines, string.format("%s: %.1f%%", GetString(BATTLESCROLLS_TOOLTIP_YOUR_AVG_TIME_AT_MAX), avgPlayerMaxStacksPercent))
-        end
-    end
-
-    if memberBreakdown then
-        table.insert(lines, "")
-        table.insert(lines, GetString(BATTLESCROLLS_TOOLTIP_PER_MEMBER) .. ":")
-        for _, member in ipairs(memberBreakdown) do
-            local name = formatMemberName(member.displayName, member.isSelf)
-            table.insert(lines, string.format("  %s: %.1f%%", name, member.uptimePercent))
-        end
-    end
-
-    return lines
-end
-
 -- Style for AcquireCustomControl: reuses the BattleScrolls_DeathAttackRow XML template
 -- (same pattern as armory tooltips using AcquireCustomControl with ZO_GamepadInteractiveAttributeRow)
 local DEATH_ATTACK_ROW_STYLE = {
@@ -184,64 +53,71 @@ local DEATH_TOOLTIP_ICON_OFFSET_X = 40
 ---Uses BattleScrolls_DeathAttackRow custom controls via AcquireCustomControl,
 ---giving us proper icon frames, killing blow skulls, and right-aligned values
 ---(same pattern as armorytooltips.lua LayoutArmoryBuildAttributes).
----@param title string Death label (e.g. "First Death")
----@param timing string Timing subtitle (e.g. "at 1:23")
----@param attacks SharedDeathRecapAttack[]|nil Attack list
-local function showDeathRecapTooltip(title, timing, attacks)
+---@param data { title: string, subtitle: string|nil, rows: DetailRow[]|nil }
+local function showDeathRecapTooltip(data)
     local tooltip = GAMEPAD_TOOLTIPS:GetTooltip(GAMEPAD_LEFT_TOOLTIP)
     GAMEPAD_TOOLTIPS:ClearTooltip(GAMEPAD_LEFT_TOOLTIP)
 
     -- Title section
     local headerSection = tooltip:AcquireSection(tooltip:GetStyle("bodyHeader"))
-    headerSection:AddLine(title, tooltip:GetStyle("title"))
+    headerSection:AddLine(data.title, tooltip:GetStyle("title"))
     tooltip:AddSection(headerSection)
 
     -- Timing subtitle (reduced spacing to keep it close to the title)
     local timingSection = tooltip:AcquireSection({ customSpacing = 5 }, tooltip:GetStyle("bodySection"))
-    timingSection:AddLine(timing, tooltip:GetStyle("bodyDescription"))
+    timingSection:AddLine(data.subtitle, tooltip:GetStyle("bodyDescription"))
     tooltip:AddSection(timingSection)
 
     -- Attack rows using BattleScrolls_DeathAttackRow custom controls
-    if attacks and #attacks > 0 then
+    if data.rows and #data.rows > 0 then
         -- Horizontal divider
         local dividerSection = tooltip:AcquireSection(tooltip:GetStyle("bodySection"))
         dividerSection:AddTexture(ZO_GAMEPAD_HEADER_DIVIDER_TEXTURE, tooltip:GetStyle("dividerLine"))
         tooltip:AddSection(dividerSection)
 
+        -- Check if any row is highlighted (killing blow) to reserve skull space on all rows
+        local anyHighlighted = false
+        for _, row in ipairs(data.rows) do
+            if row.isHighlighted then anyHighlighted = true; break end
+        end
+        local iconOffsetX = anyHighlighted and DEATH_TOOLTIP_ICON_OFFSET_X or 0
+
         local attackSection = tooltip:AcquireSection(tooltip:GetStyle("bodySection"))
-        for i, attack in ipairs(attacks) do
-            local isKillingBlow = (i == #attacks)
+        for _, row in ipairs(data.rows) do
             -- Acquire from the tooltip object (persistent), not the section (pooled).
             -- Section pools get wiped by ZO_TooltipSection:Initialize (customControlPools = {})
             -- every time a section is re-acquired, causing duplicate name errors.
             -- The tooltip object is never re-initialized, so its pools persist across resets.
             -- This matches armorytooltips.lua which calls self:AcquireCustomControl on the tooltip.
-            local row = tooltip:AcquireCustomControl(DEATH_ATTACK_ROW_STYLE)
-            row:SetHidden(false)
+            local control = tooltip:AcquireCustomControl(DEATH_ATTACK_ROW_STYLE)
+            control:SetHidden(false)
 
             -- Icon at consistent offset (reserves skull space on all rows for alignment)
-            local icon = row:GetNamedChild("Icon")
-            local abilityIcon = GetAbilityIcon(attack.abilityId)
-            icon:SetTexture(abilityIcon)
+            local icon = control:GetNamedChild("Icon")
+            icon:SetTexture(row.icon)
             icon:ClearAnchors()
-            icon:SetAnchor(LEFT, row, LEFT, DEATH_TOOLTIP_ICON_OFFSET_X, 0)
+            icon:SetAnchor(LEFT, control, LEFT, iconOffsetX, 0)
 
             -- Icon frame: square for active abilities, circle for passives
-            local isPassive = journal.utils.isPassiveIcon(abilityIcon)
-            row:GetNamedChild("EdgeFrame"):SetHidden(isPassive)
-            row:GetNamedChild("CircleFrame"):SetHidden(not isPassive)
+            local isPassive = journal.utils.isPassiveIcon(row.icon)
+            control:GetNamedChild("EdgeFrame"):SetHidden(isPassive)
+            control:GetNamedChild("CircleFrame"):SetHidden(not isPassive)
 
             -- Killing blow skull (anchored to icon's left in XML, hidden on non-killing rows)
-            local killingBlowIcon = row:GetNamedChild("KillingBlow")
+            local killingBlowIcon = control:GetNamedChild("KillingBlow")
             if killingBlowIcon then
-                killingBlowIcon:SetHidden(not isKillingBlow)
+                killingBlowIcon:SetHidden(not row.isHighlighted)
             end
 
             -- Ability name and damage value
-            row:GetNamedChild("Name"):SetText(journal.utils.getAbilityDisplayName(attack.abilityId))
-            row:GetNamedChild("Value"):SetText(journal.utils.formatCompact(attack.damage))
+            control:GetNamedChild("Name"):SetText(row.label)
+            if row.value then
+                control:GetNamedChild("Value"):SetText(row.value)
+            else
+                control:GetNamedChild("Value"):SetText("")
+            end
 
-            attackSection:AddCustomControl(row)
+            attackSection:AddCustomControl(control)
         end
         tooltip:AddSection(attackSection)
     end
@@ -253,25 +129,198 @@ local function showDeathRecapTooltip(title, timing, attacks)
     end
 end
 
+-- Style for AcquireCustomControl: uses same template as overview panel ability rows
+local ABILITY_ROW_STYLE = {
+    controlTemplate = "BattleScrolls_AbilityIconEntry",
+    widthPercent = 100,
+}
+
+-- Style for scribing script lines (smaller font, normal text color)
+local SCRIBING_SCRIPT_STYLE = {
+    fontSize = "$(GP_27)",
+    fontColor = ZO_NORMAL_TEXT,
+}
+
+-- Section style for scribing scripts (tight spacing between lines)
+local SCRIBING_SECTION_STYLE = {
+    childSpacing = 1,
+    paddingLeft = 0,
+    paddingRight = 0,
+}
+
+---Builds and shows a custom tooltip for setup bar abilities with icon rows.
+---Uses ZO_GamepadSkillLinePreview_AbilityEntry custom controls via AcquireCustomControl,
+---giving us proper icon frames and font-adjusting labels (same pattern as showDeathRecapTooltip).
+---@param data { type: string, title: string, abilities: TooltipAbility[] }
+local function showSetupBarTooltip(data)
+    local tooltip = GAMEPAD_TOOLTIPS:GetTooltip(GAMEPAD_LEFT_TOOLTIP)
+    GAMEPAD_TOOLTIPS:ClearTooltip(GAMEPAD_LEFT_TOOLTIP)
+
+    -- Title section
+    local headerSection = tooltip:AcquireSection(tooltip:GetStyle("bodyHeader"))
+    headerSection:AddLine(data.title, tooltip:GetStyle("title"))
+    tooltip:AddSection(headerSection)
+
+    -- Horizontal divider
+    local dividerSection = tooltip:AcquireSection(tooltip:GetStyle("bodySection"))
+    dividerSection:AddTexture(ZO_GAMEPAD_HEADER_DIVIDER_TEXTURE, tooltip:GetStyle("dividerLine"))
+    tooltip:AddSection(dividerSection)
+
+    -- Ability rows with scribing scripts
+    for _, ability in ipairs(data.abilities) do
+        if ability.abilityId > 0 then
+            local abilitySection = tooltip:AcquireSection(tooltip:GetStyle("bodySection"))
+            local row = tooltip:AcquireCustomControl(ABILITY_ROW_STYLE)
+            row:SetHidden(false)
+
+            local isUltimate = ability.isUltimate
+            journal.utils.populateAbilityRow(row, ability.abilityId, isUltimate)
+
+            abilitySection:AddCustomControl(row)
+            tooltip:AddSection(abilitySection)
+
+            -- Scribing scripts: each on its own line with inline icon, tight spacing
+            if ability.scripts and #ability.scripts > 0 then
+                local scriptSection = tooltip:AcquireSection(SCRIBING_SECTION_STYLE)
+                for _, script in ipairs(ability.scripts) do
+                    local line = ""
+                    if script.icon and script.icon ~= "" then
+                        line = string.format("|t28:28:%s|t ", script.icon)
+                    end
+                    scriptSection:AddLine(line .. script.name, SCRIBING_SCRIPT_STYLE)
+                end
+                tooltip:AddSection(scriptSection)
+            end
+        end
+    end
+
+    -- Show tooltip + background fragments
+    SCENE_MANAGER:AddFragment(GAMEPAD_TOOLTIPS:GetTooltipFragment(GAMEPAD_LEFT_TOOLTIP))
+    if GAMEPAD_TOOLTIPS:DoesAutoShowTooltipBg(GAMEPAD_LEFT_TOOLTIP) then
+        SCENE_MANAGER:AddFragment(GAMEPAD_TOOLTIPS:GetTooltipBgFragment(GAMEPAD_LEFT_TOOLTIP))
+    end
+end
+
+-- Styles for champion/iconList tooltip custom controls (our own templates matching armory look)
+local CHAMPION_HEADER_STYLE = {
+    controlTemplate = "BattleScrolls_ChampionDisciplineHeader",
+    height = journal.ChampionRowStyle.HEADER_HEIGHT,
+    widthPercent = 100,
+}
+local CHAMPION_ROW_STYLE = {
+    controlTemplate = "BattleScrolls_ChampionSkillRow",
+    height = journal.ChampionRowStyle.ROW_HEIGHT,
+    widthPercent = 100,
+}
+
+---Acquires and populates an icon+label row in the given tooltip section.
+local function addIconRow(tooltip, section, label, icon)
+    local row = tooltip:AcquireCustomControl(CHAMPION_ROW_STYLE)
+    row:SetHidden(false)
+    row:GetNamedChild("Icon"):SetTexture(icon)
+    row:GetNamedChild("Label"):SetText(label)
+    section:AddCustomControl(row)
+end
+
+---Builds and shows a tooltip for icon-based lists (champion skills, class skill lines).
+---Grouped data renders with discipline headers; flat data renders a plain icon+name list.
+---@param data TooltipDescriptor
+local function showIconListTooltip(data)
+    local tooltip = GAMEPAD_TOOLTIPS:GetTooltip(GAMEPAD_LEFT_TOOLTIP)
+    GAMEPAD_TOOLTIPS:ClearTooltip(GAMEPAD_LEFT_TOOLTIP)
+
+    -- Title section
+    local headerSection = tooltip:AcquireSection(tooltip:GetStyle("bodyHeader"))
+    headerSection:AddLine(data.title, tooltip:GetStyle("title"))
+    tooltip:AddSection(headerSection)
+
+    local contentSection = tooltip:AcquireSection(tooltip:GetStyle("bodySection"))
+    if data.groups then
+        for groupIdx, group in ipairs(data.groups) do
+            if groupIdx > 1 then
+                contentSection:SetNextSpacing(25)
+            end
+            local header = tooltip:AcquireCustomControl(CHAMPION_HEADER_STYLE)
+            header:SetHidden(false)
+            header:GetNamedChild("Label"):SetText(group.headerLabel)
+            local headerIconCtrl = header:GetNamedChild("Icon")
+            if headerIconCtrl then
+                local hasIcon = group.headerIcon and group.headerIcon ~= ""
+                headerIconCtrl:SetHidden(not hasIcon)
+                if hasIcon then headerIconCtrl:SetTexture(group.headerIcon) end
+            end
+            contentSection:AddCustomControl(header)
+
+            contentSection:SetNextSpacing(2)
+            local groupIcon = group.headerIcon or ""
+            for _, row in ipairs(group.rows) do
+                addIconRow(tooltip, contentSection, row.label, groupIcon)
+            end
+        end
+    elseif data.rows then
+        for _, row in ipairs(data.rows) do
+            addIconRow(tooltip, contentSection, row.label, row.icon or "")
+        end
+    end
+    tooltip:AddSection(contentSection)
+
+    -- Show tooltip + background fragments
+    SCENE_MANAGER:AddFragment(GAMEPAD_TOOLTIPS:GetTooltipFragment(GAMEPAD_LEFT_TOOLTIP))
+    if GAMEPAD_TOOLTIPS:DoesAutoShowTooltipBg(GAMEPAD_LEFT_TOOLTIP) then
+        SCENE_MANAGER:AddFragment(GAMEPAD_TOOLTIPS:GetTooltipBgFragment(GAMEPAD_LEFT_TOOLTIP))
+    end
+end
+
+---Tooltip dispatch table: maps tooltip.type to handler functions.
+---Renderers set tooltip descriptors on entries via EntryBuilder; chronicler dispatches here.
+---@type table<string, fun(data: TooltipDescriptor)>
+local tooltipDispatch = {
+    text = function(data)
+        GAMEPAD_TOOLTIPS:LayoutTitleAndDescriptionTooltip(GAMEPAD_LEFT_TOOLTIP, data.title, data.text)
+    end,
+    item = function(data)
+        GAMEPAD_TOOLTIPS:LayoutItemWithStackCountSimple(GAMEPAD_LEFT_TOOLTIP, data.itemLink)
+    end,
+    panel = function()
+        -- No-op: overview panel handles this
+    end,
+    groupTable = function()
+        -- No-op: group table handles this
+    end,
+    detailRows = function(data)
+        showDeathRecapTooltip(data)
+    end,
+    abilityList = function(data)
+        showSetupBarTooltip(data)
+    end,
+    iconList = function(data)
+        showIconListTooltip(data)
+    end,
+}
+
 ---Refreshes the tooltip for the selected entry
 ---@param journalUI BattleScrolls_Journal_Gamepad
 ---@param selectedData table|nil
 function chronicler.refreshTooltip(journalUI, selectedData)
     chronicler.resetTooltips()
 
+    local tooltip = selectedData and selectedData.tooltip
+    local isGroupTable = tooltip and tooltip.type == "groupTable"
+    local panelSpec = tooltip and tooltip.panelSpec
+
     -- Handle group table visibility on GROUP tab
     local groupTable = BattleScrolls.journal.groupTable
     if journalUI.selectedTab == STATS_TAB.GROUP then
-        if selectedData and selectedData.isOverviewEntry then
-            -- Show group table for overview entry, hide overview panel
+        if isGroupTable then
+            -- Overview entry: show group table, hide overview panel
             if groupTable then
                 groupTable:Show(journalUI)
             end
             if journalUI.overviewPanel then
                 journalUI.overviewPanel:Hide()
             end
-        elseif selectedData and selectedData.groupPlayerData then
-            -- Show player detail panel, hide group table
+        elseif panelSpec then
+            -- Player entry: show player detail panel, hide group table
             if groupTable and groupTable:IsActive() then
                 groupTable:Leave()
                 journalUI:SetActiveKeybinds(journalUI.statsKeybindStripDescriptor)
@@ -281,7 +330,7 @@ function chronicler.refreshTooltip(journalUI, selectedData)
                 groupTable:Hide()
             end
             if journalUI.overviewPanel then
-                journalUI.overviewPanel:Refresh(journalUI, selectedData)
+                journalUI.overviewPanel:Render(panelSpec)
                 journalUI.overviewPanel:Show()
             end
         else
@@ -292,8 +341,8 @@ function chronicler.refreshTooltip(journalUI, selectedData)
         -- Non-GROUP tab: hide group table, handle overview panel normally
         if groupTable then groupTable:Hide() end
         if journalUI.overviewPanel then
-            if selectedData and (selectedData.isOverviewEntry or selectedData.groupPlayerData) then
-                journalUI.overviewPanel:Refresh(journalUI, selectedData)
+            if panelSpec then
+                journalUI.overviewPanel:Render(panelSpec)
                 journalUI.overviewPanel:Show()
             else
                 journalUI.overviewPanel:Hide()
@@ -301,143 +350,13 @@ function chronicler.refreshTooltip(journalUI, selectedData)
         end
     end
 
-    if not selectedData then
+    if not selectedData or not tooltip then
         return
     end
 
-    -- Overview entry has no tooltip (uses the panel instead)
-    if selectedData.isOverviewEntry then
-        return
-    end
-
-    -- Show ability breakdown tooltip
-    if selectedData.abilityBreakdown then
-        local data = selectedData.abilityBreakdown
-        local lines = {}
-        table.insert(lines, string.format("%s: %s", GetString(BATTLESCROLLS_TOOLTIP_TOTAL), ZO_CommaDelimitNumber(data.totalDamage)))
-
-        -- Show damage type info
-        if data.damageTypeDesc then
-            table.insert(lines, string.format("%s: %s", GetString(BATTLESCROLLS_TOOLTIP_TYPE), data.damageTypeDesc))
-        end
-        if data.overTimeOrDirectDesc then
-            table.insert(lines, string.format("%s: %s", GetString(BATTLESCROLLS_TOOLTIP_DELIVERY), data.overTimeOrDirectDesc))
-        end
-
-        -- Show aggregate tick stats for the merged ability
-        appendTickStats(lines, data.critStats)
-
-        table.insert(lines, "")
-
-        for _, entry in ipairs(data.entries) do
-            local percent = data.totalDamage > 0 and (entry.damage / data.totalDamage * 100) or 0
-            local label = entry.displayName
-            table.insert(lines, string.format("  %s: %s (%.1f%%)", label, ZO_CommaDelimitNumber(entry.damage), percent))
-
-            -- Show per-entry tick stats
-            appendTickStats(lines, entry.critStats, "    ")
-        end
-
-        local description = table.concat(lines, "\n")
-        GAMEPAD_TOOLTIPS:LayoutTitleAndDescriptionTooltip(GAMEPAD_LEFT_TOOLTIP, data.baseName, description)
-        return
-    end
-
-    -- Show single ability tick stats tooltip (no breakdown)
-    if selectedData.critStats then
-        local stats = selectedData.critStats
-        local lines = {}
-        table.insert(lines, string.format("%s: %s", GetString(BATTLESCROLLS_TOOLTIP_TOTAL), ZO_CommaDelimitNumber(stats.total)))
-
-        -- Show damage type info
-        if selectedData.damageTypeDesc then
-            table.insert(lines, string.format("%s: %s", GetString(BATTLESCROLLS_TOOLTIP_TYPE), selectedData.damageTypeDesc))
-        end
-        if selectedData.overTimeOrDirectDesc then
-            table.insert(lines, string.format("%s: %s", GetString(BATTLESCROLLS_TOOLTIP_DELIVERY), selectedData.overTimeOrDirectDesc))
-        end
-
-        appendTickStats(lines, stats)
-
-        local description = table.concat(lines, "\n")
-        local title = selectedData.text or GetString(BATTLESCROLLS_TOOLTIP_ABILITY)
-        GAMEPAD_TOOLTIPS:LayoutTitleAndDescriptionTooltip(GAMEPAD_LEFT_TOOLTIP, title, description)
-        return
-    end
-
-    -- Show proc breakdown tooltip
-    if selectedData.procData and selectedData.unitNames then
-        local procData = selectedData.procData
-        local unitNames = selectedData.unitNames
-
-        local abilityName = BattleScrolls.utils.GetScribeAwareAbilityDisplayName(procData.abilityId)
-        if abilityName == "" then
-            abilityName = string.format("%s %d", GetString(BATTLESCROLLS_TOOLTIP_ABILITY), procData.abilityId)
-        end
-
-        -- Build breakdown text
-        local lines = {}
-        table.insert(lines, string.format("%s: %s", GetString(BATTLESCROLLS_TOOLTIP_TOTAL), zo_strformat(GetString(BATTLESCROLLS_STAT_TOTAL_PROCS), procData.totalProcs)))
-
-        if procData.meanIntervalMs > 0 then
-            table.insert(lines, string.format("%s: %.1fs", GetString(BATTLESCROLLS_TOOLTIP_MEAN_INTERVAL), procData.meanIntervalMs / 1000))
-        end
-        if procData.medianIntervalMs > 0 then
-            table.insert(lines, string.format("%s: %.1fs", GetString(BATTLESCROLLS_TOOLTIP_MEDIAN_INTERVAL), procData.medianIntervalMs / 1000))
-        end
-
-        table.insert(lines, "")
-        table.insert(lines, GetString(BATTLESCROLLS_TOOLTIP_BY_TARGET) .. ":")
-
-        -- Sort procs by enemy by count descending
-        local sortedByEnemy = {}
-        for _, enemyData in ipairs(procData.procsByEnemy) do
-            table.insert(sortedByEnemy, enemyData)
-        end
-        table.sort(sortedByEnemy, function(a, b)
-            return a.procCount > b.procCount
-        end)
-
-        for _, enemyData in ipairs(sortedByEnemy) do
-            local rawName = unitNames[enemyData.unitId] or GetString(BATTLESCROLLS_UNKNOWN)
-            local enemyName = zo_strformat(SI_UNIT_NAME, rawName)
-            local percent = procData.totalProcs > 0 and (enemyData.procCount / procData.totalProcs * 100) or 0
-            table.insert(lines, string.format("  %s: %d (%.1f%%)", enemyName, enemyData.procCount, percent))
-        end
-
-        local description = table.concat(lines, "\n")
-        GAMEPAD_TOOLTIPS:LayoutTitleAndDescriptionTooltip(GAMEPAD_LEFT_TOOLTIP, abilityName, description)
-        return
-    end
-
-    -- Show effect tooltip (built lazily from raw data)
-    if selectedData.effectTooltipData then
-        local data = selectedData.effectTooltipData
-        local lines
-        if data.type == "group" then
-            lines = buildGroupEffectTooltipLines(data.stats, data.durationMs, data.memberBreakdown)
-        else
-            lines = buildEffectTooltipLines(data.stats, data.durationMs)
-        end
-        local description = table.concat(lines, "\n")
-        GAMEPAD_TOOLTIPS:LayoutTitleAndDescriptionTooltip(GAMEPAD_LEFT_TOOLTIP, data.title, description)
-        return
-    end
-
-    -- Show death recap tooltip (from Damage Taken tab death entries)
-    if selectedData.deathRecapData then
-        local recap = selectedData.deathRecapData
-        local title = selectedData.text or GetString(BATTLESCROLLS_HEADER_DEATHS)
-        local timing = zo_strformat(GetString(BATTLESCROLLS_GROUP_DEATH_AT),
-            journal.utils.formatDuration(recap.timeOffsetMs))
-        showDeathRecapTooltip(title, timing, recap.attacks)
-        return
-    end
-
-    -- Show settings tooltip
-    if selectedData.tooltipText then
-        local title = selectedData.tooltipTitle or selectedData.text or ""
-        GAMEPAD_TOOLTIPS:LayoutTitleAndDescriptionTooltip(GAMEPAD_LEFT_TOOLTIP, title, selectedData.tooltipText)
+    local handler = tooltipDispatch[tooltip.type]
+    if handler then
+        handler(tooltip)
     end
 end
 
@@ -512,6 +431,7 @@ function chronicler.computeTabVisibility(decodedEncounter)
         hasEffectsGroup = hasEffectsGroup or false,
         hasAnyEffects = (hasEffectsPlayer or hasEffectsBoss or hasEffectsGroup) or false,
         hasGroupData = decodedEncounter.sharedData ~= nil and #decodedEncounter.sharedData >= 2,
+        hasSetup = decodedEncounter.setup ~= nil,
     }
 end
 
@@ -651,6 +571,19 @@ function chronicler.getEncounterTabBarEntries(journalUI)
             callback = function()
                 if journalUI.selectedTab ~= STATS_TAB.GROUP then
                     journalUI.selectedTab = STATS_TAB.GROUP
+                    chronicler.refreshList(journalUI, true)
+                end
+            end,
+        })
+    end
+
+    -- 7. Setup (standalone)
+    if tabVis.hasSetup then
+        table.insert(entries, {
+            text = GetString(BATTLESCROLLS_TAB_BUILD),
+            callback = function()
+                if journalUI.selectedTab ~= STATS_TAB.SETUP then
+                    journalUI.selectedTab = STATS_TAB.SETUP
                     chronicler.refreshList(journalUI, true)
                 end
             end,

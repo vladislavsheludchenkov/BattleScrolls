@@ -45,6 +45,7 @@ journal.StatsTab = {
     EFFECTS_BOSS = 9,
     EFFECTS_GROUP = 10,
     GROUP = 11,
+    SETUP = 12,
 }
 
 -------------------------
@@ -183,6 +184,40 @@ journal.StatIcons = {
 }
 
 -------------------------
+-- Champion Discipline Icons (shared by overview panel and tooltips)
+-------------------------
+journal.ChampionDisciplineIcons = {
+    [CHAMPION_DISCIPLINE_TYPE_COMBAT] = "EsoUI/Art/Champion/Gamepad/gp_quickmenu_combat.dds",
+    [CHAMPION_DISCIPLINE_TYPE_CONDITIONING] = "EsoUI/Art/Champion/Gamepad/gp_quickmenu_conditioning.dds",
+    [CHAMPION_DISCIPLINE_TYPE_WORLD] = "EsoUI/Art/Champion/Gamepad/gp_quickmenu_world.dds",
+}
+
+-------------------------
+-- Champion Row Style (shared by overview panel and tooltips)
+-------------------------
+journal.ChampionRowStyle = {
+    HEADER_HEIGHT = 30,
+    ROW_HEIGHT = 40,
+    ICON_SIZE = 32,
+    ICON_LABEL_GAP = 16,
+}
+
+-------------------------
+-- Ability Icon Style (shared by overview panel and tooltips)
+-------------------------
+journal.AbilityIconStyle = {
+    ICON_SIZE = 46,
+    FRAME_INSET = 4,
+    ULT_FRAME_INSET = 6,
+    ULT_EDGE_COLOR = { 0.93, 0.79, 0.24, 1 },
+    EDGE_TEXTURE = "EsoUI/Art/Miscellaneous/Gamepad/edgeframeGamepadBorder.dds",
+    CIRCLE_FRAME_TEXTURE = "EsoUI/Art/Miscellaneous/Gamepad/gp_passiveFrame_64.dds",
+    NAME_FONT = "ZoFontGamepad34",
+    ROW_HEIGHT = 54,
+    NAME_OFFSET_X = 68,  -- icon (46) + gap (22)
+}
+
+-------------------------
 -- Tick Statistics
 -------------------------
 ---@class CritStats
@@ -204,6 +239,7 @@ journal.StatIcons = {
 ---@field durationSec number Fight duration in seconds
 ---@field filters JournalFilters Current filter state
 ---@field arithmancer ArithmancerInstance|nil Calculator instance (optional, some tabs don't need it)
+---@field journalUI BattleScrolls_Journal_Gamepad Journal UI instance (for panel re-renders)
 
 ---@class JournalFilters
 ---@field targetFilter table<number, boolean>|nil Target unit filter (unitId -> true)
@@ -228,6 +264,7 @@ journal.StatIcons = {
 ---| 9 # EFFECTS_BOSS
 ---| 10 # EFFECTS_GROUP
 ---| 11 # GROUP
+---| 12 # SETUP
 
 ---@alias InstanceTab
 ---| 1 # ALL
@@ -311,8 +348,55 @@ journal.StatIcons = {
 ---@field aliveTimeMs number|nil Player alive time in ms
 ---@field topDamageTakenAbilities SharedDamageTakenAbility[] Top 5 damage-taken abilities
 ---@field deaths SharedDeaths|nil Death recap data (nil if player never died)
+---@field setupHash number|nil 16-bit setup hash (protocol 437 only, nil for 436 senders)
 
 ---@class SharedDataEntry
 ---@field displayName string Sender's display name (undecorated)
 ---@field data SharedEncounterData
 ---@field role number|nil LFG_ROLE_* constant captured at match time
+
+-------------------------
+-- Compact Setup Types (for network sharing)
+-------------------------
+
+---@class CompactSetupSet
+---@field setId number Perfected setId if perfected bonus active, else unperfected
+---@field frontCount number Piece count on front bar
+---@field backCount number Piece count on back bar
+
+---@class CompactTraitEntry
+---@field traitType number Trait type ID
+---@field count number Number of items with this trait
+
+---@class CompactEnchantEntry
+---@field enchantId number Enchant ID from GetItemLinkFinalEnchantId
+---@field count number Number of items with this enchant
+
+---@class CompactScribedAbility
+---@field abilityId number Resolved ability ID (matches a bar entry)
+---@field scriptIds number[] 3 script IDs (0 = empty)
+
+---@class CompactSetup
+---@field classId number 4 bits
+---@field raceId number 4 bits
+---@field frontAbilities number[]|nil 6 abilityIds, nil when bar disabled
+---@field backAbilities number[]|nil 6 abilityIds, nil when bar disabled
+---@field werewolfAbilities number[]|nil 6 abilityIds, nil when no WW
+---@field sets CompactSetupSet[] Up to 6 unique sets
+---@field armorWeights number[] {light, medium, heavy} counts
+---@field weaponTypes number[] {frontMH, frontOH, backMH, backOH}
+---@field armorTraits CompactTraitEntry[]
+---@field armorEnchants CompactEnchantEntry[]
+---@field jewelryTraits CompactTraitEntry[]
+---@field jewelryEnchants CompactEnchantEntry[]
+---@field weaponTraits number[] 4 trait type IDs (positional)
+---@field weaponEnchants number[] 4 enchantIds (positional)
+---@field champion number[] 12 skillIds (0 = empty)
+---@field foodAbilityIds number[] 0-3 food ability IDs
+---@field mundusAbilityIds number[] 0-2 mundus ability IDs
+---@field classSkillLineIds number[] 3 class skill line IDs
+---@field scribedAbilities CompactScribedAbility[] 0-4 scribed ability details
+---@field frontPoisonEffect number|nil Front bar crafted poison PotionEffect integer
+---@field frontPoisonItemId number|nil Front bar unique poison item ID
+---@field backPoisonEffect number|nil Back bar crafted poison PotionEffect integer
+---@field backPoisonItemId number|nil Back bar unique poison item ID

@@ -85,6 +85,7 @@ BattleScrolls = BattleScrolls or {}
 ---@field bossSeqNames table<string, string>|nil Maps "tag:seq" to boss name for shared data display
 ---@field deaths EncounterDeaths|nil Death recap data (nil if player never died)
 ---@field bossTagSeqByUnitId table<number, string>|nil Maps boss unitId to "tag:seq" key for local player boss damage mapping
+---@field setup PlayerSetup|nil  -- Player build snapshot (v9+)
 
 -- Instance types distinguish between live state (during combat) and storage format.
 -- InstanceState: Live instance with uncompressed abilityInfo and unitNames
@@ -156,6 +157,7 @@ BattleScrolls = BattleScrolls or {}
 ---@field version number Version of the saved variables structure
 ---@field history InstanceWithIndex[] Flat array of all instances/locations visited
 ---@field settings StorageSettings User settings
+---@field sharedSetups table<string, table<number, CompactSetup>>|nil Shared player setups from group members
 
 ---@class SizePreset
 ---@field key string Preset key
@@ -202,6 +204,7 @@ BattleScrolls.storage = storage
 storage.defaults = {
     version = 1,
     history = {},
+    sharedSetups = {},
     settings = {
         dpsMeterLingerMs = 30000, -- 0 = no linger, -1 = always show
         -- Personal meter settings (disabled by default until onboarding)
@@ -602,6 +605,44 @@ function storage:CleanupIfNecessaryAsync()
             BattleScrolls.gc:RequestGC(2)
             -- BattleScrolls.log.Info(string.format("Cleaned up %d old instance(s)",
             --     #indicesToRemove))
+
+            -- Prune orphaned shared setups: scan remaining encounters for referenced (displayName, setupHash) pairs
+            local storedSetups = self.savedVariables.sharedSetups
+            if storedSetups and next(storedSetups) then
+                ---@type table<string, table<number, boolean>>
+                local referenced = {}
+                for _, instance in ipairs(history) do
+                    for _, enc in ipairs(instance.encounters) do
+                        if enc.sharedData then
+                            for _, entry in ipairs(enc.sharedData) do
+                                local hash = entry.data and entry.data.setupHash
+                                if hash then
+                                    if not referenced[entry.displayName] then
+                                        referenced[entry.displayName] = {}
+                                    end
+                                    referenced[entry.displayName][hash] = true
+                                end
+                            end
+                        end
+                    end
+                end
+                -- Remove unreferenced entries
+                for displayName, hashMap in pairs(storedSetups) do
+                    local refHashes = referenced[displayName]
+                    if not refHashes then
+                        storedSetups[displayName] = nil
+                    else
+                        for hash in pairs(hashMap) do
+                            if not refHashes[hash] then
+                                hashMap[hash] = nil
+                            end
+                        end
+                        if not next(hashMap) then
+                            storedSetups[displayName] = nil
+                        end
+                    end
+                end
+            end
         end
     end):Ensure(function()
         self.cleanupTask = nil

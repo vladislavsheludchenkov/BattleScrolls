@@ -518,6 +518,79 @@ ZO_CreateStringId("BATTLESCROLLS_EFFECT_YOURS_PERCENT", "<<1>>% yours")
 ZO_CreateStringId("BATTLESCROLLS_EFFECT_STACKS_COUNT", "×<<1[$d stack/$d stacks]>>")
 
 -------------------------
+-- Build Tab
+-------------------------
+ZO_CreateStringId("BATTLESCROLLS_TAB_BUILD", "Build")
+ZO_CreateStringId("BATTLESCROLLS_SETUP_ABILITIES", "Abilities")
+ZO_CreateStringId("BATTLESCROLLS_SETUP_FRONT_BAR", "Front Bar")
+ZO_CreateStringId("BATTLESCROLLS_SETUP_BACK_BAR", "Back Bar")
+
+ZO_CreateStringId("BATTLESCROLLS_SETUP_GEAR_SETS", "Gear Sets")
+ZO_CreateStringId("BATTLESCROLLS_SETUP_EQUIPMENT", "Equipment")
+ZO_CreateStringId("BATTLESCROLLS_SETUP_POISONS", "Poisons")
+ZO_CreateStringId("BATTLESCROLLS_SETUP_CHARACTER", "Character")
+ZO_CreateStringId("BATTLESCROLLS_SETUP_CLASS_SKILLS", "Class Skill Lines")
+ZO_CreateStringId("BATTLESCROLLS_SETUP_MUNDUS", "Mundus")
+ZO_CreateStringId("BATTLESCROLLS_SETUP_FOOD", "Food")
+ZO_CreateStringId("BATTLESCROLLS_WEAPON_GREATSWORD", "Greatsword")
+ZO_CreateStringId("BATTLESCROLLS_WEAPON_BATTLE_AXE", "Battle Axe")
+ZO_CreateStringId("BATTLESCROLLS_WEAPON_MAUL", "Maul")
+
+-------------------------
+-- Food Buff Descriptions (generic foods, 14 stat combinations)
+-------------------------
+ZO_CreateStringId("BATTLESCROLLS_FOOD_MAX_HEALTH", "Maximum Health")
+ZO_CreateStringId("BATTLESCROLLS_FOOD_MAX_MAGICKA", "Maximum Magicka")
+ZO_CreateStringId("BATTLESCROLLS_FOOD_MAX_STAMINA", "Maximum Stamina")
+ZO_CreateStringId("BATTLESCROLLS_FOOD_MAX_HEALTH_MAGICKA", "Maximum Health and Magicka")
+ZO_CreateStringId("BATTLESCROLLS_FOOD_MAX_HEALTH_STAMINA", "Maximum Health and Stamina")
+ZO_CreateStringId("BATTLESCROLLS_FOOD_MAX_MAGICKA_STAMINA", "Maximum Magicka and Stamina")
+ZO_CreateStringId("BATTLESCROLLS_FOOD_MAX_TRISTAT", "Maximum Health, Magicka, and Stamina")
+ZO_CreateStringId("BATTLESCROLLS_FOOD_HEALTH_RECOVERY", "Health Recovery")
+ZO_CreateStringId("BATTLESCROLLS_FOOD_MAGICKA_RECOVERY", "Magicka Recovery")
+ZO_CreateStringId("BATTLESCROLLS_FOOD_STAMINA_RECOVERY", "Stamina Recovery")
+ZO_CreateStringId("BATTLESCROLLS_FOOD_HEALTH_MAGICKA_RECOVERY", "Health and Magicka Recovery")
+ZO_CreateStringId("BATTLESCROLLS_FOOD_HEALTH_STAMINA_RECOVERY", "Health and Stamina Recovery")
+ZO_CreateStringId("BATTLESCROLLS_FOOD_MAGICKA_STAMINA_RECOVERY", "Magicka and Stamina Recovery")
+ZO_CreateStringId("BATTLESCROLLS_FOOD_RECOVERY_TRISTAT", "Health, Magicka, and Stamina Recovery")
+
+-------------------------
+-- Alchemy Traits
+-------------------------
+ZO_CreateStringId("BATTLESCROLLS_ALCHEMY_TRAIT1", "Restore Health")
+ZO_CreateStringId("BATTLESCROLLS_ALCHEMY_TRAIT2", "Ravage Health")
+ZO_CreateStringId("BATTLESCROLLS_ALCHEMY_TRAIT3", "Restore Magicka")
+ZO_CreateStringId("BATTLESCROLLS_ALCHEMY_TRAIT4", "Ravage Magicka")
+ZO_CreateStringId("BATTLESCROLLS_ALCHEMY_TRAIT5", "Restore Stamina")
+ZO_CreateStringId("BATTLESCROLLS_ALCHEMY_TRAIT6", "Ravage Stamina")
+ZO_CreateStringId("BATTLESCROLLS_ALCHEMY_TRAIT7", "Increase Spell Resist")
+ZO_CreateStringId("BATTLESCROLLS_ALCHEMY_TRAIT8", "Breach")
+ZO_CreateStringId("BATTLESCROLLS_ALCHEMY_TRAIT9", "Increase Armor")
+ZO_CreateStringId("BATTLESCROLLS_ALCHEMY_TRAIT10", "Fracture")
+ZO_CreateStringId("BATTLESCROLLS_ALCHEMY_TRAIT11", "Increase Spell Power")
+ZO_CreateStringId("BATTLESCROLLS_ALCHEMY_TRAIT12", "Cowardice")
+ZO_CreateStringId("BATTLESCROLLS_ALCHEMY_TRAIT13", "Increase Weapon Power")
+ZO_CreateStringId("BATTLESCROLLS_ALCHEMY_TRAIT14", "Maim")
+ZO_CreateStringId("BATTLESCROLLS_ALCHEMY_TRAIT15", "Spell Critical")
+ZO_CreateStringId("BATTLESCROLLS_ALCHEMY_TRAIT16", "Uncertainty")
+ZO_CreateStringId("BATTLESCROLLS_ALCHEMY_TRAIT17", "Weapon Critical")
+ZO_CreateStringId("BATTLESCROLLS_ALCHEMY_TRAIT18", "Enervation")
+ZO_CreateStringId("BATTLESCROLLS_ALCHEMY_TRAIT19", "Unstoppable")
+ZO_CreateStringId("BATTLESCROLLS_ALCHEMY_TRAIT20", "Entrapment")
+ZO_CreateStringId("BATTLESCROLLS_ALCHEMY_TRAIT21", "Detection")
+ZO_CreateStringId("BATTLESCROLLS_ALCHEMY_TRAIT22", "Invisible")
+ZO_CreateStringId("BATTLESCROLLS_ALCHEMY_TRAIT23", "Speed")
+ZO_CreateStringId("BATTLESCROLLS_ALCHEMY_TRAIT24", "Hindrance")
+ZO_CreateStringId("BATTLESCROLLS_ALCHEMY_TRAIT25", "Protection")
+ZO_CreateStringId("BATTLESCROLLS_ALCHEMY_TRAIT26", "Vulnerability")
+ZO_CreateStringId("BATTLESCROLLS_ALCHEMY_TRAIT27", "Lingering Health")
+ZO_CreateStringId("BATTLESCROLLS_ALCHEMY_TRAIT28", "Gradual Ravage Health")
+ZO_CreateStringId("BATTLESCROLLS_ALCHEMY_TRAIT29", "Vitality")
+ZO_CreateStringId("BATTLESCROLLS_ALCHEMY_TRAIT30", "Defile")
+ZO_CreateStringId("BATTLESCROLLS_ALCHEMY_TRAIT31", "Heroism")
+ZO_CreateStringId("BATTLESCROLLS_ALCHEMY_TRAIT32", "Timidity")
+
+-------------------------
 -- Misc
 -------------------------
 ZO_CreateStringId("BATTLESCROLLS_UNKNOWN", "Unknown")
