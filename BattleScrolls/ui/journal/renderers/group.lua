@@ -589,10 +589,12 @@ function GroupRenderer.renderGroup(ctx)
                 else
                     tooltip.panelSpec = combatPanelSpec
                 end
-                -- Re-render the overview panel with the new panelSpec
+                -- Refresh via the current list target so we always render
+                -- whichever entry is actually selected (not a stale deselect)
                 local journalUI = ctx.journalUI
-                if journalUI and journalUI.overviewPanel then
-                    journalUI.overviewPanel:Render(tooltip.panelSpec)
+                if journalUI then
+                    local chronicler = journal.chronicler
+                    chronicler.refreshTooltip(journalUI, journalUI.statsList:GetTargetData())
                 end
             end
 

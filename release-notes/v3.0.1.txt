@@ -1,0 +1,4 @@
+Bugfixes:
+
+- Champion points of group members shouldn't be reported in wrong constellations when you have empty slots (sender-side fix, so requires your groupmate to be on the new version)
+- No longer tries to display build information when it's unavailable for a group member when navigating the list from an entry that did have it available

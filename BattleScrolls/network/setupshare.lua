@@ -176,11 +176,23 @@ function setupShare.convertToCompact(setup)
         getEnchantId(equipSlots[14]),
     }
 
-    -- Champion: pad to 12 with 0
-    local champion = {}
-    for i = 1, 12 do
-        local skill = setup.champion[i]
-        champion[i] = skill and skill.skillId or 0
+    -- Champion: place skills at positional slots (4 per discipline)
+    -- Decoder uses math.ceil(i / 4) to recover disciplineIndex, so positions must match.
+    local champion = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
+    local disciplineOffset = {}
+    for disciplineIndex = 1, GetNumChampionDisciplines() do
+        disciplineOffset[GetChampionDisciplineId(disciplineIndex)] = (disciplineIndex - 1) * 4
+    end
+    local disciplineCount = {}
+    for _, skill in ipairs(setup.champion) do
+        local offset = disciplineOffset[skill.disciplineId]
+        if offset then
+            local count = (disciplineCount[skill.disciplineId] or 0) + 1
+            if count <= 4 then
+                disciplineCount[skill.disciplineId] = count
+                champion[offset + count] = skill.skillId
+            end
+        end
     end
 
     -- Food: up to 3 abilityIds
