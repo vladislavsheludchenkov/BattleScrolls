@@ -104,6 +104,11 @@ function BattleScrolls_HorizontalListRow_OnInitialized(self)
         self.horizontalListControl, "ZO_GamepadHorizontalListEntry", 1,
         ZO_GamepadDefaultHorizontalListEntrySetup)
     self.horizontalListObject:SetAllowWrapping(true)
+    -- Match entries by value so Commit() re-selects the correct entry
+    -- (reselectingDuringRebuild=true) instead of defaulting to index 0.
+    self.horizontalListObject.equalityFunction = function(a, b)
+        return a.value == b.value
+    end
     self.GetHeight = function(control)
         if control.horizontalListControl:IsHidden() then
             return control.label:GetTextHeight()
@@ -155,6 +160,9 @@ local function IconHorizontalListSetup(control, data, selected, reselectingDurin
         end
     end)
 
+    -- Ensure Commit() re-selects by the current entry's value, not stale
+    -- state from a recycled control.
+    hList.oldSelectedData = currentValue and { value = currentValue } or nil
     hList:Commit()
     local ALLOW_EVEN_IF_DISABLED = true
     local NO_ANIMATION = true

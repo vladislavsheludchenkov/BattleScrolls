@@ -1,0 +1,6 @@
+New features:
+- Added search to the Effects tab. Works similarly to how you would search your inventory
+
+Bugfixes:
+- Arcanists are no longer missing Race/Class/Mundus line on the Setup screen when looking at other players on Group tab
+- Reduces flickering happening in Group menu (again)

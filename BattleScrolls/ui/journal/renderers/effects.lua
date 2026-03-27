@@ -27,6 +27,22 @@ local YIELD_INTERVAL = 20
 -- Special display name marker for self in effects filter
 local SELF_DISPLAY_NAME = FilterConstants.SELF_DISPLAY_NAME
 
+---Filters a sorted effects array by ability name against a search term
+---@param sortedEffects { abilityId: number }[] Sorted array with abilityId field
+---@param searchText string Search text from the header edit box
+---@return { abilityId: number }[] filtered Filtered array (same reference if no filter)
+local function filterBySearch(sortedEffects, searchText)
+    if not searchText or searchText == "" then return sortedEffects end
+    local lowerSearch = searchText:lower()
+    local filtered = {}
+    for _, entry in ipairs(sortedEffects) do
+        if zo_plainstrfind(utils.getAbilityDisplayName(entry.abilityId):lower(), lowerSearch) then
+            filtered[#filtered + 1] = entry
+        end
+    end
+    return filtered
+end
+
 -------------------------
 -- Effects Display Helpers
 -------------------------
@@ -441,6 +457,8 @@ function EffectsRenderer.renderEffectsPlayer(ctx)
 
         if encounter.effectsOnPlayer and not ZO_IsTableEmpty(encounter.effectsOnPlayer) then
             local result = separateBuffsAndDebuffsAsync(encounter.effectsOnPlayer, playerAliveTimeMs):Await()
+            result.buffs = filterBySearch(result.buffs, ctx.searchText)
+            result.debuffs = filterBySearch(result.debuffs, ctx.searchText)
 
             if #result.buffs > 0 then
                 displayEffectEntriesAsync(list, result.buffs, playerAliveTimeMs, GetString(BATTLESCROLLS_HEADER_YOUR_BUFFS), formatEffectValueBrief):Await()
@@ -494,6 +512,7 @@ function EffectsRenderer.renderEffectsBoss(ctx)
             local bossAliveTimeMs = encounter.unitAliveTimeMs and encounter.unitAliveTimeMs[boss.unitTag] or durationMs
 
             local sorted = sortEffectsByUptimeAsync(boss.effects, bossAliveTimeMs):Await()
+            sorted = filterBySearch(sorted, ctx.searchText)
             displayEffectEntriesAsync(list, sorted, bossAliveTimeMs, headerText, formatEffectValueBrief):Await()
 
             if i % YIELD_INTERVAL == 0 then
@@ -548,6 +567,7 @@ function EffectsRenderer.renderEffectsGroup(ctx)
             return a.abilityId < b.abilityId
         end)
         LibEffect.Yield():Await()
+        sorted = filterBySearch(sorted, ctx.searchText)
 
         local isFirst = true
         for i, entry in ipairs(sorted) do

@@ -240,6 +240,7 @@ journal.AbilityIconStyle = {
 ---@field filters JournalFilters Current filter state
 ---@field arithmancer ArithmancerInstance|nil Calculator instance (optional, some tabs don't need it)
 ---@field journalUI BattleScrolls_Journal_Gamepad Journal UI instance (for panel re-renders)
+---@field searchText string Effects search text (empty string = no filter)
 
 ---@class JournalFilters
 ---@field targetFilter table<number, boolean>|nil Target unit filter (unitId -> true)

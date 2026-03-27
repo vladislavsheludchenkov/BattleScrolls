@@ -46,8 +46,13 @@ BattleScrolls_Journal_EncounterTab = {
 }
 
 local NAVIGATION_MODE = BattleScrolls_Journal_NavigationMode
+local STATS_TAB = BattleScrolls_Journal_StatsTab
 local INSTANCE_TAB = BattleScrolls_Journal_InstanceTab
 local ENCOUNTER_TAB = BattleScrolls_Journal_EncounterTab
+
+local function isEffectsTab(tab)
+    return tab == STATS_TAB.EFFECTS_PLAYER or tab == STATS_TAB.EFFECTS_BOSS or tab == STATS_TAB.EFFECTS_GROUP
+end
 
 local canAddToMainMenu = false
 
@@ -80,6 +85,7 @@ local canAddToMainMenu = false
 ---@field encounterKeybindStripDescriptor table Encounter list keybinds
 ---@field statsKeybindStripDescriptor table Stats view keybinds
 ---@field settingsKeybindStripDescriptor table Settings view keybinds
+---@field textSearchKeybindStripDescriptor table Search header keybinds
 ---@field header Control Header control
 ---@field headerData table Header configuration
 ---@field defaultInstancePosition number Default scroll position
@@ -183,6 +189,7 @@ function BattleScrolls_Journal_Gamepad:Initialize(control)
                 self:RefreshList()
                 self:SetActiveKeybinds(self.instanceKeybindStripDescriptor)
             elseif newState == SCENE_FRAGMENT_HIDDEN then
+                self:ClearSearchText()
                 self:ResetTooltips()
                 -- Deactivate any active settings control to release DIRECTIONAL_INPUT
                 self:DeactivateSelectedSettingsControl()
@@ -190,6 +197,11 @@ function BattleScrolls_Journal_Gamepad:Initialize(control)
                 local groupTable = BattleScrolls.journal.groupTable
                 if groupTable then
                     groupTable:Hide()
+                end
+                -- Cancel any in-progress async refresh before clearing its data
+                if self.taskInProgress then
+                    self.taskInProgress:Cancel()
+                    self.taskInProgress = nil
                 end
                 -- Clean up decoded data and request GC when leaving journal
                 self.decodedEncounter = nil
@@ -226,6 +238,15 @@ function BattleScrolls_Journal_Gamepad:Initialize(control)
 end
 
 function BattleScrolls_Journal_Gamepad:OnDeferredInitialize()
+    -- Initialize search bar before RefreshHeader so the header layout can see it
+    self:AddSearch(
+        self.textSearchKeybindStripDescriptor,
+        function(_editBox)
+            self:OnEffectsSearchTextChanged()
+        end
+    )
+    self:SetTextSearchEntryHidden(true)
+
     self:RefreshHeader()
     self:InitializeLists()
 
@@ -280,6 +301,15 @@ function BattleScrolls_Journal_Gamepad:RefreshHeader()
 
     -- Refresh sub-header (show/hide based on current tab group)
     BattleScrolls.journal.subheader.refresh(self)
+
+    -- Show/hide search bar based on effects tab
+    if self.textSearchHeaderControl then
+        local showSearch = self.mode == NAVIGATION_MODE.STATS and isEffectsTab(self.selectedTab)
+        self:SetTextSearchEntryHidden(not showSearch)
+        if not showSearch then
+            self:ClearSearchText()
+        end
+    end
 end
 
 function BattleScrolls_Journal_Gamepad:OnHiding()
@@ -397,6 +427,27 @@ function BattleScrolls_Journal_Gamepad:SetActiveKeybinds(keybindDescriptor)
         KEYBIND_STRIP:AddKeybindButtonGroup(self.keybindStripDescriptor)
     end
 end
+
+-------------------------
+-- Search
+-------------------------
+
+---Called when the search edit box text changes; refreshes effects list
+function BattleScrolls_Journal_Gamepad:OnEffectsSearchTextChanged()
+    if self.mode == NAVIGATION_MODE.STATS and isEffectsTab(self.selectedTab) then
+        self:RefreshList(true)
+    end
+end
+
+---Returns the current search text from the header edit box
+---@return string
+function BattleScrolls_Journal_Gamepad:GetSearchText()
+    if self.textSearchHeaderFocus then
+        return self.textSearchHeaderFocus:GetText()
+    end
+    return ""
+end
+
 
 -------------------------
 -- Navigation Helpers

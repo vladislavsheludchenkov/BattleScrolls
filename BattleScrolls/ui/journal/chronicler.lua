@@ -637,6 +637,25 @@ function chronicler.refreshList(journalUI, skipHeaderRefresh)
         journalUI:ActivateCurrentList()
     end
 
+    -- Show/hide search bar when switching tabs via LB/RB (skipHeaderRefresh=true bypasses RefreshHeader)
+    if skipHeaderRefresh and journalUI.textSearchHeaderFocus then
+        local groupKey = journalUI.selectedTab and journal.TabToGroup[journalUI.selectedTab]
+        if groupKey == "EFFECTS" then
+            journalUI:SetTextSearchEntryHidden(false)
+        else
+            journalUI:ClearSearchText()
+            journalUI:SetTextSearchEntryHidden(true)
+        end
+        -- TabBar_OnDataChanged calls ExitHeader() before the tab callback, which
+        -- deactivates the header focus but does NOT re-activate the list. Detect
+        -- this state (header inactive + list inactive) and manually restore.
+        local currentList = journalUI:GetCurrentList()
+        if not journalUI:IsHeaderActive() and currentList and not currentList:IsActive() then
+            local REQUESTED_BY_HEADER = true
+            journalUI:ActivateCurrentList(REQUESTED_BY_HEADER)
+        end
+    end
+
     if not skipHeaderRefresh then
         journalUI:RefreshHeader()
     end

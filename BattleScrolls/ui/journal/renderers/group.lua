@@ -589,11 +589,10 @@ function GroupRenderer.renderGroup(ctx)
                 else
                     tooltip.panelSpec = combatPanelSpec
                 end
-                -- Only refresh the panel when this entry is the current target.
-                -- Skips redundant renders from deselect setup of a previous row.
+                -- Re-render the overview panel with the new panelSpec
                 local journalUI = ctx.journalUI
-                if journalUI and journalUI.statsList:GetTargetData() == entryData then
-                    journal.chronicler.refreshTooltip(journalUI, entryData)
+                if journalUI and journalUI.overviewPanel then
+                    journalUI.overviewPanel:Render(tooltip.panelSpec)
                 end
             end
 

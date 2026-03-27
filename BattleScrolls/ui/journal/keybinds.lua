@@ -446,4 +446,23 @@ function keybinds.initializeKeybindStripDescriptors(journalUI)
             sound = SOUNDS.GAMEPAD_MENU_BACK,
         },
     }
+
+    -- Text search header keybinds (shown when the search bar has focus)
+    journalUI.textSearchKeybindStripDescriptor = {
+        {
+            alignment = KEYBIND_STRIP_ALIGN_LEFT,
+            keybind = "UI_SHORTCUT_PRIMARY",
+            name = GetString(SI_GAMEPAD_SELECT_OPTION),
+            callback = function()
+                journalUI:SetTextSearchFocused(true)
+            end,
+        },
+    }
+    ZO_Gamepad_AddBackNavigationKeybindDescriptors(
+        journalUI.textSearchKeybindStripDescriptor,
+        GAME_NAVIGATION_TYPE_BUTTON,
+        function()
+            journalUI:RequestLeaveHeader()
+        end
+    )
 end

@@ -7,7 +7,8 @@
 -- with group members using a hash-based caching protocol.
 --
 -- Protocol 432: Setup Request (hash only)
--- Protocol 433: Setup Response (full CompactSetup)
+-- Protocol 433: Setup Response (legacy, 4-bit classId/raceId, read-only)
+-- Protocol 434: Setup Response (8-bit classId/raceId, send + read)
 -----------------------------------------------------------
 
 if not SemisPlaygroundCheckAccess() then
@@ -24,7 +25,7 @@ local JEWELRY_SLOT_INDICES = setupAnalysis.JEWELRY_SLOT_INDICES
 
 ---@class SetupShare
 ---@field requestProtocol Protocol|nil Protocol 432
----@field responseProtocol Protocol|nil Protocol 433
+---@field responseProtocol Protocol|nil Protocol 434 (8-bit classId/raceId)
 local setupShare = {}
 BattleScrolls.setupShare = setupShare
 
@@ -714,136 +715,149 @@ function setupShare:Initialize()
     end
     self.requestProtocol = requestProtocol
 
-    -- Protocol 433: Setup Response (full CompactSetup)
-    local responseProtocol = handler:DeclareProtocol(433, "BattleScrolls_SetupResponse")
+    -- Shared response protocol field declarations (everything after classId/raceId)
+    local function addResponseFields(protocol)
+        -- Abilities: optional bars (each needs a unique field name for LGB)
+        protocol:AddField(createAbilityBarField(LGB, "frontAbilities"))
+        protocol:AddField(createAbilityBarField(LGB, "backAbilities"))
+        protocol:AddField(createAbilityBarField(LGB, "werewolfAbilities"))
 
-    -- Header
+        -- Sets (grouped with per-bar counts)
+        protocol:AddField(LGB.CreateArrayField(
+            LGB.CreateTableField("set", {
+                LGB.CreateNumericField("setId", { minValue = 0, numBits = 10, trimValues = true }),
+                LGB.CreateNumericField("frontCount", { minValue = 0, numBits = 3, trimValues = true }),
+                LGB.CreateNumericField("backCount", { minValue = 0, numBits = 3, trimValues = true }),
+            }),
+            { maxLength = 6 }
+        ))
+
+        -- Armor weights
+        protocol:AddField(LGB.CreateNumericField("lightCount", { minValue = 0, numBits = 3, trimValues = true }))
+        protocol:AddField(LGB.CreateNumericField("mediumCount", { minValue = 0, numBits = 3, trimValues = true }))
+        protocol:AddField(LGB.CreateNumericField("heavyCount", { minValue = 0, numBits = 3, trimValues = true }))
+
+        -- Weapon types (positional)
+        protocol:AddField(LGB.CreateNumericField("frontMHWeaponType", { minValue = 0, numBits = 5, trimValues = true }))
+        protocol:AddField(LGB.CreateNumericField("frontOHWeaponType", { minValue = 0, numBits = 5, trimValues = true }))
+        protocol:AddField(LGB.CreateNumericField("backMHWeaponType", { minValue = 0, numBits = 5, trimValues = true }))
+        protocol:AddField(LGB.CreateNumericField("backOHWeaponType", { minValue = 0, numBits = 5, trimValues = true }))
+
+        -- Armor traits: grouped {traitType, count}
+        protocol:AddField(LGB.CreateArrayField(
+            LGB.CreateTableField("armorTrait", {
+                LGB.CreateNumericField("traitType", { minValue = 0, numBits = 6, trimValues = true }),
+                LGB.CreateNumericField("count", { minValue = 0, numBits = 3, trimValues = true }),
+            }),
+            { maxLength = 4 }
+        ))
+        -- Armor enchants: grouped {enchantId, count}
+        protocol:AddField(LGB.CreateArrayField(
+            LGB.CreateTableField("armorEnchant", {
+                LGB.CreateNumericField("enchantId", { minValue = 0, numBits = 9, trimValues = true }),
+                LGB.CreateNumericField("count", { minValue = 0, numBits = 3, trimValues = true }),
+            }),
+            { maxLength = 4 }
+        ))
+
+        -- Jewelry traits
+        protocol:AddField(LGB.CreateArrayField(
+            LGB.CreateTableField("jewelryTrait", {
+                LGB.CreateNumericField("traitType", { minValue = 0, numBits = 6, trimValues = true }),
+                LGB.CreateNumericField("count", { minValue = 0, numBits = 3, trimValues = true }),
+            }),
+            { maxLength = 3 }
+        ))
+        -- Jewelry enchants
+        protocol:AddField(LGB.CreateArrayField(
+            LGB.CreateTableField("jewelryEnchant", {
+                LGB.CreateNumericField("enchantId", { minValue = 0, numBits = 9, trimValues = true }),
+                LGB.CreateNumericField("count", { minValue = 0, numBits = 3, trimValues = true }),
+            }),
+            { maxLength = 3 }
+        ))
+
+        -- Weapon traits (positional, 4 slots)
+        protocol:AddField(LGB.CreateNumericField("frontMHTrait", { minValue = 0, numBits = 6, trimValues = true }))
+        protocol:AddField(LGB.CreateNumericField("frontOHTrait", { minValue = 0, numBits = 6, trimValues = true }))
+        protocol:AddField(LGB.CreateNumericField("backMHTrait", { minValue = 0, numBits = 6, trimValues = true }))
+        protocol:AddField(LGB.CreateNumericField("backOHTrait", { minValue = 0, numBits = 6, trimValues = true }))
+
+        -- Weapon enchants (positional, 4 slots)
+        protocol:AddField(LGB.CreateNumericField("frontMHEnchant", { minValue = 0, numBits = 9, trimValues = true }))
+        protocol:AddField(LGB.CreateNumericField("frontOHEnchant", { minValue = 0, numBits = 9, trimValues = true }))
+        protocol:AddField(LGB.CreateNumericField("backMHEnchant", { minValue = 0, numBits = 9, trimValues = true }))
+        protocol:AddField(LGB.CreateNumericField("backOHEnchant", { minValue = 0, numBits = 9, trimValues = true }))
+
+        -- Champion: fixed 12 slots
+        protocol:AddField(LGB.CreateArrayField(
+            LGB.CreateNumericField("champion", { minValue = 0, numBits = 10, trimValues = true }),
+            { maxLength = 12 }
+        ))
+
+        -- Food (up to 3 buff ability IDs) + Mundus
+        protocol:AddField(LGB.CreateArrayField(
+            LGB.CreateNumericField("foodAbilityIds", { minValue = 0, numBits = 18, trimValues = true }),
+            { maxLength = 3 }
+        ))
+        protocol:AddField(LGB.CreateArrayField(
+            LGB.CreateNumericField("mundusAbilityIds", { minValue = 0, numBits = 18, trimValues = true }),
+            { maxLength = 2 }
+        ))
+
+        -- Class skill lines (3 IDs)
+        protocol:AddField(LGB.CreateArrayField(
+            LGB.CreateNumericField("classSkillLineIds", { minValue = 0, numBits = 10, trimValues = true }),
+            { maxLength = 3 }
+        ))
+
+        -- Scribed ability details (sparse: only scribed abilities)
+        protocol:AddField(LGB.CreateArrayField(
+            LGB.CreateTableField("scribedAbility", {
+                LGB.CreateNumericField("abilityId", { minValue = 0, numBits = 18, trimValues = true }),
+                LGB.CreateNumericField("scriptId1", { minValue = 0, numBits = 8, trimValues = true }),
+                LGB.CreateNumericField("scriptId2", { minValue = 0, numBits = 8, trimValues = true }),
+                LGB.CreateNumericField("scriptId3", { minValue = 0, numBits = 8, trimValues = true }),
+            }),
+            { maxLength = 7 }
+        ))
+
+        -- Poisons (variant: crafted = PotionEffect 24-bit, unique = item ID 18-bit)
+        protocol:AddField(LGB.CreateOptionalField(
+            LGB.CreateVariantField({
+                LGB.CreateNumericField("frontPoisonEffect", { minValue = 0, numBits = 24, trimValues = true }),
+                LGB.CreateNumericField("frontPoisonItemId", { minValue = 0, numBits = 18, trimValues = true }),
+            })
+        ))
+        protocol:AddField(LGB.CreateOptionalField(
+            LGB.CreateVariantField({
+                LGB.CreateNumericField("backPoisonEffect", { minValue = 0, numBits = 24, trimValues = true }),
+                LGB.CreateNumericField("backPoisonItemId", { minValue = 0, numBits = 18, trimValues = true }),
+            })
+        ))
+    end
+
+    -- Protocol 433: Legacy Setup Response (read-only, 4-bit classId/raceId)
+    local legacyResponseProtocol = handler:DeclareProtocol(433, "BattleScrolls_SetupResponse")
+    legacyResponseProtocol:AddField(LGB.CreateNumericField("setupHash", { minValue = 0, numBits = 16, trimValues = true }))
+    legacyResponseProtocol:AddField(LGB.CreateNumericField("classId", { minValue = 0, numBits = 4, trimValues = true }))
+    legacyResponseProtocol:AddField(LGB.CreateNumericField("raceId", { minValue = 0, numBits = 4, trimValues = true }))
+    addResponseFields(legacyResponseProtocol)
+    legacyResponseProtocol:OnData(onSetupResponse)
+    if not legacyResponseProtocol:Finalize({ isRelevantInCombat = false, replaceQueuedMessages = false }) then
+        log.Warn("SetupShare: legacy response protocol 433 failed to finalize")
+        return
+    end
+
+    -- Protocol 434: Setup Response (send + read, 8-bit classId/raceId)
+    local responseProtocol = handler:DeclareProtocol(434, "BattleScrolls_SetupResponseV2")
     responseProtocol:AddField(LGB.CreateNumericField("setupHash", { minValue = 0, numBits = 16, trimValues = true }))
-    responseProtocol:AddField(LGB.CreateNumericField("classId", { minValue = 0, numBits = 4, trimValues = true }))
-    responseProtocol:AddField(LGB.CreateNumericField("raceId", { minValue = 0, numBits = 4, trimValues = true }))
-
-    -- Abilities: optional bars (each needs a unique field name for LGB)
-    responseProtocol:AddField(createAbilityBarField(LGB, "frontAbilities"))
-    responseProtocol:AddField(createAbilityBarField(LGB, "backAbilities"))
-    responseProtocol:AddField(createAbilityBarField(LGB, "werewolfAbilities"))
-
-    -- Sets (grouped with per-bar counts)
-    responseProtocol:AddField(LGB.CreateArrayField(
-        LGB.CreateTableField("set", {
-            LGB.CreateNumericField("setId", { minValue = 0, numBits = 10, trimValues = true }),
-            LGB.CreateNumericField("frontCount", { minValue = 0, numBits = 3, trimValues = true }),
-            LGB.CreateNumericField("backCount", { minValue = 0, numBits = 3, trimValues = true }),
-        }),
-        { maxLength = 6 }
-    ))
-
-    -- Armor weights
-    responseProtocol:AddField(LGB.CreateNumericField("lightCount", { minValue = 0, numBits = 3, trimValues = true }))
-    responseProtocol:AddField(LGB.CreateNumericField("mediumCount", { minValue = 0, numBits = 3, trimValues = true }))
-    responseProtocol:AddField(LGB.CreateNumericField("heavyCount", { minValue = 0, numBits = 3, trimValues = true }))
-
-    -- Weapon types (positional)
-    responseProtocol:AddField(LGB.CreateNumericField("frontMHWeaponType", { minValue = 0, numBits = 5, trimValues = true }))
-    responseProtocol:AddField(LGB.CreateNumericField("frontOHWeaponType", { minValue = 0, numBits = 5, trimValues = true }))
-    responseProtocol:AddField(LGB.CreateNumericField("backMHWeaponType", { minValue = 0, numBits = 5, trimValues = true }))
-    responseProtocol:AddField(LGB.CreateNumericField("backOHWeaponType", { minValue = 0, numBits = 5, trimValues = true }))
-
-    -- Armor traits: grouped {traitType, count}
-    responseProtocol:AddField(LGB.CreateArrayField(
-        LGB.CreateTableField("armorTrait", {
-            LGB.CreateNumericField("traitType", { minValue = 0, numBits = 6, trimValues = true }),
-            LGB.CreateNumericField("count", { minValue = 0, numBits = 3, trimValues = true }),
-        }),
-        { maxLength = 4 }
-    ))
-    -- Armor enchants: grouped {enchantId, count}
-    responseProtocol:AddField(LGB.CreateArrayField(
-        LGB.CreateTableField("armorEnchant", {
-            LGB.CreateNumericField("enchantId", { minValue = 0, numBits = 9, trimValues = true }),
-            LGB.CreateNumericField("count", { minValue = 0, numBits = 3, trimValues = true }),
-        }),
-        { maxLength = 4 }
-    ))
-
-    -- Jewelry traits
-    responseProtocol:AddField(LGB.CreateArrayField(
-        LGB.CreateTableField("jewelryTrait", {
-            LGB.CreateNumericField("traitType", { minValue = 0, numBits = 6, trimValues = true }),
-            LGB.CreateNumericField("count", { minValue = 0, numBits = 3, trimValues = true }),
-        }),
-        { maxLength = 3 }
-    ))
-    -- Jewelry enchants
-    responseProtocol:AddField(LGB.CreateArrayField(
-        LGB.CreateTableField("jewelryEnchant", {
-            LGB.CreateNumericField("enchantId", { minValue = 0, numBits = 9, trimValues = true }),
-            LGB.CreateNumericField("count", { minValue = 0, numBits = 3, trimValues = true }),
-        }),
-        { maxLength = 3 }
-    ))
-
-    -- Weapon traits (positional, 4 slots)
-    responseProtocol:AddField(LGB.CreateNumericField("frontMHTrait", { minValue = 0, numBits = 6, trimValues = true }))
-    responseProtocol:AddField(LGB.CreateNumericField("frontOHTrait", { minValue = 0, numBits = 6, trimValues = true }))
-    responseProtocol:AddField(LGB.CreateNumericField("backMHTrait", { minValue = 0, numBits = 6, trimValues = true }))
-    responseProtocol:AddField(LGB.CreateNumericField("backOHTrait", { minValue = 0, numBits = 6, trimValues = true }))
-
-    -- Weapon enchants (positional, 4 slots)
-    responseProtocol:AddField(LGB.CreateNumericField("frontMHEnchant", { minValue = 0, numBits = 9, trimValues = true }))
-    responseProtocol:AddField(LGB.CreateNumericField("frontOHEnchant", { minValue = 0, numBits = 9, trimValues = true }))
-    responseProtocol:AddField(LGB.CreateNumericField("backMHEnchant", { minValue = 0, numBits = 9, trimValues = true }))
-    responseProtocol:AddField(LGB.CreateNumericField("backOHEnchant", { minValue = 0, numBits = 9, trimValues = true }))
-
-    -- Champion: fixed 12 slots
-    responseProtocol:AddField(LGB.CreateArrayField(
-        LGB.CreateNumericField("champion", { minValue = 0, numBits = 10, trimValues = true }),
-        { maxLength = 12 }
-    ))
-
-    -- Food (up to 3 buff ability IDs) + Mundus
-    responseProtocol:AddField(LGB.CreateArrayField(
-        LGB.CreateNumericField("foodAbilityIds", { minValue = 0, numBits = 18, trimValues = true }),
-        { maxLength = 3 }
-    ))
-    responseProtocol:AddField(LGB.CreateArrayField(
-        LGB.CreateNumericField("mundusAbilityIds", { minValue = 0, numBits = 18, trimValues = true }),
-        { maxLength = 2 }
-    ))
-
-    -- Class skill lines (3 IDs)
-    responseProtocol:AddField(LGB.CreateArrayField(
-        LGB.CreateNumericField("classSkillLineIds", { minValue = 0, numBits = 10, trimValues = true }),
-        { maxLength = 3 }
-    ))
-
-    -- Scribed ability details (sparse: only scribed abilities)
-    responseProtocol:AddField(LGB.CreateArrayField(
-        LGB.CreateTableField("scribedAbility", {
-            LGB.CreateNumericField("abilityId", { minValue = 0, numBits = 18, trimValues = true }),
-            LGB.CreateNumericField("scriptId1", { minValue = 0, numBits = 8, trimValues = true }),
-            LGB.CreateNumericField("scriptId2", { minValue = 0, numBits = 8, trimValues = true }),
-            LGB.CreateNumericField("scriptId3", { minValue = 0, numBits = 8, trimValues = true }),
-        }),
-        { maxLength = 7 }
-    ))
-
-    -- Poisons (variant: crafted = PotionEffect 24-bit, unique = item ID 18-bit)
-    responseProtocol:AddField(LGB.CreateOptionalField(
-        LGB.CreateVariantField({
-            LGB.CreateNumericField("frontPoisonEffect", { minValue = 0, numBits = 24, trimValues = true }),
-            LGB.CreateNumericField("frontPoisonItemId", { minValue = 0, numBits = 18, trimValues = true }),
-        })
-    ))
-    responseProtocol:AddField(LGB.CreateOptionalField(
-        LGB.CreateVariantField({
-            LGB.CreateNumericField("backPoisonEffect", { minValue = 0, numBits = 24, trimValues = true }),
-            LGB.CreateNumericField("backPoisonItemId", { minValue = 0, numBits = 18, trimValues = true }),
-        })
-    ))
-
+    responseProtocol:AddField(LGB.CreateNumericField("classId", { minValue = 0, numBits = 8, trimValues = true }))
+    responseProtocol:AddField(LGB.CreateNumericField("raceId", { minValue = 0, numBits = 8, trimValues = true }))
+    addResponseFields(responseProtocol)
     responseProtocol:OnData(onSetupResponse)
     if not responseProtocol:Finalize({ isRelevantInCombat = false, replaceQueuedMessages = false }) then
-        log.Warn("SetupShare: response protocol 433 failed to finalize")
+        log.Warn("SetupShare: response protocol 434 failed to finalize")
         return
     end
     self.responseProtocol = responseProtocol

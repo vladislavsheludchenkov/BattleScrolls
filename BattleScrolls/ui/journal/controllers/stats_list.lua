@@ -176,6 +176,7 @@ function StatsListController.refresh(journalUI)
             arithmancer = journalUI.arithmancer,
             filters = journalUI:GetFiltersForTab(journalUI.selectedTab),
             journalUI = journalUI,
+            searchText = journalUI:GetSearchText(),
         }
         StatsListController.renderTab(ctx, journalUI.selectedTab):Await()
 
