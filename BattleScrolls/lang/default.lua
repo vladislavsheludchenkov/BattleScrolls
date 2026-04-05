@@ -216,6 +216,7 @@ ZO_CreateStringId("BATTLESCROLLS_SETTINGS_SLIDER_RELEASE_PRECISION", "Release fo
 -- Overview Stats
 -------------------------
 ZO_CreateStringId("BATTLESCROLLS_STAT_DURATION", "Duration")
+ZO_CreateStringId("BATTLESCROLLS_STAT_PATCH", "Patch")
 ZO_CreateStringId("BATTLESCROLLS_STAT_SUMMARY", "Summary")
 
 -- Boss Damage
@@ -268,13 +269,13 @@ ZO_CreateStringId("BATTLESCROLLS_STAT_DPS", "DPS")
 ZO_CreateStringId("BATTLESCROLLS_HEADER_BY_ABILITY", "By Ability")
 ZO_CreateStringId("BATTLESCROLLS_HEADER_BY_DAMAGE_TYPE", "By Damage Type")
 ZO_CreateStringId("BATTLESCROLLS_HEADER_DIRECT_VS_DOT", "Direct vs DoT")
-ZO_CreateStringId("BATTLESCROLLS_HEADER_AOE_VS_SINGLE", "AOE vs Single Target")
+ZO_CreateStringId("BATTLESCROLLS_HEADER_AOE_VS_SINGLE", "AoE vs Single Target")
 ZO_CreateStringId("BATTLESCROLLS_HEADER_BY_TARGET", "By Target")
 ZO_CreateStringId("BATTLESCROLLS_HEADER_BY_SOURCE", "By Source")
 
 ZO_CreateStringId("BATTLESCROLLS_STAT_DIRECT_DAMAGE", "Direct Damage")
 ZO_CreateStringId("BATTLESCROLLS_STAT_DAMAGE_OVER_TIME", "Damage over Time")
-ZO_CreateStringId("BATTLESCROLLS_STAT_AOE_DAMAGE", "AOE Damage")
+ZO_CreateStringId("BATTLESCROLLS_STAT_AOE_DAMAGE", "AoE Damage")
 ZO_CreateStringId("BATTLESCROLLS_STAT_SINGLE_TARGET_DAMAGE", "Single Target Damage")
 
 -------------------------
@@ -446,7 +447,7 @@ ZO_CreateStringId("BATTLESCROLLS_DAMAGE_DONE", "Damage Done")
 ZO_CreateStringId("BATTLESCROLLS_HEALING_OUT", "Healing Out")
 ZO_CreateStringId("BATTLESCROLLS_SELF_HEALING", "Self Healing")
 ZO_CreateStringId("BATTLESCROLLS_HEALING_IN", "Healing In")
-ZO_CreateStringId("BATTLESCROLLS_AOE", "AOE")
+ZO_CreateStringId("BATTLESCROLLS_AOE", "AoE")
 ZO_CreateStringId("BATTLESCROLLS_SINGLE_TARGET", "Single Target")
 ZO_CreateStringId("BATTLESCROLLS_HEALING_RAW_HPS", "Raw HPS")
 ZO_CreateStringId("BATTLESCROLLS_HEALING_EFFECTIVE_HPS", "Effective HPS")
@@ -700,3 +701,184 @@ ZO_CreateStringId("BATTLESCROLLS_GROUP_COL_NAME", "Name")
 ZO_CreateStringId("BATTLESCROLLS_GROUP_COL_TOTAL", "Total")
 ZO_CreateStringId("BATTLESCROLLS_GROUP_COL_CRIT", "Crit")
 ZO_CreateStringId("BATTLESCROLLS_GROUP_COL_ALIVE", "Alive")
+
+-------------------------
+-- Aggregate
+-------------------------
+-- Navigation
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_TITLE", "Aggregate")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_ENTRY", "Aggregate")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_ENTRY_DESC", "Build custom queries across encounters and instances")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_ENTRY_DESC_ENCOUNTER", "Aggregate metrics across encounters in this instance")
+
+-- Scope section
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_SCOPE", "Scope")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_INSTANCE_SCOPE", "Instance Scope")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_TIME_FILTER", "Time")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_ENCOUNTER_FILTER", "Encounter Filter")
+
+-- Instance scope options
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_SCOPE_EVERYTHING", "Everything")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_SCOPE_INSTANCED", "All Instanced")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_SCOPE_OVERLAND", "All Overland")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_SCOPE_HOUSES", "All Houses")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_SCOPE_PVP", "All PvP")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_SCOPE_ZONES", "By Zone Name")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_SCOPE_SPECIFIC", "Specific Instances")
+
+-- Time filter options
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_TIME_ALL", "All Time")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_TIME_TODAY", "Today")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_TIME_24H", "Last 24 Hours")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_TIME_3D", "Last 3 Days")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_TIME_7D", "Last 7 Days")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_TIME_14D", "Last 14 Days")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_TIME_30D", "Last 30 Days")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_TIME_90D", "Last 90 Days")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_TIME_CUSTOM", "Custom...")
+
+-- Encounter category options
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_ENC_ALL", "All Encounters")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_ENC_BOSS", "Boss Fights")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_ENC_TRASH", "Trash Fights")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_ENC_PLAYER", "Player Fights")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_ENC_DUMMY", "Dummy Fights")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_ENC_SPECIFIC", "Specific Encounters")
+
+-- Query section
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_QUERY", "Query")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_DOMAIN", "Domain")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_ROWS", "Rows")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_COLUMNS", "Columns")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_VALUES", "Values")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_AGGREGATION", "Aggregation")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_FILTERS", "Filters")
+
+-- Target filter (Damage domain)
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_TARGETS", "Targets")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_TARGETS_ALL", "All Targets")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_TARGETS_BOSSES", "Bosses Only")
+
+-- Domain names
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_DOMAIN_DAMAGE", "Damage")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_DOMAIN_HEALING_OUT", "Healing Out")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_DOMAIN_HEALING_IN", "Healing In")
+-- Effects domain labels reuse BATTLESCROLLS_TAB_EFFECTS_* strings
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_DOMAIN_GROUP", "Group")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_DOMAIN_OVERVIEW", "Overview")
+
+-- Dimension names
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_DIM_ABILITY", "Ability")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_DIM_TARGET", "Target")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_DIM_SOURCE", "Source")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_DIM_BOSS", "Boss")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_DIM_DAMAGE_TYPE", "Damage Type")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_DIM_DELIVERY", "Delivery")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_DIM_AOE_ST", "AoE / Single Target")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_DIM_BUFF_DEBUFF", "Buff / Debuff")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_DIM_GROUP_MEMBER", "Group Member")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_DIM_ROLE", "Role")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_DIM_ENCOUNTER", "Encounter")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_DIM_INSTANCE", "Instance")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_COL_METRICS", "Metrics")
+
+-- Metric names
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_TOTAL_DAMAGE", "Total Damage")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_DPS", "DPS")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_CRIT_PERCENT", "Crit %")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_HIT_COUNT", "Hits")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_MAX_HIT", "Max Hit")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_MIN_HIT", "Min Hit")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_AVG_HIT", "Avg Hit")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_EFFECTIVE_HEALING", "Effective Healing")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_RAW_HEALING", "Raw Healing")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_RAW_HPS", "Raw HPS")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_EFFECTIVE_HPS", "Effective HPS")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_OVERHEAL_PERCENT", "Overheal %")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_HEAL_CRIT_PERCENT", "Heal Crit %")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_HEAL_HIT_COUNT", "Heal Hits")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_MAX_HEAL", "Max Heal")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_AVG_HEAL", "Avg Heal")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_UPTIME_PERCENT", "Uptime %")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_PLAYER_UPTIME_PERCENT", "Your Uptime %")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_APPLICATIONS", "Applications")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_MAX_STACKS_TIME", "Max Stacks Time %")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_GROUP_DPS", "DPS")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_GROUP_BOSS_DPS", "Boss DPS")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_GROUP_TOTAL_DAMAGE", "Total Damage")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_GROUP_CRIT_PERCENT", "Crit %")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_GROUP_DOT_PERCENT", "DoT %")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_GROUP_AOE_PERCENT", "AoE %")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_GROUP_MAX_HIT", "Max Hit")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_GROUP_DTPS", "DTPS")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_GROUP_RAW_HPS", "Raw HPS")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_GROUP_EFFECTIVE_HPS", "Effective HPS")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_EFFECTIVE_HPS_OUT", "Effective HPS Out")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_RAW_HPS_OUT", "Raw HPS Out")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_EFFECTIVE_HPS_IN", "Effective HPS In")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_RAW_HPS_IN", "Raw HPS In")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_BOSS_DPS", "Boss DPS")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_BOSS_DAMAGE", "Boss Damage")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_DTPS", "DTPS")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_DAMAGE_TAKEN", "Damage Taken")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_GROUP_ALIVE_PERCENT", "Alive %")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_GROUP_DEATH_COUNT", "Deaths")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_DURATION", "Duration")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_DEATH_COUNT", "Deaths")
+
+-- Aggregation options
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_AGG_SUM", "Sum")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_AGG_AVG", "Average")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_AGG_MAX", "Max")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_AGG_MIN", "Min")
+
+-- Actions
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_RUN", "Run Query")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_SAVE", "Save Query")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_LOAD", "Load Query")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_DELETE_QUERY", "Delete Query")
+
+-- Loading / Results
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_LOADING", "Loading encounters... <<1>> / <<2>>")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_NO_RESULTS", "No data matches your query")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_NO_ENCOUNTERS", "No encounters match your filters")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_NO_BOSSES", "No boss encounters match your filters")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_ENCOUNTERS_PROCESSED", "<<1[$d encounter/$d encounters]>> processed")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_ROWS_CAPPED", "Results limited to <<1>> rows")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_COLUMNS_CAPPED", "Results limited to <<1>> columns")
+
+-- Save / Load dialogs
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_SAVE_TITLE", "Save Query")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_SAVE_PROMPT", "Enter a name for this query:")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_SAVE_OVERWRITE", "A query named \"<<1>>\" already exists. Overwrite?")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_QUERY_SAVED", "Query saved as \"<<1>>\"")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_LOAD_TITLE", "Load Query")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_DELETE_CONFIRM", "Delete query \"<<1>>\"?")
+
+-- Selector dialogs
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_SELECT_ZONES", "Select Zones")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_SELECT_INSTANCES", "Select Instances")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_SELECT_ENCOUNTERS", "Select Encounters")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_SELECT_BOSSES", "Select Boss Names")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_SELECT_METRICS", "Select Metrics")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_SELECTED_COUNT", "<<1>> selected")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_SELECT_ALL", "Select All")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_DESELECT_ALL", "Deselect All")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_NONE_SELECTED", "None selected")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_ENC_BOSS_NAMES", "By Boss Name")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_CUSTOM_DAYS", "Last <<1>> days")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_CUSTOM_RANGE_TITLE", "Custom Time Range")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_CUSTOM_DAYS_PROMPT", "Number of days back")
+
+-- Tooltips for selector options
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_TIP_DOMAIN_OVERVIEW", "Aggregated summary across all damage, healing, and effects domains. Shows combined totals rather than individual breakdowns.")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_TIP_ENC_BOSS_NAMES", "Filters to encounters that feature the selected bosses. Select boss names in the next step.")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_TIP_DIM_DELIVERY", "Splits data by delivery method: Direct, DoT (Damage over Time), HoT (Heal over Time), or Mixed.")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_TIP_DIM_DAMAGE_TYPE", "Splits data by damage type: Physical, Fire, Shock, Frost, Magic, Poison, Disease, Bleed, Oblivion, and others.")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_TIP_DOMAIN_GROUP", "Per-member combat metrics like DPS, total damage, and crit rate. For buff/debuff uptimes on group members, use Group Effects.")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_TIP_AGGREGATION", "How values are combined when multiple encounters contribute to the same cell. For example, Average DPS shows the mean across encounters, while Max shows the best single encounter.")
+
+-- Query description (subtitle)
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_DESC_BY", "<<1>> by <<2>>")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_DESC_CROSS", "× <<1>>")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_DESC_N_METRICS", "<<1[$d metric/$d metrics]>>")

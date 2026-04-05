@@ -1054,6 +1054,55 @@ local function formatFrontBack(front, back)
     return ""
 end
 
+---@class EquipmentCategoryDef
+---@field category number Visual category enum (EQUIP_SLOT_VISUAL_CATEGORY_*)
+---@field traitFn fun(): string
+---@field enchantFn fun(): string
+---@field typeFn (fun(): string)?
+---@field weightFn (fun(): string)?
+
+---Renders equipment categories from a category definition array into q3Sections.
+---Each catDef provides closures for type/weight/trait/enchant strings; the loop
+---handles SubHeader + indented detail rows with consistent color coding.
+---@param col ColumnBuilder
+---@param catDefs EquipmentCategoryDef[]
+---@param q3Sections table
+local function renderEquipmentCategories(col, catDefs, q3Sections)
+    for _, catDef in ipairs(catDefs) do
+        local typeStr = catDef.typeFn and catDef.typeFn() or ""
+        local weightStr = catDef.weightFn and catDef.weightFn() or ""
+        local traitStr = catDef.traitFn()
+        local enchantStr = catDef.enchantFn()
+
+        if typeStr ~= "" or weightStr ~= "" or traitStr ~= "" or enchantStr ~= "" then
+            local categoryName = zo_strformat("<<C:1>>",
+                GetString("SI_EQUIPSLOTVISUALCATEGORY", catDef.category))
+            q3Sections[#q3Sections + 1] = col:SubHeader(categoryName)
+
+            if typeStr ~= "" then
+                local row = col:PlainTextRow(typeStr, ZO_SELECTED_TEXT, Q3_INDENT)
+                row._topGap = 3
+                q3Sections[#q3Sections + 1] = row
+            end
+            if weightStr ~= "" then
+                local row = col:PlainTextRow(weightStr, ZO_SELECTED_TEXT, Q3_INDENT)
+                row._topGap = 3
+                q3Sections[#q3Sections + 1] = row
+            end
+            if traitStr ~= "" then
+                local row = col:PlainTextRow(traitStr, ZO_HIGHLIGHT_TEXT, Q3_INDENT)
+                row._topGap = 3
+                q3Sections[#q3Sections + 1] = row
+            end
+            if enchantStr ~= "" then
+                local row = col:PlainTextRow(enchantStr, ZO_NORMAL_TEXT, Q3_INDENT)
+                row._topGap = 3
+                q3Sections[#q3Sections + 1] = row
+            end
+        end
+    end
+end
+
 ---Builds a PanelSpec for the Setup tab (2-column layout).
 ---Q2 (left, 700px): Character info + Abilities + Champion
 ---Q3 (right, expanded): Gear sets, Equipment summary, Poisons
@@ -1067,10 +1116,10 @@ function setup.buildSetupPanelSpec(ctx)
             local setupData = ctx.encounter.setup
             if not setupData then return end
 
-            -- Row color scheme: types (bright) -> traits (standard) -> enchants (distinct)
+            -- Row color scheme: types (bright) -> traits (standard)
+            -- Enchant color (ZO_NORMAL_TEXT) is handled by renderEquipmentCategories
             local COLOR_TYPE = ZO_SELECTED_TEXT
             local COLOR_TRAIT = ZO_HIGHLIGHT_TEXT
-            local COLOR_ENCHANT = ZO_NORMAL_TEXT
 
             local col2 = q2
 
@@ -1137,12 +1186,9 @@ function setup.buildSetupPanelSpec(ctx)
                 -------------------------
                 -- Q3: Equipment by Category
                 -------------------------
-                local hideFrontOff, hideBackOff = getHiddenOffHands(setupData.equipSlots)
-
-                local CATEGORY_ORDER = {
+                renderEquipmentCategories(col3, {
                     {
                         category = EQUIP_SLOT_VISUAL_CATEGORY_APPAREL,
-                        indices = { 1, 3, 4, 7, 8, 9, 10 },
                         traitFn = function() return groupTraits(setupData.equipSlots, ARMOR_SLOT_INDICES) end,
                         enchantFn = function() return groupEnchants(setupData.equipSlots, ARMOR_SLOT_INDICES) end,
                         weightFn = function()
@@ -1152,13 +1198,11 @@ function setup.buildSetupPanelSpec(ctx)
                     },
                     {
                         category = EQUIP_SLOT_VISUAL_CATEGORY_ACCESSORIES,
-                        indices = { 2, 11, 12 },
                         traitFn = function() return groupTraits(setupData.equipSlots, JEWELRY_SLOT_INDICES) end,
                         enchantFn = function() return groupEnchants(setupData.equipSlots, JEWELRY_SLOT_INDICES) end,
                     },
                     {
                         category = EQUIP_SLOT_VISUAL_CATEGORY_WEAPONS,
-                        indices = { 5, 6, 13, 14 },
                         traitFn = function()
                             local ft, bt = getWeaponTraitsByBar(setupData.equipSlots)
                             return formatFrontBack(ft, bt)
@@ -1172,66 +1216,7 @@ function setup.buildSetupPanelSpec(ctx)
                             return formatFrontBack(fw, bw)
                         end,
                     },
-                }
-
-                for _, catDef in ipairs(CATEGORY_ORDER) do
-                    local hasItems = false
-                    for _, slotIdx in ipairs(catDef.indices) do
-                        if slotIdx == 6 and hideFrontOff then
-                            -- skip hidden front off-hand
-                        elseif slotIdx == 14 and hideBackOff then
-                            -- skip hidden back off-hand
-                        elseif setupData.equipSlots[slotIdx] then
-                            hasItems = true
-                            break
-                        end
-                    end
-
-                    if hasItems then
-                        local categoryName = zo_strformat("<<C:1>>", GetString("SI_EQUIPSLOTVISUALCATEGORY", catDef.category))
-                        local catRows = {}
-
-                        catRows[#catRows + 1] = col3:SubHeader(categoryName)
-
-                        if catDef.typeFn then
-                            local typeStr = catDef.typeFn()
-                            if typeStr ~= "" then
-                                local row = col3:PlainTextRow(typeStr, COLOR_TYPE, Q3_INDENT)
-                                row._topGap = 3
-                                catRows[#catRows + 1] = row
-                            end
-                        end
-
-                        if catDef.weightFn then
-                            local weightStr = catDef.weightFn()
-                            if weightStr ~= "" then
-                                local row = col3:PlainTextRow(weightStr, COLOR_TYPE, Q3_INDENT)
-                                row._topGap = 3
-                                catRows[#catRows + 1] = row
-                            end
-                        end
-
-                        local traitStr = catDef.traitFn()
-                        if traitStr ~= "" then
-                            local row = col3:PlainTextRow(traitStr, COLOR_TRAIT, Q3_INDENT)
-                            row._topGap = 3
-                            catRows[#catRows + 1] = row
-                        end
-
-                        local enchantStr = catDef.enchantFn()
-                        if enchantStr ~= "" then
-                            local row = col3:PlainTextRow(enchantStr, COLOR_ENCHANT, Q3_INDENT)
-                            row._topGap = 3
-                            catRows[#catRows + 1] = row
-                        end
-
-                        -- Equipment categories are sub-sections without a Section header;
-                        -- flatten their rows directly into q3Sections
-                        for _, row in ipairs(catRows) do
-                            q3Sections[#q3Sections + 1] = row
-                        end
-                    end
-                end
+                }, q3Sections)
 
                 -- Poisons
                 if setupData.frontPoison or setupData.backPoison then
@@ -1524,7 +1509,6 @@ function setup.buildCompactSetupPanelSpec(compact)
         build = function(q2, q3, q4)
             local COLOR_TYPE = ZO_SELECTED_TEXT
             local COLOR_TRAIT = ZO_HIGHLIGHT_TEXT
-            local COLOR_ENCHANT = ZO_NORMAL_TEXT
 
             -------------------------
             -- Q2: Character Info
@@ -1646,87 +1630,29 @@ function setup.buildCompactSetupPanelSpec(compact)
                 q3Sections[#q3Sections + 1] = col3:Section(GetString(BATTLESCROLLS_SETUP_GEAR_SETS), setRows)
             end
 
-            -- Apparel category
-            local armorWeightStr = formatArmorWeights(
-                compact.armorWeights[1], compact.armorWeights[2], compact.armorWeights[3])
-            local armorTraitStr = formatGroupedTraits(compact.armorTraits)
-            local armorEnchantStr = formatGroupedEnchants(compact.armorEnchants)
-            if armorWeightStr ~= "" or armorTraitStr ~= "" or armorEnchantStr ~= "" then
-                local catRows = {}
-                local categoryName = zo_strformat("<<C:1>>",
-                    GetString("SI_EQUIPSLOTVISUALCATEGORY", EQUIP_SLOT_VISUAL_CATEGORY_APPAREL))
-                catRows[#catRows + 1] = col3:SubHeader(categoryName)
-                if armorWeightStr ~= "" then
-                    local row = col3:PlainTextRow(armorWeightStr, COLOR_TYPE, Q3_INDENT)
-                    row._topGap = 3
-                    catRows[#catRows + 1] = row
-                end
-                if armorTraitStr ~= "" then
-                    local row = col3:PlainTextRow(armorTraitStr, COLOR_TRAIT, Q3_INDENT)
-                    row._topGap = 3
-                    catRows[#catRows + 1] = row
-                end
-                if armorEnchantStr ~= "" then
-                    local row = col3:PlainTextRow(armorEnchantStr, COLOR_ENCHANT, Q3_INDENT)
-                    row._topGap = 3
-                    catRows[#catRows + 1] = row
-                end
-                for _, row in ipairs(catRows) do
-                    q3Sections[#q3Sections + 1] = row
-                end
-            end
-
-            -- Weapons category
-            local weaponTypeStr = getCompactWeaponTypes(compact.weaponTypes)
-            local weaponTraitStr = getCompactWeaponTraits(compact.weaponTraits, compact.weaponTypes)
-            local weaponEnchantStr = getCompactWeaponEnchants(compact.weaponEnchants, compact.weaponTypes)
-            if weaponTypeStr ~= "" or weaponTraitStr ~= "" or weaponEnchantStr ~= "" then
-                local catRows = {}
-                local categoryName = zo_strformat("<<C:1>>",
-                    GetString("SI_EQUIPSLOTVISUALCATEGORY", EQUIP_SLOT_VISUAL_CATEGORY_WEAPONS))
-                catRows[#catRows + 1] = col3:SubHeader(categoryName)
-                if weaponTypeStr ~= "" then
-                    local row = col3:PlainTextRow(weaponTypeStr, COLOR_TYPE, Q3_INDENT)
-                    row._topGap = 3
-                    catRows[#catRows + 1] = row
-                end
-                if weaponTraitStr ~= "" then
-                    local row = col3:PlainTextRow(weaponTraitStr, COLOR_TRAIT, Q3_INDENT)
-                    row._topGap = 3
-                    catRows[#catRows + 1] = row
-                end
-                if weaponEnchantStr ~= "" then
-                    local row = col3:PlainTextRow(weaponEnchantStr, COLOR_ENCHANT, Q3_INDENT)
-                    row._topGap = 3
-                    catRows[#catRows + 1] = row
-                end
-                for _, row in ipairs(catRows) do
-                    q3Sections[#q3Sections + 1] = row
-                end
-            end
-
-            -- Accessories category
-            local jewelryTraitStr = formatGroupedTraits(compact.jewelryTraits)
-            local jewelryEnchantStr = formatGroupedEnchants(compact.jewelryEnchants)
-            if jewelryTraitStr ~= "" or jewelryEnchantStr ~= "" then
-                local catRows = {}
-                local categoryName = zo_strformat("<<C:1>>",
-                    GetString("SI_EQUIPSLOTVISUALCATEGORY", EQUIP_SLOT_VISUAL_CATEGORY_ACCESSORIES))
-                catRows[#catRows + 1] = col3:SubHeader(categoryName)
-                if jewelryTraitStr ~= "" then
-                    local row = col3:PlainTextRow(jewelryTraitStr, COLOR_TRAIT, Q3_INDENT)
-                    row._topGap = 3
-                    catRows[#catRows + 1] = row
-                end
-                if jewelryEnchantStr ~= "" then
-                    local row = col3:PlainTextRow(jewelryEnchantStr, COLOR_ENCHANT, Q3_INDENT)
-                    row._topGap = 3
-                    catRows[#catRows + 1] = row
-                end
-                for _, row in ipairs(catRows) do
-                    q3Sections[#q3Sections + 1] = row
-                end
-            end
+            -- Equipment by Category (same order as Setup tab: Apparel → Accessories → Weapons)
+            renderEquipmentCategories(col3, {
+                {
+                    category = EQUIP_SLOT_VISUAL_CATEGORY_APPAREL,
+                    traitFn = function() return formatGroupedTraits(compact.armorTraits) end,
+                    enchantFn = function() return formatGroupedEnchants(compact.armorEnchants) end,
+                    weightFn = function()
+                        return formatArmorWeights(
+                            compact.armorWeights[1], compact.armorWeights[2], compact.armorWeights[3])
+                    end,
+                },
+                {
+                    category = EQUIP_SLOT_VISUAL_CATEGORY_ACCESSORIES,
+                    traitFn = function() return formatGroupedTraits(compact.jewelryTraits) end,
+                    enchantFn = function() return formatGroupedEnchants(compact.jewelryEnchants) end,
+                },
+                {
+                    category = EQUIP_SLOT_VISUAL_CATEGORY_WEAPONS,
+                    traitFn = function() return getCompactWeaponTraits(compact.weaponTraits, compact.weaponTypes) end,
+                    enchantFn = function() return getCompactWeaponEnchants(compact.weaponEnchants, compact.weaponTypes) end,
+                    typeFn = function() return getCompactWeaponTypes(compact.weaponTypes) end,
+                },
+            }, q3Sections)
 
             -- Poisons
             local hasFrontPoison = compact.frontPoisonEffect or compact.frontPoisonItemId

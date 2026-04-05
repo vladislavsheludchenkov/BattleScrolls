@@ -47,10 +47,10 @@ setupAnalysis.BACK_MAIN_HAND_INDEX = 13
 -- Slot classification for trait grouping by equipment category
 setupAnalysis.JEWELRY_SLOT_INDICES = { 2, 11, 12 }
 
----@type table<number, number|false>
+---@type table<number, number|string>
 setupAnalysis.ENCHANT_OVERRIDES = {
-    [179] = 37,    -- Prismatic Recovery: broken category, force correct one
-    [178] = false, -- Always use GetItemLinkEnchantInfo fallback
+    [179] = 37, -- Prismatic Recovery: broken category, force correct one
+    [178] = "|H1:item:166046:370:50:0:0:0:0:0:0:0:0:0:0:0:0:0:1:0:0:0:0|h|h", -- Prismatic Cost Reduction: no valid category, resolve via glyph link
 }
 
 -- Local aliases for performance
@@ -241,7 +241,6 @@ end
 ---@param equipSlots (string|false)[]
 ---@param slotIndices? number[] Specific slot indices to examine (defaults to all slots)
 ---@return string formatted Trait summary (e.g. "4x Divines, 2x Sturdy")
----@return { trait: number, count: number, name: string }[] traitDetails Sorted trait breakdown
 function setupAnalysis.groupTraits(equipSlots, slotIndices)
     local traitCounts = {}
     local traitOrder = {}
@@ -280,7 +279,7 @@ function setupAnalysis.groupTraits(equipSlots, slotIndices)
         table.insert(parts, string.format("%dx %s", detail.count, detail.name))
     end
 
-    return table.concat(parts, ", "), details
+    return table.concat(parts, ", ")
 end
 
 ---Groups trait IDs from equipment slots (numeric-only, for CompactSetup conversion)
@@ -320,6 +319,34 @@ end
 -- ENCHANTS
 -- =============================================================================
 
+---Resolves enchant display name from an enchant ID using overrides and category lookup.
+---Returns nil when the name cannot be resolved (caller decides on fallback).
+---@param enchantId number
+---@return string|nil name Short enchant name, or nil if unresolvable
+local function resolveEnchantName(enchantId)
+    local override = ENCHANT_OVERRIDES[enchantId]
+    if type(override) == "number" then
+        local raw = GetString("SI_ENCHANTMENTSEARCHCATEGORYTYPE", override)
+        if raw and raw ~= "" then
+            return zo_strformat("<<1>>", raw)
+        end
+    elseif type(override) == "string" then
+        -- Item link override for enchants with no valid search category
+        local _, header = GetItemLinkEnchantInfo(override)
+        if header and header ~= "" then
+            return zo_strformat("<<1>>", header)
+        end
+    elseif override == nil then
+        local category = GetEnchantSearchCategoryType(enchantId)
+        if not category or category == ENCHANTMENT_SEARCH_CATEGORY_NONE then return nil end
+        local raw = GetString("SI_ENCHANTMENTSEARCHCATEGORYTYPE", category)
+        if raw and raw ~= "" then
+            return zo_strformat("<<1>>", raw)
+        end
+    end
+    return nil
+end
+
 ---Gets the short enchant category name from an item link.
 ---Uses the enchantment search category (e.g. "Berserker", "Prismatic Defense")
 ---instead of the verbose tooltip header ("Multi-Effect Enchantment").
@@ -329,23 +356,10 @@ function setupAnalysis.getEnchantName(link)
     local enchantId = GetItemLinkFinalEnchantId(link)
     if not enchantId or enchantId == 0 then return "" end
 
-    local override = ENCHANT_OVERRIDES[enchantId]
-    if override then
-        local raw = GetString("SI_ENCHANTMENTSEARCHCATEGORYTYPE", override)
-        if raw and raw ~= "" then
-            return zo_strformat("<<1>>", raw)
-        end
-    elseif override == nil then
-        -- No override — use normal lookup
-        local category = GetEnchantSearchCategoryType(enchantId)
-        if not category or category == ENCHANTMENT_SEARCH_CATEGORY_NONE then return "" end
-        local raw = GetString("SI_ENCHANTMENTSEARCHCATEGORYTYPE", category)
-        if raw and raw ~= "" then
-            return zo_strformat("<<1>>", raw)
-        end
-    end
+    local name = resolveEnchantName(enchantId)
+    if name then return name end
 
-    -- Fallback: extract name from enchant header
+    -- Fallback: extract name from the equipped item's enchant header
     local _, header = GetItemLinkEnchantInfo(link)
     if header and header ~= "" then
         return zo_strformat("<<1>>", header)
@@ -359,24 +373,7 @@ end
 ---@return string name Short enchant name, or "" if unknown
 function setupAnalysis.getEnchantNameById(enchantId)
     if not enchantId or enchantId == 0 then return "" end
-
-    local override = ENCHANT_OVERRIDES[enchantId]
-    if override then
-        local raw = GetString("SI_ENCHANTMENTSEARCHCATEGORYTYPE", override)
-        if raw and raw ~= "" then
-            return zo_strformat("<<1>>", raw)
-        end
-    elseif override == nil then
-        local category = GetEnchantSearchCategoryType(enchantId)
-        if not category or category == ENCHANTMENT_SEARCH_CATEGORY_NONE then return "" end
-        local raw = GetString("SI_ENCHANTMENTSEARCHCATEGORYTYPE", category)
-        if raw and raw ~= "" then
-            return zo_strformat("<<1>>", raw)
-        end
-    end
-
-    -- No GetItemLinkEnchantInfo fallback — receiver has no item link
-    return ""
+    return resolveEnchantName(enchantId) or ""
 end
 
 ---Groups and formats enchants from equipment slots (same pattern as groupTraits)

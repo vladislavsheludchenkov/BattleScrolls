@@ -91,6 +91,14 @@ ui/journal/settings_templates.lua
 ui/journal/controllers/stats_list.lua
 ui/journal/controllers/instance_list.lua
 ui/journal/controllers/encounter_list.lua
+; Pivot Builder (loads after all journal dependencies)
+ui/journal/pivot/types.lua
+ui/journal/pivot/extractors.lua
+ui/journal/pivot/engine.lua
+ui/journal/pivot/saved.lua
+ui/journal/pivot/query.lua
+ui/journal/pivot/config_renderer.lua
+ui/journal/pivot/result_renderer.lua
 ui/journal/journal.lua
 ui/journal/dialogs.lua
 ui/journal/filters.lua

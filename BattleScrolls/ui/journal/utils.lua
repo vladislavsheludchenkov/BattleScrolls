@@ -126,8 +126,12 @@ function utils.formatCompact(value)
         return string.format("%.1fM", value / 1000000)
     elseif value >= 1000 then
         return string.format("%.1fK", value / 1000)
-    else
+    elseif value % 1 < 0.005 then
         return string.format("%.0f", value)
+    elseif value >= 1 then
+        return string.format("%.1f", value)
+    else
+        return string.format("%.2f", value)
     end
 end
 

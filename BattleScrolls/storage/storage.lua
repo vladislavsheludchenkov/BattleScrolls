@@ -62,6 +62,7 @@ BattleScrolls = BattleScrolls or {}
 ---@field bossSeqNames table<string, string>|nil Maps "tag:seq" to boss name for shared data display
 ---@field deaths EncounterDeaths|nil Death recap data (nil if player never died)
 ---@field bossTagSeqByUnitId table<number, string>|nil Maps boss unitId to "tag:seq" key for local player boss damage mapping
+---@field gameVersion string|nil Game patch version at time of encounter (e.g. "11.3.5")
 
 ---@class Encounter
 ---@field displayName string|nil Pre-computed display name for encounter list UI (avoids decoding entire encounter)
@@ -86,6 +87,7 @@ BattleScrolls = BattleScrolls or {}
 ---@field deaths EncounterDeaths|nil Death recap data (nil if player never died)
 ---@field bossTagSeqByUnitId table<number, string>|nil Maps boss unitId to "tag:seq" key for local player boss damage mapping
 ---@field setup PlayerSetup|nil  -- Player build snapshot (v9+)
+---@field gameVersion string|nil Game patch version at time of encounter (e.g. "11.3.5")
 
 -- Instance types distinguish between live state (during combat) and storage format.
 -- InstanceState: Live instance with uncompressed abilityInfo and unitNames
@@ -151,11 +153,13 @@ BattleScrolls = BattleScrolls or {}
 ---@field effectReconciliationPreset "max"|"high"|"normal"|"low"|"off"
 ---@field storageSizePreset "xs"|"small"|"medium"|"large"|"xl"|"caution"|"yolo"
 ---@field favoriteEffects table<number, boolean>
+---@field pivotQueries table<string, PivotQuery>|nil Saved pivot queries
 ---@field hasCompletedOnboarding boolean
 
 ---@class StorageData
 ---@field version number Version of the saved variables structure
 ---@field history InstanceWithIndex[] Flat array of all instances/locations visited
+---@field nextInstanceIndex number|nil High-water mark for instance.index assignment (auto-initialized from history)
 ---@field settings StorageSettings User settings
 ---@field sharedSetups table<string, table<number, CompactSetup>>|nil Shared player setups from group members
 
@@ -534,15 +538,19 @@ end
 ---PushInstance adds an instance to the history, cleaning up old entries if necessary and assigning it a unique index
 ---@param instance Instance The instance to add
 function storage:PushInstance(instance)
-    local index
-
-    if self.savedVariables.history[#self.savedVariables.history] then
-        index = self.savedVariables.history[#self.savedVariables.history].index + 1
-    else
-        index = 1
+    -- Initialize high-water mark from existing history if not yet set (handles migration)
+    if not self.savedVariables.nextInstanceIndex then
+        local maxIndex = 0
+        for _, inst in ipairs(self.savedVariables.history) do
+            if inst.index and inst.index > maxIndex then
+                maxIndex = inst.index
+            end
+        end
+        self.savedVariables.nextInstanceIndex = maxIndex + 1
     end
 
-    instance.index = index
+    instance.index = self.savedVariables.nextInstanceIndex
+    self.savedVariables.nextInstanceIndex = self.savedVariables.nextInstanceIndex + 1
 
     table.insert(self.savedVariables.history, instance)
 end

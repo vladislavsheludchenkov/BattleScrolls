@@ -101,12 +101,14 @@ local ITEMS_PER_YIELD = 50
 
 ---Increments progress counter and yields if threshold reached.
 ---Must only be called from within a LibEffect.Async coroutine.
+---GC is not requested here — the encoding loop is nearly allocation-free.
+---The caller (scribe) handles GC before and after encoding.
 ---@param progress EncodeProgress
 local function countAndMaybeYield(progress)
     progress.count = progress.count + 1
     if progress.count >= ITEMS_PER_YIELD then
         progress.count = 0
-        LibEffect.YieldWithGC():Await()
+        LibEffect.Yield():Await()
     end
 end
 
@@ -115,7 +117,7 @@ end
 local function flushProgress(progress)
     if progress.count > 0 then
         progress.count = 0
-        LibEffect.YieldWithGC():Await()
+        LibEffect.Yield():Await()
     end
 end
 
@@ -1124,6 +1126,7 @@ function binaryStorage.encodeEncounterAsync(encounter)
             sharedData = encounter.sharedData,
             bossSeqNames = encounter.bossSeqNames,
             bossTagSeqByUnitId = encounter.bossTagSeqByUnitId,
+            gameVersion = encounter.gameVersion,
         }
     end)
 end

@@ -52,6 +52,7 @@ local ENCODE_FLUSH_BYTES = 180
 ---@field private _bytes number[] Pending bytes (not yet converted to base64)
 ---@field private _currentByte number Partial byte being built
 ---@field private _currentBits number Bits in partial byte (0-7)
+---@field private _chunkBuf string[] Reusable buffer for base64 char assembly
 local BitEncoder = {}
 BitEncoder.__index = BitEncoder
 
@@ -63,6 +64,7 @@ function BitEncoder.new()
         _bytes = {},
         _currentByte = 0,
         _currentBits = 0,
+        _chunkBuf = {},
     }, BitEncoder)
 end
 
@@ -136,24 +138,27 @@ function BitEncoder:_flushToChunk()
     local processBytes = math.floor(len / 3) * 3  -- Only complete triplets
     if processBytes == 0 then return end
 
-    local chunk = {}
+    local chunk = self._chunkBuf
+    local ci = 0
     for i = 1, processBytes, 3 do
         local b1, b2, b3 = bytes[i], bytes[i + 1], bytes[i + 2]
         local n = b1 * 65536 + b2 * 256 + b3
-        chunk[#chunk + 1] = B64_CHAR[math.floor(n / 262144)]
-        chunk[#chunk + 1] = B64_CHAR[math.floor(n / 4096) % 64]
-        chunk[#chunk + 1] = B64_CHAR[math.floor(n / 64) % 64]
-        chunk[#chunk + 1] = B64_CHAR[n % 64]
+        ci = ci + 1; chunk[ci] = B64_CHAR[math.floor(n / 262144)]
+        ci = ci + 1; chunk[ci] = B64_CHAR[math.floor(n / 4096) % 64]
+        ci = ci + 1; chunk[ci] = B64_CHAR[math.floor(n / 64) % 64]
+        ci = ci + 1; chunk[ci] = B64_CHAR[n % 64]
     end
 
-    self._chunks[#self._chunks + 1] = table.concat(chunk)
+    self._chunks[#self._chunks + 1] = table.concat(chunk, nil, 1, ci)
 
-    -- Keep remainder
-    local newBytes = {}
-    for i = processBytes + 1, len do
-        newBytes[#newBytes + 1] = bytes[i]
+    -- Shift remainder in-place
+    local newLen = len - processBytes
+    for i = 1, newLen do
+        bytes[i] = bytes[i + processBytes]
     end
-    self._bytes = newBytes
+    for i = newLen + 1, len do
+        bytes[i] = nil
+    end
 end
 
 ---Finalizes encoding and returns chunks
@@ -175,17 +180,18 @@ function BitEncoder:finish()
     end
 
     -- Process remaining bytes
-    local chunk = {}
+    local chunk = self._chunkBuf
+    local ci = 0
     local i = 1
 
     -- Complete triplets
     while i <= len - 2 do
         local b1, b2, b3 = bytes[i], bytes[i + 1], bytes[i + 2]
         local n = b1 * 65536 + b2 * 256 + b3
-        chunk[#chunk + 1] = B64_CHAR[math.floor(n / 262144)]
-        chunk[#chunk + 1] = B64_CHAR[math.floor(n / 4096) % 64]
-        chunk[#chunk + 1] = B64_CHAR[math.floor(n / 64) % 64]
-        chunk[#chunk + 1] = B64_CHAR[n % 64]
+        ci = ci + 1; chunk[ci] = B64_CHAR[math.floor(n / 262144)]
+        ci = ci + 1; chunk[ci] = B64_CHAR[math.floor(n / 4096) % 64]
+        ci = ci + 1; chunk[ci] = B64_CHAR[math.floor(n / 64) % 64]
+        ci = ci + 1; chunk[ci] = B64_CHAR[n % 64]
         i = i + 3
     end
 
@@ -194,21 +200,21 @@ function BitEncoder:finish()
     if remaining == 2 then
         local b1, b2 = bytes[i], bytes[i + 1]
         local n = b1 * 65536 + b2 * 256
-        chunk[#chunk + 1] = B64_CHAR[math.floor(n / 262144)]
-        chunk[#chunk + 1] = B64_CHAR[math.floor(n / 4096) % 64]
-        chunk[#chunk + 1] = B64_CHAR[math.floor(n / 64) % 64]
-        chunk[#chunk + 1] = "="
+        ci = ci + 1; chunk[ci] = B64_CHAR[math.floor(n / 262144)]
+        ci = ci + 1; chunk[ci] = B64_CHAR[math.floor(n / 4096) % 64]
+        ci = ci + 1; chunk[ci] = B64_CHAR[math.floor(n / 64) % 64]
+        ci = ci + 1; chunk[ci] = "="
     elseif remaining == 1 then
         local b1 = bytes[i]
         local n = b1 * 65536
-        chunk[#chunk + 1] = B64_CHAR[math.floor(n / 262144)]
-        chunk[#chunk + 1] = B64_CHAR[math.floor(n / 4096) % 64]
-        chunk[#chunk + 1] = "="
-        chunk[#chunk + 1] = "="
+        ci = ci + 1; chunk[ci] = B64_CHAR[math.floor(n / 262144)]
+        ci = ci + 1; chunk[ci] = B64_CHAR[math.floor(n / 4096) % 64]
+        ci = ci + 1; chunk[ci] = "="
+        ci = ci + 1; chunk[ci] = "="
     end
 
-    if #chunk > 0 then
-        chunks[#chunks + 1] = table.concat(chunk)
+    if ci > 0 then
+        chunks[#chunks + 1] = table.concat(chunk, nil, 1, ci)
     end
 
     return chunks
@@ -224,6 +230,7 @@ end
 ---@field private _posInChunk number Position within current chunk
 ---@field private _bytes number[] Decoded bytes buffer (consumed bytes are removed)
 ---@field private _bitOffset number Bit offset within _bytes[1] (0-7)
+---@field private _strBuf number[] Reusable buffer for string byte assembly
 local BitDecoder = {}
 BitDecoder.__index = BitDecoder
 
@@ -237,6 +244,7 @@ function BitDecoder.new(chunks)
         _posInChunk = 1,
         _bytes = {},
         _bitOffset = 0,
+        _strBuf = {},
     }, BitDecoder)
 end
 
@@ -356,11 +364,11 @@ function BitDecoder:readString()
     if len == 0 then
         return ""
     end
-    local chars = {}
+    local buf = self._strBuf
     for i = 1, len do
-        chars[i] = string.char(self:readUInt(8))
+        buf[i] = self:readUInt(8)
     end
-    return table.concat(chars)
+    return string.char(unpack(buf, 1, len))
 end
 
 -- =============================================================================

@@ -177,6 +177,7 @@ local strings = {
     -- Overview Stats
     -------------------------
     [BATTLESCROLLS_STAT_DURATION] = "Длительность",
+    [BATTLESCROLLS_STAT_PATCH] = "Обновление",
     [BATTLESCROLLS_STAT_SUMMARY] = "Сводка",
 
     -- Boss Damage
@@ -691,6 +692,189 @@ local strings = {
     [BATTLESCROLLS_ALCHEMY_TRAIT30] = "Осквернение",
     [BATTLESCROLLS_ALCHEMY_TRAIT31] = "Героизм",
     [BATTLESCROLLS_ALCHEMY_TRAIT32] = "Трусливость",
+
+    -------------------------
+    -- Aggregate
+    -------------------------
+    -- Navigation
+    [BATTLESCROLLS_PIVOT_TITLE] = "Аналитика",
+    [BATTLESCROLLS_PIVOT_ENTRY] = "Аналитика",
+    [BATTLESCROLLS_PIVOT_ENTRY_DESC] = "Анализ данных по нескольким сражениям и инстансам",
+    [BATTLESCROLLS_PIVOT_ENTRY_DESC_ENCOUNTER] = "Анализ данных по сражениям в этом инстансе",
+
+    -- Scope section
+    [BATTLESCROLLS_PIVOT_SCOPE] = "Выборка",
+    [BATTLESCROLLS_PIVOT_INSTANCE_SCOPE] = "Тип контента",
+    [BATTLESCROLLS_PIVOT_TIME_FILTER] = "Время",
+    [BATTLESCROLLS_PIVOT_ENCOUNTER_FILTER] = "Фильтр сражений",
+
+    -- Instance scope options
+    [BATTLESCROLLS_PIVOT_SCOPE_EVERYTHING] = "Всё",
+    [BATTLESCROLLS_PIVOT_SCOPE_INSTANCED] = "Все инстансы",
+    [BATTLESCROLLS_PIVOT_SCOPE_OVERLAND] = "Весь открытый мир",
+    [BATTLESCROLLS_PIVOT_SCOPE_HOUSES] = "Все дома",
+    [BATTLESCROLLS_PIVOT_SCOPE_PVP] = "Весь PvP",
+    [BATTLESCROLLS_PIVOT_SCOPE_ZONES] = "По названию зоны",
+    [BATTLESCROLLS_PIVOT_SCOPE_SPECIFIC] = "Конкретные инстансы",
+
+    -- Time filter options
+    [BATTLESCROLLS_PIVOT_TIME_ALL] = "Всё время",
+    [BATTLESCROLLS_PIVOT_TIME_TODAY] = "Сегодня",
+    [BATTLESCROLLS_PIVOT_TIME_24H] = "Последние 24 часа",
+    [BATTLESCROLLS_PIVOT_TIME_3D] = "Последние 3 дня",
+    [BATTLESCROLLS_PIVOT_TIME_7D] = "Последние 7 дней",
+    [BATTLESCROLLS_PIVOT_TIME_14D] = "Последние 14 дней",
+    [BATTLESCROLLS_PIVOT_TIME_30D] = "Последние 30 дней",
+    [BATTLESCROLLS_PIVOT_TIME_90D] = "Последние 90 дней",
+    [BATTLESCROLLS_PIVOT_TIME_CUSTOM] = "Другое...",
+
+    -- Encounter category options
+    [BATTLESCROLLS_PIVOT_ENC_ALL] = "Все сражения",
+    [BATTLESCROLLS_PIVOT_ENC_BOSS] = "Сражения с боссами",
+    [BATTLESCROLLS_PIVOT_ENC_TRASH] = "Сражения с мобами",
+    [BATTLESCROLLS_PIVOT_ENC_PLAYER] = "PvP-сражения",
+    [BATTLESCROLLS_PIVOT_ENC_DUMMY] = "Сражения с манекеном",
+    [BATTLESCROLLS_PIVOT_ENC_SPECIFIC] = "Конкретные сражения",
+
+    -- Query section
+    [BATTLESCROLLS_PIVOT_QUERY] = "Запрос",
+    [BATTLESCROLLS_PIVOT_DOMAIN] = "Тип данных",
+    [BATTLESCROLLS_PIVOT_ROWS] = "Строки",
+    [BATTLESCROLLS_PIVOT_COLUMNS] = "Столбцы",
+    [BATTLESCROLLS_PIVOT_VALUES] = "Значения",
+    [BATTLESCROLLS_PIVOT_AGGREGATION] = "Агрегация",
+    [BATTLESCROLLS_PIVOT_FILTERS] = "Фильтры",
+
+    -- Target filter
+    [BATTLESCROLLS_PIVOT_TARGETS] = "Цели",
+    [BATTLESCROLLS_PIVOT_TARGETS_ALL] = "Все цели",
+    [BATTLESCROLLS_PIVOT_TARGETS_BOSSES] = "Только боссы",
+
+    -- Domain names
+    [BATTLESCROLLS_PIVOT_DOMAIN_DAMAGE] = "Урон",
+    [BATTLESCROLLS_PIVOT_DOMAIN_HEALING_OUT] = "Исходящее исцеление",
+    [BATTLESCROLLS_PIVOT_DOMAIN_HEALING_IN] = "Входящее исцеление",
+    -- Effects domain labels reuse BATTLESCROLLS_TAB_EFFECTS_* strings
+    [BATTLESCROLLS_PIVOT_DOMAIN_GROUP] = "Группа",
+    [BATTLESCROLLS_PIVOT_DOMAIN_OVERVIEW] = "Обзор",
+
+    -- Dimension names
+    [BATTLESCROLLS_PIVOT_DIM_ABILITY] = "Способность",
+    [BATTLESCROLLS_PIVOT_DIM_TARGET] = "Цель",
+    [BATTLESCROLLS_PIVOT_DIM_SOURCE] = "Источник",
+    [BATTLESCROLLS_PIVOT_DIM_BOSS] = "Босс",
+    [BATTLESCROLLS_PIVOT_DIM_DAMAGE_TYPE] = "Тип урона",
+    [BATTLESCROLLS_PIVOT_DIM_DELIVERY] = "Способ нанесения",
+    [BATTLESCROLLS_PIVOT_DIM_AOE_ST] = "По площади / По цели",
+    [BATTLESCROLLS_PIVOT_DIM_BUFF_DEBUFF] = "Бафф / Дебафф",
+    [BATTLESCROLLS_PIVOT_DIM_GROUP_MEMBER] = "Участник группы",
+    [BATTLESCROLLS_PIVOT_DIM_ROLE] = "Роль",
+    [BATTLESCROLLS_PIVOT_DIM_ENCOUNTER] = "Сражение",
+    [BATTLESCROLLS_PIVOT_DIM_INSTANCE] = "Инстанс",
+    [BATTLESCROLLS_PIVOT_COL_METRICS] = "Метрики",
+
+    -- Metric names
+    [BATTLESCROLLS_PIVOT_METRIC_TOTAL_DAMAGE] = "Общий урон",
+    [BATTLESCROLLS_PIVOT_METRIC_DPS] = "DPS",
+    [BATTLESCROLLS_PIVOT_METRIC_CRIT_PERCENT] = "Крит %",
+    [BATTLESCROLLS_PIVOT_METRIC_HIT_COUNT] = "Попадания",
+    [BATTLESCROLLS_PIVOT_METRIC_MAX_HIT] = "Макс. удар",
+    [BATTLESCROLLS_PIVOT_METRIC_MIN_HIT] = "Мин. удар",
+    [BATTLESCROLLS_PIVOT_METRIC_AVG_HIT] = "Средн. удар",
+    [BATTLESCROLLS_PIVOT_METRIC_EFFECTIVE_HEALING] = "Эфф. исцеление",
+    [BATTLESCROLLS_PIVOT_METRIC_RAW_HEALING] = "Полное исцеление",
+    [BATTLESCROLLS_PIVOT_METRIC_RAW_HPS] = "Полный HPS",
+    [BATTLESCROLLS_PIVOT_METRIC_EFFECTIVE_HPS] = "Эфф. HPS",
+    [BATTLESCROLLS_PIVOT_METRIC_OVERHEAL_PERCENT] = "Переисцеление %",
+    [BATTLESCROLLS_PIVOT_METRIC_HEAL_CRIT_PERCENT] = "Крит исцеления %",
+    [BATTLESCROLLS_PIVOT_METRIC_HEAL_HIT_COUNT] = "Исцелений",
+    [BATTLESCROLLS_PIVOT_METRIC_MAX_HEAL] = "Макс. исцеление",
+    [BATTLESCROLLS_PIVOT_METRIC_AVG_HEAL] = "Средн. исцеление",
+    [BATTLESCROLLS_PIVOT_METRIC_UPTIME_PERCENT] = "Покрытие %",
+    [BATTLESCROLLS_PIVOT_METRIC_PLAYER_UPTIME_PERCENT] = "Ваше покрытие %",
+    [BATTLESCROLLS_PIVOT_METRIC_APPLICATIONS] = "Применения",
+    [BATTLESCROLLS_PIVOT_METRIC_MAX_STACKS_TIME] = "Время на макс. зарядах %",
+    [BATTLESCROLLS_PIVOT_METRIC_GROUP_DPS] = "DPS",
+    [BATTLESCROLLS_PIVOT_METRIC_GROUP_BOSS_DPS] = "DPS по боссу",
+    [BATTLESCROLLS_PIVOT_METRIC_GROUP_TOTAL_DAMAGE] = "Общий урон",
+    [BATTLESCROLLS_PIVOT_METRIC_GROUP_CRIT_PERCENT] = "Крит %",
+    [BATTLESCROLLS_PIVOT_METRIC_GROUP_DOT_PERCENT] = "DoT %",
+    [BATTLESCROLLS_PIVOT_METRIC_GROUP_AOE_PERCENT] = "AoE %",
+    [BATTLESCROLLS_PIVOT_METRIC_GROUP_MAX_HIT] = "Макс. удар",
+    [BATTLESCROLLS_PIVOT_METRIC_GROUP_DTPS] = "DTPS",
+    [BATTLESCROLLS_PIVOT_METRIC_GROUP_RAW_HPS] = "Общий HPS",
+    [BATTLESCROLLS_PIVOT_METRIC_GROUP_EFFECTIVE_HPS] = "Эффективный HPS",
+    [BATTLESCROLLS_PIVOT_METRIC_EFFECTIVE_HPS_OUT] = "Эффективный HPS (исх.)",
+    [BATTLESCROLLS_PIVOT_METRIC_RAW_HPS_OUT] = "Общий HPS (исх.)",
+    [BATTLESCROLLS_PIVOT_METRIC_EFFECTIVE_HPS_IN] = "Эффективный HPS (вх.)",
+    [BATTLESCROLLS_PIVOT_METRIC_RAW_HPS_IN] = "Общий HPS (вх.)",
+    [BATTLESCROLLS_PIVOT_METRIC_BOSS_DPS] = "DPS по боссу",
+    [BATTLESCROLLS_PIVOT_METRIC_BOSS_DAMAGE] = "Урон по боссу",
+    [BATTLESCROLLS_PIVOT_METRIC_DTPS] = "DTPS",
+    [BATTLESCROLLS_PIVOT_METRIC_DAMAGE_TAKEN] = "Полученный урон",
+    [BATTLESCROLLS_PIVOT_METRIC_GROUP_ALIVE_PERCENT] = "Жив %",
+    [BATTLESCROLLS_PIVOT_METRIC_GROUP_DEATH_COUNT] = "Смерти",
+    [BATTLESCROLLS_PIVOT_METRIC_DURATION] = "Длительность",
+    [BATTLESCROLLS_PIVOT_METRIC_DEATH_COUNT] = "Смерти",
+
+    -- Aggregation options
+    [BATTLESCROLLS_PIVOT_AGG_SUM] = "Сумма",
+    [BATTLESCROLLS_PIVOT_AGG_AVG] = "Среднее",
+    [BATTLESCROLLS_PIVOT_AGG_MAX] = "Макс",
+    [BATTLESCROLLS_PIVOT_AGG_MIN] = "Мин",
+
+    -- Actions
+    [BATTLESCROLLS_PIVOT_RUN] = "Выполнить запрос",
+    [BATTLESCROLLS_PIVOT_SAVE] = "Сохранить запрос",
+    [BATTLESCROLLS_PIVOT_LOAD] = "Загрузить запрос",
+    [BATTLESCROLLS_PIVOT_DELETE_QUERY] = "Удалить запрос",
+
+    -- Loading / Results
+    [BATTLESCROLLS_PIVOT_LOADING] = "Загрузка сражений... <<1>> / <<2>>",
+    [BATTLESCROLLS_PIVOT_NO_RESULTS] = "Нет данных по вашему запросу",
+    [BATTLESCROLLS_PIVOT_NO_ENCOUNTERS] = "Нет сражений, подходящих под фильтры",
+    [BATTLESCROLLS_PIVOT_NO_BOSSES] = "Нет боссов, подходящих под фильтры",
+    [BATTLESCROLLS_PIVOT_ENCOUNTERS_PROCESSED] = "<<1[$d сражение/$d сражения/$d сражений]>> обработано",
+    [BATTLESCROLLS_PIVOT_ROWS_CAPPED] = "Результаты ограничены <<1>> строками",
+    [BATTLESCROLLS_PIVOT_COLUMNS_CAPPED] = "Результаты ограничены <<1>> столбцами",
+    [BATTLESCROLLS_PIVOT_TIP_DOMAIN_OVERVIEW] = "Сводка по всем данным: урон, исцеление и эффекты. Показывает общие итоги вместо отдельных разбивок.",
+    [BATTLESCROLLS_PIVOT_TIP_ENC_BOSS_NAMES] = "Показывает только сражения с выбранными боссами. Имена боссов выбираются на следующем шаге.",
+    [BATTLESCROLLS_PIVOT_TIP_DIM_DELIVERY] = "Разделяет данные по способу нанесения: Прямой, DoT (урон с течением времени), HoT (исцеление с течением времени) или Смешанный.",
+    [BATTLESCROLLS_PIVOT_TIP_DIM_DAMAGE_TYPE] = "Разделяет данные по типу урона: физический, огонь, молния, лёд, магия, яд, болезнь, кровотечение, Обливион и другие.",
+    [BATTLESCROLLS_PIVOT_TIP_DOMAIN_GROUP] = "Боевые показатели каждого участника группы: DPS, общий урон, процент критов. Для времени действия баффов/дебаффов используйте Эффекты группы.",
+    [BATTLESCROLLS_PIVOT_TIP_AGGREGATION] = "Как объединяются значения, когда несколько сражений попадают в одну ячейку. Например, средний DPS показывает среднее значение по сражениям, а максимум — лучший бой.",
+
+    -- Save dialog
+    [BATTLESCROLLS_PIVOT_SAVE_TITLE] = "Сохранить запрос",
+    [BATTLESCROLLS_PIVOT_SAVE_PROMPT] = "Введите название для запроса:",
+    [BATTLESCROLLS_PIVOT_SAVE_OVERWRITE] = "Запрос с именем \"<<1>>\" уже существует. Перезаписать?",
+
+    -- Load/delete dialog
+    [BATTLESCROLLS_PIVOT_QUERY_SAVED] = "Запрос сохранён как \"<<1>>\"",
+    [BATTLESCROLLS_PIVOT_LOAD_TITLE] = "Загрузить запрос",
+    [BATTLESCROLLS_PIVOT_DELETE_CONFIRM] = "Удалить запрос \"<<1>>\"?",
+
+    -- Selector dialogs
+    [BATTLESCROLLS_PIVOT_SELECT_ZONES] = "Выбрать зоны",
+    [BATTLESCROLLS_PIVOT_SELECT_INSTANCES] = "Выбрать инстансы",
+    [BATTLESCROLLS_PIVOT_SELECT_ENCOUNTERS] = "Выбрать сражения",
+    [BATTLESCROLLS_PIVOT_SELECT_BOSSES] = "Выбрать имена боссов",
+    [BATTLESCROLLS_PIVOT_SELECT_METRICS] = "Выбрать метрики",
+    [BATTLESCROLLS_PIVOT_SELECTED_COUNT] = "<<1>> выбрано",
+    [BATTLESCROLLS_PIVOT_SELECT_ALL] = "Выбрать все",
+    [BATTLESCROLLS_PIVOT_DESELECT_ALL] = "Снять все",
+    [BATTLESCROLLS_PIVOT_NONE_SELECTED] = "Ничего не выбрано",
+
+    -- Filter/range
+    [BATTLESCROLLS_PIVOT_ENC_BOSS_NAMES] = "По имени босса",
+    [BATTLESCROLLS_PIVOT_CUSTOM_DAYS] = "За <<1[$d день/$d дня/$d дней]>>",
+    [BATTLESCROLLS_PIVOT_CUSTOM_DAYS_PROMPT] = "Количество дней назад",
+    [BATTLESCROLLS_PIVOT_CUSTOM_RANGE_TITLE] = "Произвольный период",
+
+    -- Query description
+    [BATTLESCROLLS_PIVOT_DESC_BY] = "<<1>> — <<2>>",
+    [BATTLESCROLLS_PIVOT_DESC_CROSS] = "× <<1>>",
+    [BATTLESCROLLS_PIVOT_DESC_N_METRICS] = "<<1[$d метрика/$d метрики/$d метрик]>>",
 }
 
 BS_STRINGS = strings

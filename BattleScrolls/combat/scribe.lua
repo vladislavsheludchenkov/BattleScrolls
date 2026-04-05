@@ -566,6 +566,7 @@ function scribe:ImportEncounterFromStateAsync()
             isDummyFight = capturedState.isDummyFight or nil,
             playerAliveTimeMs = playerAliveTimeMs ~= durationMs and playerAliveTimeMs or nil,
             unitAliveTimeMs = next(unitAliveTimeMs) and unitAliveTimeMs or nil,
+            gameVersion = GetESOVersionString():match("%d+%.%d+%.%d+"),
         }
 
         -- Capture death recaps

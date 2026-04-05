@@ -715,6 +715,21 @@
                         </Control>
                     </Controls>
                 </Control>
+                <!-- Pivot table: dynamic sortable result table for Pivot Builder -->
+                <Control name="$(parent)PivotTable"
+                    inherits="ZO_GamepadGrid_NavQuadrant_2_3_4_Anchors ZO_GamepadInteractiveSortFilterListControl"
+                    hidden="true">
+                    <Controls>
+                        <Control name="$(parent)NestedBg" inherits="ZO_SharedGamepadNavQuadrant_2_3_4_Background_Template"/>
+                        <Control name="$(parent)Container" override="true">
+                            <Controls>
+                                <Control name="$(parent)Headers" override="true">
+                                    <!-- Headers are created dynamically in Lua -->
+                                </Control>
+                            </Controls>
+                        </Control>
+                    </Controls>
+                </Control>
             </Controls>
         </TopLevelControl>
     </Controls>

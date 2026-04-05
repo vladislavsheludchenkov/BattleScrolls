@@ -13,5 +13,12 @@
                 BattleScrolls_ParametricDialog_OnInitialized(self)
             </OnInitialized>
         </TopLevelControl>
+
+        <!-- Text Input Dialog (for save query name etc.) -->
+        <TopLevelControl name="BattleScrolls_TextInputDialog" inherits="ZO_GenericGamepadDialogBase" hidden="true" tier="HIGH" level="100">
+            <OnInitialized>
+                BattleScrolls_TextInputDialog_OnInitialized(self)
+            </OnInitialized>
+        </TopLevelControl>
     </Controls>
 </GuiXml>

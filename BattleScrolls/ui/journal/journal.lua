@@ -12,6 +12,7 @@ BattleScrolls_Journal_NavigationMode = {
     ENCOUNTERS = 2,
     STATS = 3,
     SETTINGS = 4,
+    PIVOT = 5,
 }
 
 BattleScrolls_Journal_StatsTab = {
@@ -80,15 +81,25 @@ local canAddToMainMenu = false
 ---@field encounterList ZO_ParametricScrollList Encounter list control
 ---@field statsList ZO_ParametricScrollList Stats list control
 ---@field settingsList ZO_ParametricScrollList Settings list control
+---@field pivotConfigList ZO_ParametricScrollList Pivot config list control
+---@field pivotQuery PivotQuery|nil Current pivot query being configured
+---@field pivotResult PivotResult|nil Current pivot result
+---@field pivotSourceMode NavigationMode|nil Mode that launched pivot (for back navigation)
+---@field pivotSubState number|nil Pivot sub-state (CONFIG or RESULTS)
+---@field pivotFiber Effect|nil Running pivot query fiber
+---@field pivotReturnState string|nil "stats" or "encounters" — Back returns to pivot results
 ---@field keybindStripDescriptor table|nil Active keybind descriptor
 ---@field instanceKeybindStripDescriptor table Instance list keybinds
 ---@field encounterKeybindStripDescriptor table Encounter list keybinds
 ---@field statsKeybindStripDescriptor table Stats view keybinds
 ---@field settingsKeybindStripDescriptor table Settings view keybinds
+---@field pivotConfigKeybindStripDescriptor table Pivot config keybinds
+---@field pivotResultKeybindStripDescriptor table Pivot result keybinds
 ---@field textSearchKeybindStripDescriptor table Search header keybinds
 ---@field header Control Header control
 ---@field headerData table Header configuration
----@field defaultInstancePosition number Default scroll position
+---@field defaultInstancePosition number|nil Default scroll position (instance list)
+---@field defaultEncounterPosition number|nil Default scroll position (encounter list)
 ---@field lastSubView table<TabGroupKey, StatsTab> Remembered sub-view per tab group within session
 BattleScrolls_Journal_Gamepad = ZO_Gamepad_ParametricList_Screen:Subclass()
 
@@ -140,7 +151,8 @@ end
 
 function BattleScrolls_Journal_Gamepad:Initialize(control)
     self.control = control
-    self.defaultInstancePosition = 2
+    self.defaultInstancePosition = 3  -- Skip Settings and Aggregate entries
+    self.defaultEncounterPosition = 2  -- Skip Aggregate entry
 
     LibEffect.Async(function()
         LibEffect.Sleep(1850):Await()
@@ -203,6 +215,19 @@ function BattleScrolls_Journal_Gamepad:Initialize(control)
                     self.taskInProgress:Cancel()
                     self.taskInProgress = nil
                 end
+                -- Cancel pivot fiber if running
+                if self.pivotFiber then
+                    self.pivotFiber:Cancel()
+                    self.pivotFiber = nil
+                end
+                -- Hide pivot result table
+                BattleScrolls.journal.pivot.resultRenderer.hide()
+                -- Clean up pivot state
+                self.pivotQuery = nil
+                self.pivotResult = nil
+                self.pivotSourceMode = nil
+                self.pivotSubState = nil
+                self.pivotReturnState = nil
                 -- Clean up decoded data and request GC when leaving journal
                 self.decodedEncounter = nil
                 self.abilityInfo = nil
@@ -220,6 +245,7 @@ function BattleScrolls_Journal_Gamepad:Initialize(control)
         BATTLESCROLLS_JOURNAL_GAMEPAD_SCENE:AddFragment(GAMEPAD_NAV_QUADRANT_1_BACKGROUND_FRAGMENT)
         BATTLESCROLLS_JOURNAL_GAMEPAD_SCENE:AddFragment(GAMEPAD_GENERIC_FOOTER_FRAGMENT)
         BATTLESCROLLS_JOURNAL_GAMEPAD_SCENE:AddFragment(GAMEPAD_MENU_SOUND_FRAGMENT)
+        BATTLESCROLLS_JOURNAL_GAMEPAD_SCENE:AddFragment(FRAME_EMOTE_FRAGMENT_SOCIAL)
         BATTLESCROLLS_JOURNAL_GAMEPAD_SCENE:AddFragment(BATTLESCROLLS_JOURNAL_GAMEPAD_FRAGMENT)
         LibEffect.YieldWithGC():Await()
 
@@ -274,13 +300,18 @@ function BattleScrolls_Journal_Gamepad:RefreshHeader()
         self.headerData.tabBarEntries = self:GetEncounterListTabBarEntries()
     elseif self.mode == NAVIGATION_MODE.STATS and self.selectedEncounter and self.selectedInstance then
         self.headerData.tabBarEntries = self:GetEncounterTabBarEntries()
-        self.headerData.data1HeaderText = GetString(BATTLESCROLLS_GROUP_COL_NAME)
-        self.headerData.data1Text = BattleScrolls.utils.GetUndecoratedDisplayName()
-        self.headerData.data2HeaderText = GetString(BATTLESCROLLS_STAT_DURATION)
-        self.headerData.data2Text = BattleScrolls.journal.utils.formatPreciseDuration(self.selectedEncounter.durationMs)
+        self:buildStatsHeaderData()
     elseif self.mode == NAVIGATION_MODE.SETTINGS then
         self.headerData.titleText = GetString(BATTLESCROLLS_UI_NAME)
         self.headerData.subtitleText = GetString(BATTLESCROLLS_UI_SETTINGS)
+    elseif self.mode == NAVIGATION_MODE.PIVOT then
+        self.headerData.titleText = GetString(BATTLESCROLLS_UI_NAME)
+        local pivotSubState = self.pivotSubState or BattleScrolls.journal.pivot.SubState.CONFIG
+        if pivotSubState == BattleScrolls.journal.pivot.SubState.RESULTS and self.pivotQuery then
+            self.headerData.subtitleText = BattleScrolls.journal.pivot.configRenderer.describeQuery(self.pivotQuery)
+        else
+            self.headerData.subtitleText = GetString(BATTLESCROLLS_PIVOT_TITLE)
+        end
     end
 
     if self.mode == NAVIGATION_MODE.STATS then
@@ -288,6 +319,7 @@ function BattleScrolls_Journal_Gamepad:RefreshHeader()
     end
 
     ZO_GamepadGenericHeader_Refresh(self.header, self.headerData, true)
+    self:applyStatsHeaderLayout()
 
     if self.headerData.tabBarEntries then
         if self.pendingTabIndex then
@@ -309,6 +341,72 @@ function BattleScrolls_Journal_Gamepad:RefreshHeader()
         if not showSearch then
             self:ClearSearchText()
         end
+    end
+end
+
+---Builds header data pairs for the current stats tab. Compact single-line on effects tabs,
+---full label/value pairs on others.
+function BattleScrolls_Journal_Gamepad:buildStatsHeaderData()
+    self.headerData.data1HeaderText = nil
+    self.headerData.data1Text = nil
+    self.headerData.data2HeaderText = nil
+    self.headerData.data2Text = nil
+    self.headerData.data3HeaderText = nil
+    self.headerData.data3Text = nil
+
+    if isEffectsTab(self.selectedTab) then
+        self.headerData.data1HeaderText = BattleScrolls.utils.GetUndecoratedDisplayName()
+        local value = BattleScrolls.journal.utils.formatPreciseDuration(self.selectedEncounter.durationMs)
+        if self.selectedEncounter.gameVersion then
+            value = value .. "  —  " .. self.selectedEncounter.gameVersion
+        end
+        self.headerData.data1Text = value
+    else
+        self.headerData.data1HeaderText = GetString(BATTLESCROLLS_GROUP_COL_NAME)
+        self.headerData.data1Text = BattleScrolls.utils.GetUndecoratedDisplayName()
+        self.headerData.data2HeaderText = GetString(BATTLESCROLLS_STAT_DURATION)
+        self.headerData.data2Text = BattleScrolls.journal.utils.formatPreciseDuration(self.selectedEncounter.durationMs)
+        if self.selectedEncounter.gameVersion then
+            self.headerData.data3HeaderText = GetString(BATTLESCROLLS_STAT_PATCH)
+            self.headerData.data3Text = self.selectedEncounter.gameVersion
+        end
+    end
+end
+
+---Re-anchors data pairs below the subheader when it is visible, and applies
+---the stacked (compact) layout on effects tabs. Must be called after
+---RefreshData / RefreshData since reflow resets DATA1HEADER anchors.
+function BattleScrolls_Journal_Gamepad:applyStatsHeaderLayout()
+    if self.mode ~= NAVIGATION_MODE.STATS then return end
+
+    -- RefreshData reflow resets DATA1HEADER to the divider. When subheader is visible,
+    -- re-anchor it below the subheader (same as subheader.refresh, which may be skipped
+    -- during subtab navigation). Applies to all tab groups with sub-views.
+    local subheader = BattleScrolls.journal.subheader
+    if subheader.visible and subheader.control and subheader.data1Header then
+        subheader.data1Header:ClearAnchors()
+        subheader.data1Header:SetAnchor(BOTTOMLEFT, subheader.control, BOTTOMLEFT, 0, ZO_GAMEPAD_CONTENT_HEADER_DIVIDER_INFO_BOTTOM_PADDING_Y)
+        subheader.data1Header:SetAnchor(BOTTOMRIGHT, subheader.control, BOTTOMRIGHT, 0, ZO_GAMEPAD_CONTENT_HEADER_DIVIDER_INFO_BOTTOM_PADDING_Y)
+    end
+
+    if not isEffectsTab(self.selectedTab) then return end
+
+    local controls = self.header.controls
+    local data1 = controls[ZO_GAMEPAD_HEADER_CONTROLS.DATA1]
+    local data1Header = controls[ZO_GAMEPAD_HEADER_CONTROLS.DATA1HEADER]
+    if not data1 or not data1Header then return end
+
+    -- Force stacked layout: full-width value below header label (matches ESO's overlap anchors)
+    data1:ClearAnchors()
+    data1:SetAnchor(BOTTOMLEFT, data1Header, BOTTOMLEFT, 0, 40)
+    data1:SetAnchor(BOTTOMRIGHT, data1Header, BOTTOMRIGHT, 0, 40)
+    data1:SetHorizontalAlignment(TEXT_ALIGN_LEFT)
+
+    -- RefreshData anchored search to DATA1HEADER (first match in anchor targets),
+    -- but DATA1 is now 40px below — re-anchor search below DATA1
+    if self.textSearchHeaderControl then
+        self.textSearchHeaderControl:ClearAnchors()
+        self.textSearchHeaderControl:SetAnchor(TOPLEFT, data1, BOTTOMLEFT, 0, 0)
     end
 end
 
@@ -382,6 +480,9 @@ function BattleScrolls_Journal_Gamepad:InitializeLists()
     end)
     self.settingsList = self:AddList("Settings", function(list)
         BattleScrolls.journal.settingsTemplates.setupSettingsList(list)
+    end)
+    self.pivotConfigList = self:AddList("PivotConfig", function(list)
+        SetupList(list, GetString(BATTLESCROLLS_PIVOT_NO_RESULTS))
     end)
 
     self.mode = NAVIGATION_MODE.INSTANCES

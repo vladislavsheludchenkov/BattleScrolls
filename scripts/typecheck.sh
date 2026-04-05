@@ -40,7 +40,7 @@ lua-language-server --check "$ADDON_DIR" \
     --logpath "$TEMP_DIR" \
     --checklevel "Warning" \
     --check_format "json" \
-    2>&1 | tee "$TEMP_DIR/output.txt"
+    2>&1 | tr '\r' '\n' | grep -vE '^\s*$|^[>= ]+[0-9]+/[0-9]+|^Initializing' | tee "$TEMP_DIR/output.txt"
 
 # Check for the results file
 if [ -f "$TEMP_DIR/check.json" ]; then

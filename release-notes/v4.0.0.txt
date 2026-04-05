@@ -1,0 +1,11 @@
+New features:
+- Have you ever thought "I wish my fantasy MMORPG had spreadsheets built-in"? Probably not, but it's there now. Aggregate over any amount of past encounters, extracting the data you want to see, with pivot tables support.
+
+Minor changes:
+- Current patch version (such as 11.3.5) is now displayed in each encounter
+- Other players will see you reading a scroll (what else would it be?) while you're in Battle Scrolls UI
+- Instance name is now displayed as list header in encounter list
+
+Bugfixes:
+- Prismatic reduce cost enchantment is now correctly displayed when someone in your group is using it
+- Layout of build screen is now consistent between Group and Build tabs

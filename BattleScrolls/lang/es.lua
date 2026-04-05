@@ -176,6 +176,7 @@ local strings = {
     -- Overview Stats
     -------------------------
     [BATTLESCROLLS_STAT_DURATION] = "Duración",
+    [BATTLESCROLLS_STAT_PATCH] = "Parche",
     [BATTLESCROLLS_STAT_SUMMARY] = "Resumen",
 
     -- Boss Damage
@@ -689,6 +690,189 @@ local strings = {
     [BATTLESCROLLS_ALCHEMY_TRAIT30] = "Profanación",
     [BATTLESCROLLS_ALCHEMY_TRAIT31] = "Heroísmo",
     [BATTLESCROLLS_ALCHEMY_TRAIT32] = "Timidez",
+
+    -------------------------
+    -- Aggregate
+    -------------------------
+    -- Navigation
+    [BATTLESCROLLS_PIVOT_TITLE] = "Análisis",
+    [BATTLESCROLLS_PIVOT_ENTRY] = "Análisis",
+    [BATTLESCROLLS_PIVOT_ENTRY_DESC] = "Analiza datos de múltiples combates e instancias",
+    [BATTLESCROLLS_PIVOT_ENTRY_DESC_ENCOUNTER] = "Analiza datos de los combates en esta instancia",
+
+    -- Scope section
+    [BATTLESCROLLS_PIVOT_SCOPE] = "Alcance",
+    [BATTLESCROLLS_PIVOT_INSTANCE_SCOPE] = "Alcance de instancias",
+    [BATTLESCROLLS_PIVOT_TIME_FILTER] = "Tiempo",
+    [BATTLESCROLLS_PIVOT_ENCOUNTER_FILTER] = "Filtro de combate",
+
+    -- Instance scope options
+    [BATTLESCROLLS_PIVOT_SCOPE_EVERYTHING] = "Todo",
+    [BATTLESCROLLS_PIVOT_SCOPE_INSTANCED] = "Todas las instancias",
+    [BATTLESCROLLS_PIVOT_SCOPE_OVERLAND] = "Todo mundo abierto",
+    [BATTLESCROLLS_PIVOT_SCOPE_HOUSES] = "Todas las casas",
+    [BATTLESCROLLS_PIVOT_SCOPE_PVP] = "Todo JcJ",
+    [BATTLESCROLLS_PIVOT_SCOPE_ZONES] = "Por nombre de zona",
+    [BATTLESCROLLS_PIVOT_SCOPE_SPECIFIC] = "Instancias específicas",
+
+    -- Time filter options
+    [BATTLESCROLLS_PIVOT_TIME_ALL] = "Todo el tiempo",
+    [BATTLESCROLLS_PIVOT_TIME_TODAY] = "Hoy",
+    [BATTLESCROLLS_PIVOT_TIME_24H] = "Últimas 24 horas",
+    [BATTLESCROLLS_PIVOT_TIME_3D] = "Últimos 3 días",
+    [BATTLESCROLLS_PIVOT_TIME_7D] = "Últimos 7 días",
+    [BATTLESCROLLS_PIVOT_TIME_14D] = "Últimos 14 días",
+    [BATTLESCROLLS_PIVOT_TIME_30D] = "Últimos 30 días",
+    [BATTLESCROLLS_PIVOT_TIME_90D] = "Últimos 90 días",
+    [BATTLESCROLLS_PIVOT_TIME_CUSTOM] = "Personalizado...",
+
+    -- Encounter category options
+    [BATTLESCROLLS_PIVOT_ENC_ALL] = "Todos los combates",
+    [BATTLESCROLLS_PIVOT_ENC_BOSS] = "Combates de jefe",
+    [BATTLESCROLLS_PIVOT_ENC_TRASH] = "Combates de adds",
+    [BATTLESCROLLS_PIVOT_ENC_PLAYER] = "Combates JcJ",
+    [BATTLESCROLLS_PIVOT_ENC_DUMMY] = "Combates con muñeco",
+    [BATTLESCROLLS_PIVOT_ENC_SPECIFIC] = "Combates específicos",
+
+    -- Query section
+    [BATTLESCROLLS_PIVOT_QUERY] = "Consulta",
+    [BATTLESCROLLS_PIVOT_DOMAIN] = "Dominio",
+    [BATTLESCROLLS_PIVOT_ROWS] = "Filas",
+    [BATTLESCROLLS_PIVOT_COLUMNS] = "Columnas",
+    [BATTLESCROLLS_PIVOT_VALUES] = "Valores",
+    [BATTLESCROLLS_PIVOT_AGGREGATION] = "Agregación",
+    [BATTLESCROLLS_PIVOT_FILTERS] = "Filtros",
+
+    -- Target filter
+    [BATTLESCROLLS_PIVOT_TARGETS] = "Objetivos",
+    [BATTLESCROLLS_PIVOT_TARGETS_ALL] = "Todos los objetivos",
+    [BATTLESCROLLS_PIVOT_TARGETS_BOSSES] = "Solo jefes",
+
+    -- Domain names
+    [BATTLESCROLLS_PIVOT_DOMAIN_DAMAGE] = "Daño",
+    [BATTLESCROLLS_PIVOT_DOMAIN_HEALING_OUT] = "Curación otorgada",
+    [BATTLESCROLLS_PIVOT_DOMAIN_HEALING_IN] = "Curación recibida",
+    -- Effects domain labels reuse BATTLESCROLLS_TAB_EFFECTS_* strings
+    [BATTLESCROLLS_PIVOT_DOMAIN_GROUP] = "Grupo",
+    [BATTLESCROLLS_PIVOT_DOMAIN_OVERVIEW] = "Resumen",
+
+    -- Dimension names
+    [BATTLESCROLLS_PIVOT_DIM_ABILITY] = "Habilidad",
+    [BATTLESCROLLS_PIVOT_DIM_TARGET] = "Objetivo",
+    [BATTLESCROLLS_PIVOT_DIM_SOURCE] = "Fuente",
+    [BATTLESCROLLS_PIVOT_DIM_BOSS] = "Jefe",
+    [BATTLESCROLLS_PIVOT_DIM_DAMAGE_TYPE] = "Tipo de daño",
+    [BATTLESCROLLS_PIVOT_DIM_DELIVERY] = "Aplicación",
+    [BATTLESCROLLS_PIVOT_DIM_AOE_ST] = "AoE / Objetivo único",
+    [BATTLESCROLLS_PIVOT_DIM_BUFF_DEBUFF] = "Buff / Debuff",
+    [BATTLESCROLLS_PIVOT_DIM_GROUP_MEMBER] = "Miembro del grupo",
+    [BATTLESCROLLS_PIVOT_DIM_ROLE] = "Rol",
+    [BATTLESCROLLS_PIVOT_DIM_ENCOUNTER] = "Combate",
+    [BATTLESCROLLS_PIVOT_DIM_INSTANCE] = "Instancia",
+    [BATTLESCROLLS_PIVOT_COL_METRICS] = "Métricas",
+
+    -- Metric names
+    [BATTLESCROLLS_PIVOT_METRIC_TOTAL_DAMAGE] = "Daño total",
+    [BATTLESCROLLS_PIVOT_METRIC_DPS] = "DPS",
+    [BATTLESCROLLS_PIVOT_METRIC_CRIT_PERCENT] = "Crít %",
+    [BATTLESCROLLS_PIVOT_METRIC_HIT_COUNT] = "Golpes",
+    [BATTLESCROLLS_PIVOT_METRIC_MAX_HIT] = "Golpe máx.",
+    [BATTLESCROLLS_PIVOT_METRIC_MIN_HIT] = "Golpe mín.",
+    [BATTLESCROLLS_PIVOT_METRIC_AVG_HIT] = "Golpe prom.",
+    [BATTLESCROLLS_PIVOT_METRIC_EFFECTIVE_HEALING] = "Curación efectiva",
+    [BATTLESCROLLS_PIVOT_METRIC_RAW_HEALING] = "Curación bruta",
+    [BATTLESCROLLS_PIVOT_METRIC_RAW_HPS] = "HPS bruto",
+    [BATTLESCROLLS_PIVOT_METRIC_EFFECTIVE_HPS] = "HPS efectivo",
+    [BATTLESCROLLS_PIVOT_METRIC_OVERHEAL_PERCENT] = "Sobrecuración %",
+    [BATTLESCROLLS_PIVOT_METRIC_HEAL_CRIT_PERCENT] = "Crít curación %",
+    [BATTLESCROLLS_PIVOT_METRIC_HEAL_HIT_COUNT] = "Golpes de curación",
+    [BATTLESCROLLS_PIVOT_METRIC_MAX_HEAL] = "Curación máx.",
+    [BATTLESCROLLS_PIVOT_METRIC_AVG_HEAL] = "Curación prom.",
+    [BATTLESCROLLS_PIVOT_METRIC_UPTIME_PERCENT] = "Tiempo activo %",
+    [BATTLESCROLLS_PIVOT_METRIC_PLAYER_UPTIME_PERCENT] = "Tu tiempo activo %",
+    [BATTLESCROLLS_PIVOT_METRIC_APPLICATIONS] = "Aplicaciones",
+    [BATTLESCROLLS_PIVOT_METRIC_MAX_STACKS_TIME] = "Acumulaciones máx. %",
+    [BATTLESCROLLS_PIVOT_METRIC_GROUP_DPS] = "DPS",
+    [BATTLESCROLLS_PIVOT_METRIC_GROUP_BOSS_DPS] = "DPS al jefe",
+    [BATTLESCROLLS_PIVOT_METRIC_GROUP_TOTAL_DAMAGE] = "Daño total",
+    [BATTLESCROLLS_PIVOT_METRIC_GROUP_CRIT_PERCENT] = "Crít %",
+    [BATTLESCROLLS_PIVOT_METRIC_GROUP_DOT_PERCENT] = "DoT %",
+    [BATTLESCROLLS_PIVOT_METRIC_GROUP_AOE_PERCENT] = "AoE %",
+    [BATTLESCROLLS_PIVOT_METRIC_GROUP_MAX_HIT] = "Golpe máx.",
+    [BATTLESCROLLS_PIVOT_METRIC_GROUP_DTPS] = "DTPS",
+    [BATTLESCROLLS_PIVOT_METRIC_GROUP_RAW_HPS] = "HPS bruto",
+    [BATTLESCROLLS_PIVOT_METRIC_GROUP_EFFECTIVE_HPS] = "HPS efectivo",
+    [BATTLESCROLLS_PIVOT_METRIC_EFFECTIVE_HPS_OUT] = "HPS efectivo (sal.)",
+    [BATTLESCROLLS_PIVOT_METRIC_RAW_HPS_OUT] = "HPS bruto (sal.)",
+    [BATTLESCROLLS_PIVOT_METRIC_EFFECTIVE_HPS_IN] = "HPS efectivo (ent.)",
+    [BATTLESCROLLS_PIVOT_METRIC_RAW_HPS_IN] = "HPS bruto (ent.)",
+    [BATTLESCROLLS_PIVOT_METRIC_BOSS_DPS] = "DPS al jefe",
+    [BATTLESCROLLS_PIVOT_METRIC_BOSS_DAMAGE] = "Daño al jefe",
+    [BATTLESCROLLS_PIVOT_METRIC_DTPS] = "DTPS",
+    [BATTLESCROLLS_PIVOT_METRIC_DAMAGE_TAKEN] = "Daño recibido",
+    [BATTLESCROLLS_PIVOT_METRIC_GROUP_ALIVE_PERCENT] = "Vivo %",
+    [BATTLESCROLLS_PIVOT_METRIC_GROUP_DEATH_COUNT] = "Muertes",
+    [BATTLESCROLLS_PIVOT_METRIC_DURATION] = "Duración",
+    [BATTLESCROLLS_PIVOT_METRIC_DEATH_COUNT] = "Muertes",
+
+    -- Aggregation options
+    [BATTLESCROLLS_PIVOT_AGG_SUM] = "Suma",
+    [BATTLESCROLLS_PIVOT_AGG_AVG] = "Promedio",
+    [BATTLESCROLLS_PIVOT_AGG_MAX] = "Máx",
+    [BATTLESCROLLS_PIVOT_AGG_MIN] = "Mín",
+
+    -- Actions
+    [BATTLESCROLLS_PIVOT_RUN] = "Ejecutar consulta",
+    [BATTLESCROLLS_PIVOT_SAVE] = "Guardar consulta",
+    [BATTLESCROLLS_PIVOT_LOAD] = "Cargar consulta",
+    [BATTLESCROLLS_PIVOT_DELETE_QUERY] = "Eliminar consulta",
+
+    -- Loading / Results
+    [BATTLESCROLLS_PIVOT_LOADING] = "Cargando combates... <<1>> / <<2>>",
+    [BATTLESCROLLS_PIVOT_NO_RESULTS] = "No hay datos que coincidan con tu consulta",
+    [BATTLESCROLLS_PIVOT_NO_ENCOUNTERS] = "Ningún combate coincide con tus filtros",
+    [BATTLESCROLLS_PIVOT_NO_BOSSES] = "Ningún combate de jefe coincide con tus filtros",
+    [BATTLESCROLLS_PIVOT_ENCOUNTERS_PROCESSED] = "<<1[$d combate procesado/$d combates procesados]>>",
+    [BATTLESCROLLS_PIVOT_ROWS_CAPPED] = "Resultados limitados a <<1>> filas",
+    [BATTLESCROLLS_PIVOT_COLUMNS_CAPPED] = "Resultados limitados a <<1>> columnas",
+    [BATTLESCROLLS_PIVOT_TIP_DOMAIN_OVERVIEW] = "Resumen agregado de todos los dominios de daño, sanación y efectos. Muestra totales combinados en lugar de desgloses individuales.",
+    [BATTLESCROLLS_PIVOT_TIP_ENC_BOSS_NAMES] = "Filtra a encuentros con los jefes seleccionados. Selecciona los nombres de jefe en el siguiente paso.",
+    [BATTLESCROLLS_PIVOT_TIP_DIM_DELIVERY] = "Divide los datos por método de aplicación: Directo, DoT (daño con el tiempo), HoT (sanación con el tiempo) o Mixto.",
+    [BATTLESCROLLS_PIVOT_TIP_DIM_DAMAGE_TYPE] = "Divide los datos por tipo de daño: Físico, Fuego, Descarga, Escarcha, Magia, Veneno, Enfermedad, Sangrado, Oblivion y otros.",
+    [BATTLESCROLLS_PIVOT_TIP_DOMAIN_GROUP] = "Estadísticas de combate por miembro: DPS, daño total y tasa de crítico. Para tiempos de buffs/debuffs en miembros del grupo, usa Efectos de grupo.",
+    [BATTLESCROLLS_PIVOT_TIP_AGGREGATION] = "Cómo se combinan los valores cuando múltiples encuentros contribuyen a la misma celda. Por ejemplo, DPS promedio muestra la media entre encuentros, mientras que Máx muestra el mejor encuentro.",
+
+    -- Save dialog
+    [BATTLESCROLLS_PIVOT_SAVE_TITLE] = "Guardar consulta",
+    [BATTLESCROLLS_PIVOT_SAVE_PROMPT] = "Introduce un nombre para esta consulta:",
+    [BATTLESCROLLS_PIVOT_SAVE_OVERWRITE] = "Ya existe una consulta llamada \"<<1>>\". ¿Sobrescribir?",
+
+    -- Load/delete dialog
+    [BATTLESCROLLS_PIVOT_QUERY_SAVED] = "Consulta guardada como \"<<1>>\"",
+    [BATTLESCROLLS_PIVOT_LOAD_TITLE] = "Cargar consulta",
+    [BATTLESCROLLS_PIVOT_DELETE_CONFIRM] = "¿Eliminar consulta \"<<1>>\"?",
+
+    -- Selector dialogs
+    [BATTLESCROLLS_PIVOT_SELECT_ZONES] = "Seleccionar zonas",
+    [BATTLESCROLLS_PIVOT_SELECT_INSTANCES] = "Seleccionar instancias",
+    [BATTLESCROLLS_PIVOT_SELECT_ENCOUNTERS] = "Seleccionar combates",
+    [BATTLESCROLLS_PIVOT_SELECT_BOSSES] = "Seleccionar nombres de jefe",
+    [BATTLESCROLLS_PIVOT_SELECT_METRICS] = "Seleccionar métricas",
+    [BATTLESCROLLS_PIVOT_SELECTED_COUNT] = "<<1>> seleccionados",
+    [BATTLESCROLLS_PIVOT_SELECT_ALL] = "Seleccionar todo",
+    [BATTLESCROLLS_PIVOT_DESELECT_ALL] = "Deseleccionar todo",
+    [BATTLESCROLLS_PIVOT_NONE_SELECTED] = "Ninguno seleccionado",
+
+    -- Filter/range
+    [BATTLESCROLLS_PIVOT_ENC_BOSS_NAMES] = "Por nombre de jefe",
+    [BATTLESCROLLS_PIVOT_CUSTOM_DAYS] = "Últimos <<1>> días",
+    [BATTLESCROLLS_PIVOT_CUSTOM_DAYS_PROMPT] = "Número de días atrás",
+    [BATTLESCROLLS_PIVOT_CUSTOM_RANGE_TITLE] = "Rango de tiempo personalizado",
+
+    -- Query description
+    [BATTLESCROLLS_PIVOT_DESC_BY] = "<<1>> por <<2>>",
+    [BATTLESCROLLS_PIVOT_DESC_CROSS] = "× <<1>>",
+    [BATTLESCROLLS_PIVOT_DESC_N_METRICS] = "<<1[$d métrica/$d métricas]>>",
 }
 
 -- Register translations

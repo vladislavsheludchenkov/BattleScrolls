@@ -148,11 +148,22 @@ function EncounterListController.refresh(journalUI)
     end
     list:Clear()
 
+    -- Add Aggregate entry at the top (hidden when drilling down from pivot results)
+    if not journalUI.pivotReturnState then
+        local pivotEntry = ZO_GamepadEntryData:New(GetString(BATTLESCROLLS_PIVOT_ENTRY), "EsoUI/Art/Crafting/Gamepad/gp_crafting_menuIcon_research.dds")
+        pivotEntry.isPivot = true
+        pivotEntry.tooltip = { type = "text", title = GetString(BATTLESCROLLS_PIVOT_ENTRY), text = GetString(BATTLESCROLLS_PIVOT_ENTRY_DESC_ENCOUNTER) }
+        pivotEntry:SetIconTintOnSelection(true)
+        pivotEntry:SetIconDisabledTintOnSelection(true)
+        list:AddEntry("ZO_GamepadItemSubEntryTemplate", pivotEntry)
+    end
+
     local instance = journalUI.selectedInstance
     local encounters = instance and instance.encounters
 
     if encounters then
         local selectedTab = journalUI.selectedEncounterTab or ENCOUNTER_TAB.ALL
+        local isFirst = true
         for _, rawEncounter in ipairs(encounters) do
             -- Use raw encounter for filtering - bossesUnits is stored unencoded
             if encounterPassesFilter(rawEncounter, selectedTab) then
@@ -168,14 +179,25 @@ function EncounterListController.refresh(journalUI)
                 local timeSinceInstanceStart = rawEncounter.timestampS - instance.timestampS
                 entryData:AddSubLabel(ZO_FormatTime(timeSinceInstanceStart, TIME_FORMAT_STYLE_SHOW_LARGEST_TWO_UNITS, TIME_FORMAT_PRECISION_SECONDS) .. " " .. GetString(BATTLESCROLLS_ENCOUNTER_INTO_INSTANCE))
 
-                list:AddEntry("ZO_GamepadItemSubEntryTemplate", entryData)
+                -- First encounter gets a header so LT from list bottom jumps here (not to Aggregate)
+                if isFirst then
+                    entryData:SetHeader(instance.zone or "")
+                    list:AddEntryWithHeader("ZO_GamepadItemSubEntryTemplate", entryData)
+                    isFirst = false
+                else
+                    list:AddEntry("ZO_GamepadItemSubEntryTemplate", entryData)
+                end
             end
         end
     end
 
     list:Commit()
 
-    if initialTimestampS and list:GetNumEntries() > 0 then
+    -- Default focus to first encounter (skip Aggregate entry)
+    if journalUI.defaultEncounterPosition and journalUI.defaultEncounterPosition <= list:GetNumEntries() then
+        list:SetSelectedIndexWithoutAnimation(journalUI.defaultEncounterPosition)
+        journalUI.defaultEncounterPosition = nil
+    elseif initialTimestampS and list:GetNumEntries() > 0 then
         -- Try to restore previous selection
         local newIndex = utils.findMatchingIndex(initialTimestampS, list.dataList, list:GetSelectedIndex() or 1, function(item)
             return item and item.data and item.data.timestampS

@@ -156,6 +156,14 @@ function InstanceListController.refresh(journalUI)
     settingsEntry:SetIconDisabledTintOnSelection(true)
     list:AddEntry("ZO_GamepadItemSubEntryTemplate", settingsEntry)
 
+    -- Add Aggregate entry
+    local pivotEntry = ZO_GamepadEntryData:New(GetString(BATTLESCROLLS_PIVOT_ENTRY), "EsoUI/Art/Crafting/Gamepad/gp_crafting_menuIcon_research.dds")
+    pivotEntry.isPivot = true
+    pivotEntry.tooltip = { type = "text", title = GetString(BATTLESCROLLS_PIVOT_ENTRY), text = GetString(BATTLESCROLLS_PIVOT_ENTRY_DESC) }
+    pivotEntry:SetIconTintOnSelection(true)
+    pivotEntry:SetIconDisabledTintOnSelection(true)
+    list:AddEntry("ZO_GamepadItemSubEntryTemplate", pivotEntry)
+
     local history = BattleScrolls.storage and BattleScrolls.storage.savedVariables and BattleScrolls.storage.savedVariables.history
     if history then
         -- Show instances in reverse chronological order (newest first)

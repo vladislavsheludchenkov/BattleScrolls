@@ -28,6 +28,7 @@ journal.NavigationMode = {
     ENCOUNTERS = 2,
     STATS = 3,
     SETTINGS = 4,
+    PIVOT = 5,
 }
 
 -------------------------
@@ -252,6 +253,7 @@ journal.AbilityIconStyle = {
 ---| 2 # ENCOUNTERS
 ---| 3 # STATS
 ---| 4 # SETTINGS
+---| 5 # PIVOT
 
 ---@alias StatsTab
 ---| 1 # OVERVIEW

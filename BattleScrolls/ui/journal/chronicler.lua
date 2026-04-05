@@ -625,6 +625,66 @@ function chronicler.refreshSettingsList(journalUI)
     end)
 end
 
+---Get or cache the loading label control
+---@param journalUI BattleScrolls_Journal_Gamepad
+---@return Control|nil
+local function getLoadingLabel(journalUI)
+    if journalUI._loadingLabel then return journalUI._loadingLabel end
+    local overviewPane = journalUI.control:GetNamedChild("OverviewPane")
+    if overviewPane then
+        journalUI._loadingLabel = overviewPane:GetNamedChild("LoadingLabel")
+    end
+    return journalUI._loadingLabel
+end
+
+function chronicler.refreshPivotList(journalUI)
+    local pivotSubState = journalUI.pivotSubState or BattleScrolls.journal.pivot.SubState.CONFIG
+    local loadingLabel = getLoadingLabel(journalUI)
+
+    -- Hide group table (stats-mode) if still visible
+    local groupTable = BattleScrolls.journal.groupTable
+    if groupTable then groupTable:Hide() end
+
+    if pivotSubState == BattleScrolls.journal.pivot.SubState.CONFIG then
+        BattleScrolls.journal.pivot.resultRenderer.hide()
+        if journalUI.overviewPanel then journalUI.overviewPanel:Hide() end
+        local list = journalUI.pivotConfigList
+        local query = journalUI.pivotQuery
+        if query then
+            -- Update aggregation state before rendering so the entry appears/disappears correctly
+            local scopedEncounters = BattleScrolls.journal.pivot.engine.resolveScope(query.scope)
+            BattleScrolls.journal.pivot.query.updateAggregation(query, #scopedEncounters)
+            BattleScrolls.journal.pivot.configRenderer.render(list, query, journalUI)
+        end
+    elseif pivotSubState == BattleScrolls.journal.pivot.SubState.LOADING then
+        BattleScrolls.journal.pivot.resultRenderer.hide()
+        -- Show loading label inside OverviewPane but hide its content containers
+        if journalUI.overviewPanel then
+            journalUI.overviewPanel.control:SetHidden(false)
+            journalUI.overviewPanel:ShowLoading()
+        end
+        if loadingLabel then
+            loadingLabel:SetText(zo_strformat(GetString(BATTLESCROLLS_PIVOT_LOADING), 0, 0))
+            loadingLabel:SetHidden(false)
+        end
+    elseif pivotSubState == BattleScrolls.journal.pivot.SubState.RESULTS then
+        if journalUI.overviewPanel then journalUI.overviewPanel:Hide() end
+        local result = journalUI.pivotResult
+        if result then
+            local pivotTableControl = journalUI.control:GetNamedChild("PivotTable")
+            BattleScrolls.journal.pivot.resultRenderer.show(result, pivotTableControl)
+            if result.rowsCapped then
+                ZO_Alert(UI_ALERT_CATEGORY_ALERT, nil,
+                    zo_strformat(GetString(BATTLESCROLLS_PIVOT_ROWS_CAPPED), #result.rows))
+            end
+            if result.columnsCapped then
+                ZO_Alert(UI_ALERT_CATEGORY_ALERT, nil,
+                    zo_strformat(GetString(BATTLESCROLLS_PIVOT_COLUMNS_CAPPED), #result.columns))
+            end
+        end
+    end
+end
+
 ---Main refresh dispatch based on current mode
 ---@param journalUI BattleScrolls_Journal_Gamepad
 ---@param skipHeaderRefresh boolean|nil
@@ -637,15 +697,25 @@ function chronicler.refreshList(journalUI, skipHeaderRefresh)
         journalUI:ActivateCurrentList()
     end
 
-    -- Show/hide search bar when switching tabs via LB/RB (skipHeaderRefresh=true bypasses RefreshHeader)
-    if skipHeaderRefresh and journalUI.textSearchHeaderFocus then
-        local groupKey = journalUI.selectedTab and journal.TabToGroup[journalUI.selectedTab]
-        if groupKey == "EFFECTS" then
-            journalUI:SetTextSearchEntryHidden(false)
-        else
-            journalUI:ClearSearchText()
-            journalUI:SetTextSearchEntryHidden(true)
+    -- When switching tabs via LB/RB (skipHeaderRefresh=true bypasses RefreshHeader),
+    -- update search bar visibility and header data pairs (compact on effects, full on others).
+    if skipHeaderRefresh then
+        if journalUI.textSearchHeaderFocus then
+            local groupKey = journalUI.selectedTab and journal.TabToGroup[journalUI.selectedTab]
+            if groupKey == "EFFECTS" then
+                journalUI:SetTextSearchEntryHidden(false)
+            else
+                journalUI:ClearSearchText()
+                journalUI:SetTextSearchEntryHidden(true)
+            end
         end
+
+        if journalUI.mode == NAVIGATION_MODE.STATS and journalUI.selectedEncounter then
+            journalUI:buildStatsHeaderData()
+            ZO_GamepadGenericHeader_RefreshData(journalUI.header, journalUI.headerData)
+            journalUI:applyStatsHeaderLayout()
+        end
+
         -- TabBar_OnDataChanged calls ExitHeader() before the tab callback, which
         -- deactivates the header focus but does NOT re-activate the list. Detect
         -- this state (header inactive + list inactive) and manually restore.
@@ -668,6 +738,8 @@ function chronicler.refreshList(journalUI, skipHeaderRefresh)
         chronicler.refreshStatsList(journalUI)
     elseif journalUI.mode == NAVIGATION_MODE.SETTINGS then
         chronicler.refreshSettingsList(journalUI)
+    elseif journalUI.mode == NAVIGATION_MODE.PIVOT then
+        chronicler.refreshPivotList(journalUI)
     end
 
     -- Refresh sub-header on every list refresh (handles show/hide based on tab).
