@@ -32,6 +32,7 @@ core/log.lua
 ; Combat domain
 combat/arithmancer.lua
 combat/accumulators.lua
+combat/weaving.lua
 combat/effects.lua
 combat/effects_events.lua
 combat/effects_reconcile.lua
@@ -85,6 +86,7 @@ ui/journal/renderers/group.lua
 ui/journal/renderers/setup.lua
 ui/journal/renderers/overview.lua
 ui/journal/renderers/settings.lua
+ui/journal/renderers/activity.lua
 ui/journal/keybinds.lua
 ui/journal/horizontal_list.lua
 ui/journal/settings_templates.lua

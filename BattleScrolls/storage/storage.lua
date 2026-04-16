@@ -47,6 +47,23 @@ BattleScrolls = BattleScrolls or {}
 ---@field meanIntervalMs number Mean time between procs in milliseconds
 ---@field medianIntervalMs number Median time between procs in milliseconds
 
+---@class WeavingAbilityData
+---@field abilityId number
+---@field activations number Total times this skill was activated
+---@field afterSum number Total ms of weave gaps after this skill
+---@field afterCount number Number of "after" measurements
+---@field beforeSum number Total ms of weave gaps before this skill (can be negative)
+---@field beforeCount number Number of "before" measurements
+---@field weavingErrors number Times a skill→skill happened after this skill (no LA in between)
+
+---@class WeavingData
+---@field lightAttackHits number Light attack count (from slot activation)
+---@field heavyAttackHits number Heavy attack count (from ACTION_RESULT_BEGIN)
+---@field skillActivations number Total skill/ultimate activations
+---@field totalWeavingErrors number Total skill→skill count (no LA in between)
+---@field doubleLaErrors number Total la→la count (double light attack without a skill)
+---@field byAbility WeavingAbilityData[] Per-ability weaving breakdown
+
 ---Binary-encoded encounter (v3+)
 ---@class CompactEncounter
 ---@field _v number Schema version (3+)
@@ -87,6 +104,7 @@ BattleScrolls = BattleScrolls or {}
 ---@field deaths EncounterDeaths|nil Death recap data (nil if player never died)
 ---@field bossTagSeqByUnitId table<number, string>|nil Maps boss unitId to "tag:seq" key for local player boss damage mapping
 ---@field setup PlayerSetup|nil  -- Player build snapshot (v9+)
+---@field weaving WeavingData|nil Weaving/rotation activity data (v12+)
 ---@field gameVersion string|nil Game patch version at time of encounter (e.g. "11.3.5")
 
 -- Instance types distinguish between live state (during combat) and storage format.

@@ -1,0 +1,11 @@
+New features:
+- Weaving tracking is here! Tracks average and total time lost between casts, counts missed light attacks/skills. With overall aggregated data and a per skill breakdown
+- Added a new Activity tab where weaving data lives now
+- Weaving data is also accessible for aggregations, but only with Overview domain selected
+
+Minor changes:
+- Proc tracking moved from Overview tab (have you noticed it was there the whole time?) to the new Activity tab
+- Memory usage and performance should be a bit better in and out of combat, especially with effect tracking disabled partially or completely
+
+Bugfixes:
+- Players that have effect tracking disabled in their settings now show proper alive time % on group tab instead of always 100%

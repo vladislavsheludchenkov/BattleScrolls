@@ -340,13 +340,13 @@ local function updateStatsOnUpdated(stats, instance, stackCount, appliedByPlayer
     instance.stackCount = stackCount
 end
 
----Ensures a unit has alive state initialized, starting as alive from now
+---Ensures a unit has alive state initialized, starting from now (when we first discover the unit)
 ---@param ctx EffectContext
 ---@param key string unitTag for bosses, displayName for group members
 ---@param startAlive boolean|nil Whether to start alive (default true)
 local function ensureUnitAliveState(ctx, key, startAlive)
     if not ctx.unitAliveState[key] then
-        ctx.unitAliveState[key] = BattleScrolls.structures.newUnitAliveState(startAlive ~= false)
+        ctx.unitAliveState[key] = BattleScrolls.structures.newUnitAliveState(startAlive ~= false, GetGameTimeMilliseconds())
     end
 end
 
@@ -799,18 +799,22 @@ end
 ---@param unitTag string
 function effects.handleUnitDeath(ctx, unitTag)
     if not ctx.initialized then return end
-    if not effects.isEnabled() then return end
 
     local storageKey, isBoss = getUnitStorageKey(ctx, unitTag)
     local nowMs = GetGameTimeMilliseconds()
 
-    -- Finalize alive time for this unit
+    -- Finalize alive time for this unit (always, regardless of effect tracking)
     if ctx.unitAliveState[storageKey] then
         finalizeUnitAliveTime(ctx.unitAliveState[storageKey], nowMs)
         ctx.unitAliveState[storageKey].isDead = true
+    else
+        -- First time seeing this unit and it's already dead — initialize as dead
+        ensureUnitAliveState(ctx, storageKey, false)
     end
 
-    -- Finalize all active effects for this unit
+    -- Finalize all active effects for this unit (only if effect tracking enabled)
+    if not effects.isEnabled() then return end
+
     local storage = isBoss and ctx.effectsOnBosses or ctx.effectsOnGroup
     finalizeEffectsForUnit(ctx, storageKey, storage, nowMs)
 
@@ -827,18 +831,13 @@ end
 ---@param unitTag string
 function effects.handleUnitAlive(ctx, unitTag)
     if not ctx.initialized then return end
-    if not effects.isEnabled() then return end
 
     local storageKey, isBoss = getUnitStorageKey(ctx, unitTag)
-
-    -- Check granular setting
-    if isBoss and not isBossDebuffsEnabled() then return end
-    if not isBoss and not isGroupBuffsEnabled() then return end
 
     -- Check if this unit was actually dead (vs just changing unitTag position)
     local wasActuallyDead = ctx.unitAliveState[storageKey] and ctx.unitAliveState[storageKey].isDead
 
-    -- Resume alive time tracking (or initialize if new)
+    -- Resume alive time tracking (always, regardless of effect tracking)
     if ctx.unitAliveState[storageKey] then
         -- Only reset lastAliveStartMs if unit was actually dead (resurrection)
         -- If unit wasn't dead, this is just a unitTag change - don't reset alive tracking
@@ -851,9 +850,11 @@ function effects.handleUnitAlive(ctx, unitTag)
         ensureUnitAliveState(ctx, storageKey, true)
     end
 
-    -- Backfill effects that are currently active on this unit
-    -- With stable storageKey-based activeEffect keys, this will update existing entries
-    -- rather than creating duplicates
+    -- Backfill effects (only if effect tracking + granular setting enabled)
+    if not effects.isEnabled() then return end
+    if isBoss and not isBossDebuffsEnabled() then return end
+    if not isBoss and not isGroupBuffsEnabled() then return end
+
     local storage = isBoss and ctx.effectsOnBosses or ctx.effectsOnGroup
     local effectTypeFilter = isBoss and BUFF_EFFECT_TYPE_DEBUFF or BUFF_EFFECT_TYPE_BUFF
 
@@ -873,17 +874,18 @@ end
 ---@param ctx EffectContext
 function effects.handlePlayerDeath(ctx)
     if not ctx.initialized then return end
-    if not effects.isEnabled() then return end
 
     local nowMs = GetGameTimeMilliseconds()
 
-    -- Finalize alive time for player
+    -- Finalize alive time for player (always, regardless of effect tracking)
     if ctx.playerAliveState then
         finalizeUnitAliveTime(ctx.playerAliveState, nowMs)
         ctx.playerAliveState.isDead = true
     end
 
-    -- Finalize all active player effects
+    -- Finalize all active player effects (only if effect tracking enabled)
+    if not effects.isEnabled() then return end
+
     local playerSlots = ctx.activeEffects["player"]
     if playerSlots then
         for effectSlot, instance in pairs(playerSlots) do
@@ -905,15 +907,16 @@ end
 ---@param ctx EffectContext
 function effects.handlePlayerAlive(ctx)
     if not ctx.initialized then return end
-    if not effects.isEnabled() then return end
 
-    -- Resume alive time tracking
+    -- Resume alive time tracking (always, regardless of effect tracking)
     if ctx.playerAliveState then
         ctx.playerAliveState.isDead = false
         ctx.playerAliveState.lastAliveStartMs = GetGameTimeMilliseconds()
     end
 
-    -- Backfill player effects based on granular settings
+    -- Backfill player effects (only if effect tracking enabled)
+    if not effects.isEnabled() then return end
+
     local playerBuffsEnabled = isPlayerBuffsEnabled()
     local playerDebuffsEnabled = isPlayerDebuffsEnabled()
 
@@ -1174,18 +1177,18 @@ end
 ---@param ctx EffectContext
 function effects.handlePlayerFullRefresh(ctx)
     if not ctx.initialized then return end
+
+    -- Reconcile alive state (always, regardless of effect tracking)
+    local isAlive = reconcilePlayerAliveState(ctx)
+
+    -- Effect reconciliation (only if enabled and player is alive)
+    if not isAlive then return end
     if not effects.isEnabled() then return end
 
     local playerBuffsEnabled = isPlayerBuffsEnabled()
     local playerDebuffsEnabled = isPlayerDebuffsEnabled()
 
-    -- Skip if both player buffs and player debuffs are disabled
     if not playerBuffsEnabled and not playerDebuffsEnabled then return end
-
-    -- Reconcile alive state first - this may call handlePlayerDeath/handlePlayerAlive
-    if not reconcilePlayerAliveState(ctx) then
-        return  -- Player is dead, no effect reconciliation needed
-    end
 
     -- Determine effect type filter based on granular settings
     local effectTypeFilter = nil
@@ -1204,8 +1207,6 @@ end
 ---@param unitTag string Boss unit tag (e.g., "boss1")
 function effects.handleBossFullRefresh(ctx, unitTag)
     if not ctx.initialized then return end
-    if not effects.isEnabled() then return end
-    if not isBossDebuffsEnabled() then return end
 
     local currentName = GetRawUnitName(unitTag)
 
@@ -1220,13 +1221,14 @@ function effects.handleBossFullRefresh(ctx, unitTag)
         end
     end
 
-    -- Reconcile alive state first - this catches missed death/despawn events
-    -- Must run even for dead/despawned bosses so we finalize effects and alive time
-    if not reconcileUnitAliveState(ctx, unitTag, unitTag) then
-        return  -- Boss is dead/despawned, alive state was reconciled
-    end
+    -- Reconcile alive state (always, regardless of effect tracking)
+    local isAlive = reconcileUnitAliveState(ctx, unitTag, unitTag)
 
-    -- Ensure storage exists
+    -- Effect reconciliation (only if enabled and boss is alive)
+    if not isAlive then return end
+    if not effects.isEnabled() then return end
+    if not isBossDebuffsEnabled() then return end
+
     if not ctx.effectsOnBosses[unitTag] then
         ctx.effectsOnBosses[unitTag] = {}
     end
@@ -1239,19 +1241,19 @@ end
 ---@param unitTag string Group unit tag (e.g., "group1")
 function effects.handleGroupFullRefresh(ctx, unitTag)
     if not ctx.initialized then return end
-    if not effects.isEnabled() then return end
-    if not isGroupBuffsEnabled() then return end
     if AreUnitsEqual("player", unitTag) then return end
     if IsGroupCompanionUnitTag(unitTag) then return end
 
     local displayName = getGroupDisplayName(unitTag)
 
-    -- Reconcile alive state first - this may call handleUnitDeath/handleUnitAlive
-    if not reconcileUnitAliveState(ctx, displayName, unitTag) then
-        return  -- Group member is dead, no effect reconciliation needed
-    end
+    -- Reconcile alive state (always, regardless of effect tracking)
+    local isAlive = reconcileUnitAliveState(ctx, displayName, unitTag)
 
-    -- Ensure storage exists
+    -- Effect reconciliation (only if enabled and member is alive)
+    if not isAlive then return end
+    if not effects.isEnabled() then return end
+    if not isGroupBuffsEnabled() then return end
+
     if not ctx.effectsOnGroup[displayName] then
         ctx.effectsOnGroup[displayName] = {}
     end
@@ -1277,7 +1279,6 @@ end
 ---@param ctx EffectContext
 function effects.handleFullRefreshAll(ctx)
     if not ctx.initialized then return end
-    if not effects.isEnabled() then return end
 
     effects.handlePlayerFullRefresh(ctx)
 
@@ -1391,8 +1392,35 @@ function effects.finalize(ctx, endTimeMs)
 end
 
 ---Backfills active effects when combat starts (captures effects already active)
+---Also initializes alive state for all known units (always, regardless of effect tracking)
 ---@param ctx EffectContext
 function effects.backfill(ctx)
+    -- Initialize alive state for player (always, regardless of effect tracking)
+    ctx.playerAliveState = BattleScrolls.structures.newUnitAliveState(not IsUnitDead("player"), ctx.fightStartTimeMs)
+
+    -- Initialize alive state for existing bosses
+    for i = BOSS_RANK_ITERATION_BEGIN, BOSS_RANK_ITERATION_END do
+        local bossTag = BOSS_TAGS[i]
+        local bossName = GetRawUnitName(bossTag)
+        if bossName ~= "" then
+            if not ctx.bossNames[bossTag] then
+                ctx.bossNames[bossTag] = bossName
+            end
+            ensureUnitAliveState(ctx, bossTag, not IsUnitDead(bossTag))
+        end
+    end
+
+    -- Initialize alive state for existing group members
+    for i = 1, GetGroupSize() do
+        local groupTag = GetGroupUnitTagByIndex(i)
+        if groupTag and not AreUnitsEqual("player", groupTag) and not IsGroupCompanionUnitTag(groupTag) then
+            local displayName = getGroupDisplayName(groupTag)
+            local isAlive = not IsUnitDead(groupTag) and IsUnitOnline(groupTag)
+            ensureUnitAliveState(ctx, displayName, isAlive)
+        end
+    end
+
+    -- Effect backfill (only if effect tracking enabled)
     if not effects.isEnabled() then return end
 
     -- Backfill player effects based on granular settings
@@ -1400,13 +1428,10 @@ function effects.backfill(ctx)
     local playerDebuffsEnabled = isPlayerDebuffsEnabled()
 
     if playerBuffsEnabled and playerDebuffsEnabled then
-        -- Both enabled - track all
         backfillEffectsForUnitTag(ctx, "player", ctx.effectsOnPlayer, nil, nil)
     elseif playerBuffsEnabled then
-        -- Only buffs enabled
         backfillEffectsForUnitTag(ctx, "player", ctx.effectsOnPlayer, BUFF_EFFECT_TYPE_BUFF, nil)
     elseif playerDebuffsEnabled then
-        -- Only debuffs enabled
         backfillEffectsForUnitTag(ctx, "player", ctx.effectsOnPlayer, BUFF_EFFECT_TYPE_DEBUFF, nil)
     end
 
@@ -1414,22 +1439,10 @@ function effects.backfill(ctx)
     if isBossDebuffsEnabled() then
         for i = BOSS_RANK_ITERATION_BEGIN, BOSS_RANK_ITERATION_END do
             local bossTag = BOSS_TAGS[i]
-            local bossName = GetRawUnitName(bossTag)
-            if bossName ~= "" and not IsUnitDead(bossTag) then
-                -- Capture boss name proactively
-                if not ctx.bossNames[bossTag] then
-                    ctx.bossNames[bossTag] = bossName
-                end
-
-                -- Initialize alive state for this boss
-                ensureUnitAliveState(ctx, bossTag, true)
-
-                -- Ensure storage exists
+            if ctx.bossNames[bossTag] and not IsUnitDead(bossTag) then
                 if not ctx.effectsOnBosses[bossTag] then
                     ctx.effectsOnBosses[bossTag] = {}
                 end
-
-                -- Backfill debuffs on this boss
                 backfillEffectsForUnitTag(ctx, bossTag, ctx.effectsOnBosses[bossTag], BUFF_EFFECT_TYPE_DEBUFF, bossTag)
             end
         end
@@ -1440,21 +1453,11 @@ function effects.backfill(ctx)
         for i = 1, GetGroupSize() do
             local groupTag = GetGroupUnitTagByIndex(i)
             if groupTag and not AreUnitsEqual("player", groupTag) and not IsGroupCompanionUnitTag(groupTag) then
-                local isDead = IsUnitDead(groupTag)
-
-                -- Skip dead group members - don't track effects on them
-                if not isDead then
+                if not IsUnitDead(groupTag) then
                     local displayName = getGroupDisplayName(groupTag)
-
-                    -- Initialize alive state for this member
-                    ensureUnitAliveState(ctx, displayName, true)
-
-                    -- Ensure storage exists
                     if not ctx.effectsOnGroup[displayName] then
                         ctx.effectsOnGroup[displayName] = {}
                     end
-
-                    -- Backfill buffs on this group member
                     backfillEffectsForUnitTag(ctx, groupTag, ctx.effectsOnGroup[displayName], BUFF_EFFECT_TYPE_BUFF, displayName)
                 end
             end

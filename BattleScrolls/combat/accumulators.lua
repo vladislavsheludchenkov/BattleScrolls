@@ -16,6 +16,15 @@ BattleScrolls = BattleScrolls or {}
 ---@field healingStats HealingStats
 ---@field procs table<number, ProcEvent[]>
 ---@field abilityInfo table<number, AbilityInfo>
+---@field weaving WeavingState
+
+---@class WeavingAccumulator
+---@field activations number Total times this skill was activated
+---@field afterSum number Weaving time after this skill
+---@field afterCount number
+---@field beforeSum number Weaving time before this skill
+---@field beforeCount number
+---@field errors number Times a skill→skill happened after this skill
 
 ---@class BattleScrollsAccumulators
 local accumulators = {}

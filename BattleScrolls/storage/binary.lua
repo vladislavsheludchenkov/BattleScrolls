@@ -12,7 +12,7 @@ BattleScrolls = BattleScrolls or {}
 local binaryStorage = {}
 BattleScrolls.binaryStorage = binaryStorage
 
-local CURRENT_VERSION = 11
+local CURRENT_VERSION = 12
 
 -- Import BitEncoder/BitDecoder from bitcodec module
 local BitEncoder = BattleScrolls.bitcodec.BitEncoder
@@ -531,6 +531,91 @@ local function readProcs(decoder)
     end
 
     return result
+end
+
+-- =============================================================================
+-- WEAVING ENCODING
+-- =============================================================================
+
+---Writes a signed time value (sign bit + absolute value)
+---@param encoder BitEncoder
+---@param value number
+local function writeSignedTime(encoder, value)
+    encoder:writeBit(value < 0)
+    encoder:writeUInt(math.abs(value), BITS.TIME_MS)
+end
+
+---Reads a signed time value (sign bit + absolute value)
+---@param decoder BitDecoder
+---@return number
+local function readSignedTime(decoder)
+    local negative = decoder:readBit()
+    local magnitude = decoder:readUInt(BITS.TIME_MS)
+    return negative and -magnitude or magnitude
+end
+
+---Writes weaving data to encoder
+---@param encoder BitEncoder
+---@param weaving WeavingData|nil
+local function writeWeaving(encoder, weaving)
+    if not weaving then
+        encoder:writeBit(false)
+        return
+    end
+
+    encoder:writeBit(true)
+    encoder:writeUInt(weaving.lightAttackHits or 0, BITS.COUNT)
+    encoder:writeUInt(weaving.heavyAttackHits or 0, BITS.COUNT)
+    encoder:writeUInt(weaving.skillActivations or 0, BITS.COUNT)
+    encoder:writeUInt(weaving.totalWeavingErrors or 0, BITS.COUNT)
+    encoder:writeUInt(weaving.doubleLaErrors or 0, BITS.COUNT)
+
+    local byAbility = weaving.byAbility or {}
+    local abilityCount = writeCount(encoder, #byAbility, BITS.MAP_COUNT)
+    for i = 1, abilityCount do
+        local entry = byAbility[i]
+        encoder:writeUInt(entry.abilityId, BITS.ABILITY_ID)
+        encoder:writeUInt(entry.activations or 0, BITS.COUNT)
+        writeSignedTime(encoder, entry.afterSum or 0)
+        encoder:writeUInt(entry.afterCount or 0, BITS.COUNT)
+        writeSignedTime(encoder, entry.beforeSum or 0)
+        encoder:writeUInt(entry.beforeCount or 0, BITS.COUNT)
+        encoder:writeUInt(entry.weavingErrors or 0, BITS.COUNT)
+    end
+end
+
+---Reads weaving data from decoder
+---@param decoder BitDecoder
+---@return WeavingData|nil
+local function readWeaving(decoder)
+    if not decoder:readBit() then
+        return nil
+    end
+
+    ---@type WeavingData
+    local weaving = {
+        lightAttackHits = decoder:readUInt(BITS.COUNT),
+        heavyAttackHits = decoder:readUInt(BITS.COUNT),
+        skillActivations = decoder:readUInt(BITS.COUNT),
+        totalWeavingErrors = decoder:readUInt(BITS.COUNT),
+        doubleLaErrors = decoder:readUInt(BITS.COUNT),
+        byAbility = {},
+    }
+
+    local abilityCount = decoder:readUInt(BITS.MAP_COUNT)
+    for _ = 1, abilityCount do
+        weaving.byAbility[#weaving.byAbility + 1] = {
+            abilityId = decoder:readUInt(BITS.ABILITY_ID),
+            activations = decoder:readUInt(BITS.COUNT),
+            afterSum = readSignedTime(decoder),
+            afterCount = decoder:readUInt(BITS.COUNT),
+            beforeSum = readSignedTime(decoder),
+            beforeCount = decoder:readUInt(BITS.COUNT),
+            weavingErrors = decoder:readUInt(BITS.COUNT),
+        }
+    end
+
+    return weaving
 end
 
 -- =============================================================================
@@ -1109,6 +1194,8 @@ function binaryStorage.encodeEncounterAsync(encounter)
         writeDeaths(encoder, encounter.deaths)
         -- v9+: player setup
         writeSetup(encoder, encounter.setup)
+        -- v12+: weaving data
+        writeWeaving(encoder, encounter.weaving)
         flushProgress(progress)
 
         local chunks = encoder:finish()
@@ -1139,8 +1226,8 @@ end
 function binaryStorage.decodeEncounterAsync(binaryEncounter)
     return LibEffect.Async(function()
         local _v = binaryEncounter._v
-        if _v < 7 or _v > 11 then
-            error("Invalid binary encounter version: " .. tostring(_v) .. " (expected 7-11)")
+        if _v < 7 or _v > 12 then
+            error("Invalid binary encounter version: " .. tostring(_v) .. " (expected 7-12)")
         end
 
         local decoder = BitDecoder.new(binaryEncounter._data)
@@ -1197,6 +1284,11 @@ function binaryStorage.decodeEncounterAsync(binaryEncounter)
         -- v9+: player setup
         if _v >= 9 then
             result.setup = readSetup(decoder, _v)
+        end
+
+        -- v12+: weaving data
+        if _v >= 12 then
+            result.weaving = readWeaving(decoder)
         end
 
         return result

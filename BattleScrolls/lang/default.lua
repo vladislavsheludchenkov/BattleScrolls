@@ -46,6 +46,33 @@ ZO_CreateStringId("BATTLESCROLLS_TAB_EFFECTS_PLAYER", "Your Effects")
 ZO_CreateStringId("BATTLESCROLLS_TAB_EFFECTS_BOSS", "Boss Effects")
 ZO_CreateStringId("BATTLESCROLLS_TAB_EFFECTS_GROUP", "Group Effects")
 ZO_CreateStringId("BATTLESCROLLS_TAB_GROUP", "Group")
+ZO_CreateStringId("BATTLESCROLLS_TAB_ACTIVITY", "Activity")
+
+-------------------------
+-- Weaving Stats
+-------------------------
+ZO_CreateStringId("BATTLESCROLLS_HEADER_WEAVING", "Weaving")
+ZO_CreateStringId("BATTLESCROLLS_HEADER_WEAVING_BY_ABILITY", "Weaving by Ability")
+ZO_CreateStringId("BATTLESCROLLS_STAT_AVG_WEAVE_TIME", "Average Cast Delay")
+ZO_CreateStringId("BATTLESCROLLS_STAT_WEAVE_TIME_BEFORE", "Weave Time Before")
+ZO_CreateStringId("BATTLESCROLLS_STAT_TIME_LOST", "Time Lost")
+ZO_CreateStringId("BATTLESCROLLS_STAT_LIGHT_ATTACKS", "Light Attacks")
+ZO_CreateStringId("BATTLESCROLLS_STAT_HEAVY_ATTACKS", "Heavy Attacks")
+ZO_CreateStringId("BATTLESCROLLS_STAT_SKILL_ACTIVATIONS", "Skill Activations")
+ZO_CreateStringId("BATTLESCROLLS_STAT_CASTS", "Casts")
+ZO_CreateStringId("BATTLESCROLLS_STAT_WEAVING_ERRORS", "Weaving Errors")
+ZO_CreateStringId("BATTLESCROLLS_STAT_MISSED_LA", "Missed Light Attacks")
+ZO_CreateStringId("BATTLESCROLLS_STAT_DOUBLE_LA", "Double Light Attacks")
+
+-- Weaving Tooltip Descriptions
+ZO_CreateStringId("BATTLESCROLLS_TOOLTIP_DELAY_AFTER", "Delay After Cast")
+ZO_CreateStringId("BATTLESCROLLS_TOOLTIP_DELAY_BEFORE", "Delay Before Cast")
+ZO_CreateStringId("BATTLESCROLLS_TOOLTIP_INTER_CAST_DESC", "Average delay between casts. Measured from when a skill's GCD or cast time ends to when the next action begins. Also known as Weaving Average in CMX.")
+ZO_CreateStringId("BATTLESCROLLS_TOOLTIP_TIME_LOST_DESC", "Total time between casts during the encounter. Also known as Weaving Total in CMX.")
+ZO_CreateStringId("BATTLESCROLLS_TOOLTIP_MISSED_LA_DESC", "Skill cast directly after another skill, without a light attack in between.")
+ZO_CreateStringId("BATTLESCROLLS_TOOLTIP_DOUBLE_LA_DESC", "Two light attack inputs in a row, without a skill in between.")
+ZO_CreateStringId("BATTLESCROLLS_FORMAT_SECONDS", "<<1>>s")
+ZO_CreateStringId("BATTLESCROLLS_FORMAT_MILLISECONDS", "<<1>>ms")
 
 -------------------------
 -- Time Headers
@@ -825,6 +852,11 @@ ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_GROUP_ALIVE_PERCENT", "Alive %")
 ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_GROUP_DEATH_COUNT", "Deaths")
 ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_DURATION", "Duration")
 ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_DEATH_COUNT", "Deaths")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_AVG_WEAVE_TIME", "Average Cast Delay")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_TIME_LOST", "Time Lost")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_LIGHT_ATTACKS_PER_SEC", "LA/s")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_WEAVING_ERRORS", "Missed LAs")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_METRIC_DOUBLE_LA_ERRORS", "Double LAs")
 
 -- Aggregation options
 ZO_CreateStringId("BATTLESCROLLS_PIVOT_AGG_SUM", "Sum")

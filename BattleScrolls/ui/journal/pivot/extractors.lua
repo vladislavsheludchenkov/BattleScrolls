@@ -36,7 +36,7 @@ local function formatSeconds(value)
     if value >= 60 then
         return string.format("%d:%02d", math.floor(value / 60), math.floor(value) % 60)
     end
-    return string.format("%.1fs", value)
+    return zo_strformat(GetString(BATTLESCROLLS_FORMAT_SECONDS), string.format("%.1f", value))
 end
 
 local function formatCount(value)
@@ -1013,6 +1013,69 @@ extractors.metrics[pivot.Metric.DAMAGE_TAKEN] = {
     ---@diagnostic disable-next-line: unused-local
     extract = function(breakdown, durationS) return 0 end, -- extracted in Overview engine
     format = formatCompact,
+    defaultAggregation = pivot.Aggregation.SUM,
+    higherIsBetter = false,
+}
+
+-------------------------
+-- Weaving Metrics (Overview domain, extracted in Overview engine)
+-------------------------
+
+extractors.metrics[pivot.Metric.AVG_WEAVE_TIME] = {
+    id = pivot.Metric.AVG_WEAVE_TIME,
+    displayName = "BATTLESCROLLS_PIVOT_METRIC_AVG_WEAVE_TIME",
+    domains = { [pivot.Domain.OVERVIEW] = true },
+    ---@diagnostic disable-next-line: unused-local
+    extract = function(breakdown, durationS) return 0 end, -- extracted in Overview engine
+    format = function(value)
+        return zo_strformat(GetString(BATTLESCROLLS_FORMAT_MILLISECONDS), value)
+    end,
+    defaultAggregation = pivot.Aggregation.AVG,
+    higherIsBetter = false,
+}
+
+extractors.metrics[pivot.Metric.LIGHT_ATTACKS_PER_SEC] = {
+    id = pivot.Metric.LIGHT_ATTACKS_PER_SEC,
+    displayName = "BATTLESCROLLS_PIVOT_METRIC_LIGHT_ATTACKS_PER_SEC",
+    domains = { [pivot.Domain.OVERVIEW] = true },
+    ---@diagnostic disable-next-line: unused-local
+    extract = function(breakdown, durationS) return 0 end, -- extracted in Overview engine
+    format = function(value)
+        return string.format("%.2f", value)
+    end,
+    defaultAggregation = pivot.Aggregation.AVG,
+    higherIsBetter = true,
+}
+
+extractors.metrics[pivot.Metric.WEAVING_ERRORS] = {
+    id = pivot.Metric.WEAVING_ERRORS,
+    displayName = "BATTLESCROLLS_PIVOT_METRIC_WEAVING_ERRORS",
+    domains = { [pivot.Domain.OVERVIEW] = true },
+    ---@diagnostic disable-next-line: unused-local
+    extract = function(breakdown, durationS) return 0 end, -- extracted in Overview engine
+    format = formatCount,
+    defaultAggregation = pivot.Aggregation.SUM,
+    higherIsBetter = false,
+}
+
+extractors.metrics[pivot.Metric.TIME_LOST] = {
+    id = pivot.Metric.TIME_LOST,
+    displayName = "BATTLESCROLLS_PIVOT_METRIC_TIME_LOST",
+    domains = { [pivot.Domain.OVERVIEW] = true },
+    ---@diagnostic disable-next-line: unused-local
+    extract = function(breakdown, durationS) return 0 end, -- extracted in Overview engine
+    format = formatSeconds,
+    defaultAggregation = pivot.Aggregation.AVG,
+    higherIsBetter = false,
+}
+
+extractors.metrics[pivot.Metric.DOUBLE_LA_ERRORS] = {
+    id = pivot.Metric.DOUBLE_LA_ERRORS,
+    displayName = "BATTLESCROLLS_PIVOT_METRIC_DOUBLE_LA_ERRORS",
+    domains = { [pivot.Domain.OVERVIEW] = true },
+    ---@diagnostic disable-next-line: unused-local
+    extract = function(breakdown, durationS) return 0 end, -- extracted in Overview engine
+    format = formatCount,
     defaultAggregation = pivot.Aggregation.SUM,
     higherIsBetter = false,
 }

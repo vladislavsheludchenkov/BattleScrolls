@@ -852,6 +852,9 @@ function setup.renderSetup(ctx)
                     local name = zo_strformat("<<C:1>>", GetAbilityName(abilityId, ""))
                     if name ~= "" then
                         local desc = GetAbilityDescription(abilityId, nil, "")
+                        if desc ~= "" then
+                            desc = zo_strformat("<<C:1>>", desc)
+                        end
                         EntryBuilder.addEntry(list, {
                             label = name,
                             icon = getMundusConstellationIcon(abilityId),
@@ -873,7 +876,7 @@ function setup.renderSetup(ctx)
                         if itemLink then
                             foodTooltip = { type = "item", itemLink = itemLink }
                         else
-                            local desc = GetAbilityDescription(food.abilityId, nil, "")
+                            local desc = zo_strformat("<<1>>", GetAbilityDescription(food.abilityId, nil, ""))
                             foodTooltip = { type = "text", title = name, text = desc or "" }
                         end
                         EntryBuilder.addEntry(list, {

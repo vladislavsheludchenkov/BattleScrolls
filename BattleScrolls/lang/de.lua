@@ -47,6 +47,31 @@ local strings = {
     [BATTLESCROLLS_TAB_EFFECTS_BOSS] = "Bosseffekte",
     [BATTLESCROLLS_TAB_EFFECTS_GROUP] = "Gruppeneffekte",
     [BATTLESCROLLS_TAB_GROUP] = "Gruppe",
+    [BATTLESCROLLS_TAB_ACTIVITY] = "Aktivität",
+
+    -------------------------
+    -- Weaving Stats
+    -------------------------
+    [BATTLESCROLLS_HEADER_WEAVING] = "Weaving",
+    [BATTLESCROLLS_HEADER_WEAVING_BY_ABILITY] = "Weaving nach Fähigkeit",
+    [BATTLESCROLLS_STAT_AVG_WEAVE_TIME] = "Durchschnittliche Wirkverzögerung",
+    [BATTLESCROLLS_STAT_WEAVE_TIME_BEFORE] = "Weave-Zeit davor",
+    [BATTLESCROLLS_STAT_TIME_LOST] = "Verlorene Zeit",
+    [BATTLESCROLLS_STAT_LIGHT_ATTACKS] = "Leichte Angriffe",
+    [BATTLESCROLLS_STAT_HEAVY_ATTACKS] = "Schwere Angriffe",
+    [BATTLESCROLLS_STAT_SKILL_ACTIVATIONS] = "Fertigkeiten",
+    [BATTLESCROLLS_STAT_CASTS] = "Gewirkt",
+    [BATTLESCROLLS_STAT_WEAVING_ERRORS] = "Weaving-Fehler",
+    [BATTLESCROLLS_STAT_MISSED_LA] = "Verpasste leichte Angriffe",
+    [BATTLESCROLLS_STAT_DOUBLE_LA] = "Doppelte leichte Angriffe",
+    [BATTLESCROLLS_TOOLTIP_DELAY_AFTER] = "Verzögerung danach",
+    [BATTLESCROLLS_TOOLTIP_DELAY_BEFORE] = "Verzögerung davor",
+    [BATTLESCROLLS_FORMAT_SECONDS] = "<<1>>s",
+    [BATTLESCROLLS_FORMAT_MILLISECONDS] = "<<1>>ms",
+    [BATTLESCROLLS_TOOLTIP_INTER_CAST_DESC] = "Durchschnittliche Verzögerung zwischen Fähigkeiten. Gemessen vom Ende der GCD oder Wirkzeit einer Fähigkeit bis zum Beginn der nächsten Aktion. In CMX auch als Weaving Average bekannt.",
+    [BATTLESCROLLS_TOOLTIP_TIME_LOST_DESC] = "Gesamte Leerlaufzeit zwischen Fähigkeiten im Kampf. In CMX auch als Weaving Total bekannt.",
+    [BATTLESCROLLS_TOOLTIP_MISSED_LA_DESC] = "Fähigkeit direkt nach einer anderen Fähigkeit gewirkt, ohne leichten Angriff dazwischen.",
+    [BATTLESCROLLS_TOOLTIP_DOUBLE_LA_DESC] = "Zwei leichte Angriffe hintereinander, ohne Fähigkeit dazwischen.",
 
     -------------------------
     -- Time Headers
@@ -814,6 +839,11 @@ local strings = {
     [BATTLESCROLLS_PIVOT_METRIC_GROUP_DEATH_COUNT] = "Tode",
     [BATTLESCROLLS_PIVOT_METRIC_DURATION] = "Dauer",
     [BATTLESCROLLS_PIVOT_METRIC_DEATH_COUNT] = "Tode",
+    [BATTLESCROLLS_PIVOT_METRIC_AVG_WEAVE_TIME] = "Wirkverzögerung",
+    [BATTLESCROLLS_PIVOT_METRIC_TIME_LOST] = "Verlorene Zeit",
+    [BATTLESCROLLS_PIVOT_METRIC_LIGHT_ATTACKS_PER_SEC] = "LA/s",
+    [BATTLESCROLLS_PIVOT_METRIC_WEAVING_ERRORS] = "Fehlende LA",
+    [BATTLESCROLLS_PIVOT_METRIC_DOUBLE_LA_ERRORS] = "Doppelte LA",
 
     -- Aggregation options
     [BATTLESCROLLS_PIVOT_AGG_SUM] = "Summe",

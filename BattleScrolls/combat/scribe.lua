@@ -496,6 +496,9 @@ function scribe:ImportEncounterFromStateAsync()
         return
     end
 
+    -- Flush any unconfirmed pending LA before snapshotting
+    BattleScrolls.weaving:FlushPendingLa()
+
     -- Capture references to state data (state:Reset() creates new tables, doesn't modify old ones)
     local capturedLocation = self.location
     ---@type BattleScrollsState|nil
@@ -701,6 +704,35 @@ function scribe:ImportEncounterFromStateAsync()
                     medianIntervalMs = medianIntervalMs,
                 })
             end
+        end
+
+        -- Weaving finalization: convert per-ability accumulators to encounter data
+        local cw = capturedState.weaving
+        local hasWeavingData = cw.skillActivations > 0
+            or cw.lightAttackHits > 0
+            or cw.heavyAttackHits > 0
+        if hasWeavingData then
+            local weavingByAbility = {}
+            for abilityId, data in pairs(cw.weavingByAbilityId) do
+                weavingByAbility[#weavingByAbility + 1] = {
+                    abilityId = abilityId,
+                    activations = data.activations,
+                    afterSum = data.afterSum,
+                    afterCount = data.afterCount,
+                    beforeSum = data.beforeSum,
+                    beforeCount = data.beforeCount,
+                    weavingErrors = data.errors,
+                }
+            end
+
+            encounter.weaving = {
+                lightAttackHits = cw.lightAttackHits,
+                heavyAttackHits = cw.heavyAttackHits,
+                skillActivations = cw.skillActivations,
+                totalWeavingErrors = cw.totalWeavingErrors,
+                doubleLaErrors = cw.doubleLaErrors,
+                byAbility = weavingByAbility,
+            }
         end
 
         encounter.unitNames = capturedState.unitIdToName

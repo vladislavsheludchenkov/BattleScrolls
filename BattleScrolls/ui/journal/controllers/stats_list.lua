@@ -34,6 +34,7 @@ local panelSpecBuilders = {
     [StatsTab.EFFECTS_BOSS]      = renderers.effects.buildEffectsPanelSpec,
     [StatsTab.EFFECTS_GROUP]     = renderers.effects.buildEffectsPanelSpec,
     [StatsTab.SETUP]             = renderers.setup.buildSetupPanelSpec,
+    [StatsTab.ACTIVITY]          = renderers.activity.buildActivityPanelSpec,
 }
 
 -------------------------
@@ -83,6 +84,8 @@ function StatsListController.renderTab(ctx, selectedTab)
             renderers.group.renderGroup(ctx):Await()
         elseif selectedTab == StatsTab.SETUP then
             renderers.setup.renderSetup(ctx):Await()
+        elseif selectedTab == StatsTab.ACTIVITY then
+            renderers.activity.renderActivity(ctx):Await()
         end
     end)
 end

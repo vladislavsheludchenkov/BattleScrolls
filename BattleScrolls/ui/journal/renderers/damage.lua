@@ -97,26 +97,26 @@ local function buildAbilityTooltipText(merged)
     local lines = {}
 
     -- Total line
-    table.insert(lines, string.format("%s: %s", GetString(BATTLESCROLLS_OVERVIEW_TOTAL), ZO_CommaDelimitNumber(merged.totalDamage)))
+    table.insert(lines, string.format("%s: %s", GetString(BATTLESCROLLS_TOOLTIP_TOTAL), ZO_CommaDelimitNumber(merged.totalDamage)))
 
     -- Damage type and delivery info
     if merged.damageTypeDesc then
-        table.insert(lines, merged.damageTypeDesc)
+        table.insert(lines, string.format("%s: %s", GetString(BATTLESCROLLS_TOOLTIP_TYPE), merged.damageTypeDesc))
     end
     if merged.overTimeOrDirectDesc then
-        table.insert(lines, merged.overTimeOrDirectDesc)
+        table.insert(lines, string.format("%s: %s", GetString(BATTLESCROLLS_TOOLTIP_DELIVERY), merged.overTimeOrDirectDesc))
     end
 
     if merged.breakdown then
         -- Multi-variant breakdown
-        table.insert(lines, "")
         tooltips.appendTickStats(lines, merged.breakdown.critStats)
 
+        table.insert(lines, "")
+
         for _, entry in ipairs(merged.breakdown.entries) do
-            table.insert(lines, "")
             local pct = merged.totalDamage > 0 and (entry.damage / merged.totalDamage * 100) or 0
-            table.insert(lines, string.format("%s: %s (%.1f%%)", entry.displayName, ZO_CommaDelimitNumber(entry.damage), pct))
-            tooltips.appendTickStats(lines, entry.critStats, "  ")
+            table.insert(lines, string.format("  %s: %s (%.1f%%)", entry.displayName, ZO_CommaDelimitNumber(entry.damage), pct))
+            tooltips.appendTickStats(lines, entry.critStats, "    ")
         end
     else
         -- Single variant

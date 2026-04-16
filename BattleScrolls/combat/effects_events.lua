@@ -3,20 +3,49 @@ if not SemisPlaygroundCheckAccess() then
 end
 
 -- Effect Event Registration for BattleScrolls
+-- Demand-driven: only subscribes to events during combat, and only to categories
+-- enabled in settings. Death/alive events always subscribe during combat.
 
 BattleScrolls = BattleScrolls or {}
 
 ---@type BattleScrollsEffects
 local effects = BattleScrolls.effects
 
----@class EffectsEvents
----@field Initialize fun(self: EffectsEvents) Register all event handlers
+---@class EffectsEvents : StateObserver
+---@field Initialize fun(self: EffectsEvents) Register as state observer
 ---@field Cleanup fun(self: EffectsEvents) Unregister all event handlers
 local effectsEvents = {}
 BattleScrolls.effectsEvents = effectsEvents
 
 ---@type string
 local PATTERN_GROUP = "^group"
+
+-- =============================================================================
+-- SETTINGS HELPERS
+-- =============================================================================
+
+---@return boolean
+local function isPlayerEffectsNeeded()
+    local settings = BattleScrolls.storage and BattleScrolls.storage.savedVariables and BattleScrolls.storage.savedVariables.settings
+    if settings and settings.effectTrackingEnabled == false then return false end
+    local buffs = not (settings and settings.trackPlayerBuffs == false)
+    local debuffs = not (settings and settings.trackPlayerDebuffs == false)
+    return buffs or debuffs
+end
+
+---@return boolean
+local function isBossEffectsNeeded()
+    local settings = BattleScrolls.storage and BattleScrolls.storage.savedVariables and BattleScrolls.storage.savedVariables.settings
+    if settings and settings.effectTrackingEnabled == false then return false end
+    return not (settings and settings.trackBossDebuffs == false)
+end
+
+---@return boolean
+local function isGroupEffectsNeeded()
+    local settings = BattleScrolls.storage and BattleScrolls.storage.savedVariables and BattleScrolls.storage.savedVariables.settings
+    if settings and settings.effectTrackingEnabled == false then return false end
+    return not (settings and settings.trackGroupBuffs == false)
+end
 
 -- =============================================================================
 -- EVENT HANDLERS
@@ -26,7 +55,7 @@ local function onPlayerEffect(_eventCode, changeType, effectSlot, _effectName, _
                               stackCount, _iconName, _deprecatedBuffType, effectType, _abilityType,
                               _statusEffectType, _unitName, _unitId, abilityId, sourceType)
     local s = BattleScrolls.state
-    if not s or not s.inCombat then return end
+    if not s then return end
     effects.handlePlayerEffect(s, changeType, effectSlot, effectType, stackCount, abilityId, sourceType, beginTime)
 end
 
@@ -34,7 +63,7 @@ local function onBossEffect(_eventCode, changeType, effectSlot, _effectName, uni
                             stackCount, _iconName, _deprecatedBuffType, effectType, _abilityType,
                             _statusEffectType, unitName, unitId, abilityId, sourceType)
     local s = BattleScrolls.state
-    if not s or not s.inCombat then return end
+    if not s then return end
     -- Correlate boss unitTag↔unitId from authoritative effect events (non-faded only;
     -- faded events can maybe carry stale unitIds from despawned bosses)
     if changeType ~= EFFECT_RESULT_FADED then
@@ -52,14 +81,14 @@ local function onGroupEffect(_eventCode, changeType, effectSlot, _effectName, un
                              stackCount, _iconName, _deprecatedBuffType, effectType, _abilityType,
                              _statusEffectType, _unitName, unitId, abilityId, sourceType)
     local s = BattleScrolls.state
-    if not s or not s.inCombat then return end
+    if not s then return end
     effects.handleGroupEffect(s, changeType, effectSlot, unitTag, effectType, stackCount, abilityId, unitId, sourceType, beginTime, endTime)
 end
 
 local function onPlayerDeathState(_eventCode, unitTag, isDead)
     if not AreUnitsEqual("player", unitTag) then return end
     local s = BattleScrolls.state
-    if not s or not s.inCombat then return end
+    if not s then return end
     if isDead then
         effects.handlePlayerDeath(s)
     else
@@ -69,7 +98,7 @@ end
 
 local function onBossDeathState(_eventCode, unitTag, isDead)
     local s = BattleScrolls.state
-    if not s or not s.inCombat then return end
+    if not s then return end
     if isDead then
         effects.handleUnitDeath(s, unitTag)
     else
@@ -81,7 +110,7 @@ local function onGroupDeathState(_eventCode, unitTag, isDead)
     if AreUnitsEqual("player", unitTag) then return end
     if IsGroupCompanionUnitTag(unitTag) then return end
     local s = BattleScrolls.state
-    if not s or not s.inCombat then return end
+    if not s then return end
     if isDead then
         effects.handleUnitDeath(s, unitTag)
     else
@@ -91,7 +120,7 @@ end
 
 local function onBossDestroyed(_eventCode, unitTag)
     local s = BattleScrolls.state
-    if not s or not s.inCombat then return end
+    if not s then return end
     effects.handleUnitDeath(s, unitTag)
 end
 
@@ -99,7 +128,7 @@ local function onGroupDestroyed(_eventCode, unitTag)
     if AreUnitsEqual("player", unitTag) then return end
     if IsGroupCompanionUnitTag(unitTag) then return end
     local s = BattleScrolls.state
-    if not s or not s.inCombat then return end
+    if not s then return end
     -- Treat as death if offline OR actually dead
     -- Portal entry = online and not dead = still alive
     if not IsUnitOnline(unitTag) or IsUnitDead(unitTag) then
@@ -109,7 +138,7 @@ end
 
 local function onBossCreated(_eventCode, unitTag)
     local s = BattleScrolls.state
-    if not s or not s.inCombat then return end
+    if not s then return end
     -- Detect tag reuse before state update (old BossData still accessible)
     if s.bossNames[unitTag] then
         local newName = GetRawUnitName(unitTag)
@@ -128,7 +157,7 @@ local function onGroupCreated(_eventCode, unitTag)
     if AreUnitsEqual("player", unitTag) then return end
     if IsGroupCompanionUnitTag(unitTag) then return end
     local s = BattleScrolls.state
-    if not s or not s.inCombat then return end
+    if not s then return end
     -- Do full refresh which reconciles both alive state and effects
     effects.handleGroupFullRefresh(s, unitTag)
 end
@@ -138,7 +167,7 @@ local function onGroupConnectedStatus(_eventCode, unitTag, isOnline)
     if IsGroupCompanionUnitTag(unitTag) then return end
     if not unitTag:find(PATTERN_GROUP) then return end
     local s = BattleScrolls.state
-    if not s or not s.inCombat then return end
+    if not s then return end
     if isOnline then
         -- Do full refresh which reconciles both alive state and effects
         effects.handleGroupFullRefresh(s, unitTag)
@@ -150,31 +179,16 @@ end
 
 local function onEffectsFullUpdate(_eventCode)
     local s = BattleScrolls.state
-    if not s or not s.inCombat then return end
-    -- BattleScrolls.log.Info("Got EVENT_EFFECTS_FULL_UPDATE, triggering full refresh")
+    if not s then return end
     effects.handleFullRefreshAll(s)
 end
 
 -- =============================================================================
--- INITIALIZATION
+-- EVENT SUBSCRIPTION
 -- =============================================================================
 
-function effectsEvents:Initialize()
-    -- Player effects
-    EVENT_MANAGER:RegisterForEvent("BS_Effects_Player", EVENT_EFFECT_CHANGED, onPlayerEffect)
-    EVENT_MANAGER:AddFilterForEvent("BS_Effects_Player", EVENT_EFFECT_CHANGED,
-        REGISTER_FILTER_UNIT_TAG, "player")
-
-    -- Boss effects
-    EVENT_MANAGER:RegisterForEvent("BS_Effects_Boss", EVENT_EFFECT_CHANGED, onBossEffect)
-    EVENT_MANAGER:AddFilterForEvent("BS_Effects_Boss", EVENT_EFFECT_CHANGED,
-        REGISTER_FILTER_UNIT_TAG_PREFIX, "boss")
-
-    -- Group effects
-    EVENT_MANAGER:RegisterForEvent("BS_Effects_Group", EVENT_EFFECT_CHANGED, onGroupEffect)
-    EVENT_MANAGER:AddFilterForEvent("BS_Effects_Group", EVENT_EFFECT_CHANGED,
-        REGISTER_FILTER_UNIT_TAG_PREFIX, "group")
-
+---Subscribes to death/alive/lifecycle events (always needed during combat for alive tracking)
+local function subscribeAliveEvents()
     -- Player death state
     EVENT_MANAGER:RegisterForEvent("BS_Effects_Death_Player", EVENT_UNIT_DEATH_STATE_CHANGED, onPlayerDeathState)
     EVENT_MANAGER:AddFilterForEvent("BS_Effects_Death_Player", EVENT_UNIT_DEATH_STATE_CHANGED,
@@ -213,14 +227,39 @@ function effectsEvents:Initialize()
     -- Group connected status (online/offline)
     EVENT_MANAGER:RegisterForEvent("BS_Effects_Connected_Group", EVENT_GROUP_MEMBER_CONNECTED_STATUS, onGroupConnectedStatus)
 
-    -- Full effect refresh
+    -- Full effect refresh (runs alive reconciliation unconditionally)
     EVENT_MANAGER:RegisterForEvent("BS_Effects_FullUpdate", EVENT_EFFECTS_FULL_UPDATE, onEffectsFullUpdate)
 end
 
-function effectsEvents:Cleanup()
+---Subscribes to effect change events based on current settings
+local function subscribeEffectEvents()
+    if isPlayerEffectsNeeded() then
+        EVENT_MANAGER:RegisterForEvent("BS_Effects_Player", EVENT_EFFECT_CHANGED, onPlayerEffect)
+        EVENT_MANAGER:AddFilterForEvent("BS_Effects_Player", EVENT_EFFECT_CHANGED,
+            REGISTER_FILTER_UNIT_TAG, "player")
+    end
+
+    if isBossEffectsNeeded() then
+        EVENT_MANAGER:RegisterForEvent("BS_Effects_Boss", EVENT_EFFECT_CHANGED, onBossEffect)
+        EVENT_MANAGER:AddFilterForEvent("BS_Effects_Boss", EVENT_EFFECT_CHANGED,
+            REGISTER_FILTER_UNIT_TAG_PREFIX, "boss")
+    end
+
+    if isGroupEffectsNeeded() then
+        EVENT_MANAGER:RegisterForEvent("BS_Effects_Group", EVENT_EFFECT_CHANGED, onGroupEffect)
+        EVENT_MANAGER:AddFilterForEvent("BS_Effects_Group", EVENT_EFFECT_CHANGED,
+            REGISTER_FILTER_UNIT_TAG_PREFIX, "group")
+    end
+end
+
+---Unsubscribes from all events
+local function unsubscribeAll()
+    -- Effect events (may not be registered — UnregisterForEvent is safe to call regardless)
     EVENT_MANAGER:UnregisterForEvent("BS_Effects_Player", EVENT_EFFECT_CHANGED)
     EVENT_MANAGER:UnregisterForEvent("BS_Effects_Boss", EVENT_EFFECT_CHANGED)
     EVENT_MANAGER:UnregisterForEvent("BS_Effects_Group", EVENT_EFFECT_CHANGED)
+
+    -- Alive/lifecycle events
     EVENT_MANAGER:UnregisterForEvent("BS_Effects_Death_Player", EVENT_UNIT_DEATH_STATE_CHANGED)
     EVENT_MANAGER:UnregisterForEvent("BS_Effects_Death_Boss", EVENT_UNIT_DEATH_STATE_CHANGED)
     EVENT_MANAGER:UnregisterForEvent("BS_Effects_Death_Group", EVENT_UNIT_DEATH_STATE_CHANGED)
@@ -230,4 +269,29 @@ function effectsEvents:Cleanup()
     EVENT_MANAGER:UnregisterForEvent("BS_Effects_Created_Group", EVENT_UNIT_CREATED)
     EVENT_MANAGER:UnregisterForEvent("BS_Effects_Connected_Group", EVENT_GROUP_MEMBER_CONNECTED_STATUS)
     EVENT_MANAGER:UnregisterForEvent("BS_Effects_FullUpdate", EVENT_EFFECTS_FULL_UPDATE)
+end
+
+-- =============================================================================
+-- STATE OBSERVER
+-- =============================================================================
+
+function effectsEvents:OnStateInitialized()
+    subscribeAliveEvents()
+    subscribeEffectEvents()
+end
+
+function effectsEvents:OnStatePreReset()
+    unsubscribeAll()
+end
+
+-- =============================================================================
+-- INITIALIZATION
+-- =============================================================================
+
+function effectsEvents:Initialize()
+    BattleScrolls.state:RegisterObserver(self)
+end
+
+function effectsEvents:Cleanup()
+    unsubscribeAll()
 end

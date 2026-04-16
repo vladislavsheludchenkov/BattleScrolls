@@ -47,6 +47,31 @@ local strings = {
     [BATTLESCROLLS_TAB_EFFECTS_BOSS] = "ボス効果",
     [BATTLESCROLLS_TAB_EFFECTS_GROUP] = "グループ効果",
     [BATTLESCROLLS_TAB_GROUP] = "グループ",
+    [BATTLESCROLLS_TAB_ACTIVITY] = "アクティビティ",
+
+    -------------------------
+    -- Weaving Stats
+    -------------------------
+    [BATTLESCROLLS_HEADER_WEAVING] = "ウィービング",
+    [BATTLESCROLLS_HEADER_WEAVING_BY_ABILITY] = "スキル別ウィービング",
+    [BATTLESCROLLS_STAT_AVG_WEAVE_TIME] = "平均キャスト遅延時間",
+    [BATTLESCROLLS_STAT_WEAVE_TIME_BEFORE] = "ウィーブ時間（前）",
+    [BATTLESCROLLS_STAT_TIME_LOST] = "ロスタイム",
+    [BATTLESCROLLS_STAT_LIGHT_ATTACKS] = "軽攻撃",
+    [BATTLESCROLLS_STAT_HEAVY_ATTACKS] = "重攻撃",
+    [BATTLESCROLLS_STAT_SKILL_ACTIVATIONS] = "スキル発動",
+    [BATTLESCROLLS_STAT_CASTS] = "発動回数",
+    [BATTLESCROLLS_STAT_WEAVING_ERRORS] = "ウィービングエラー",
+    [BATTLESCROLLS_STAT_MISSED_LA] = "軽攻撃抜け",
+    [BATTLESCROLLS_STAT_DOUBLE_LA] = "二重軽攻撃",
+    [BATTLESCROLLS_TOOLTIP_DELAY_AFTER] = "キャスト後の遅延",
+    [BATTLESCROLLS_TOOLTIP_DELAY_BEFORE] = "キャスト前の遅延",
+    [BATTLESCROLLS_FORMAT_SECONDS] = "<<1>>秒",
+    [BATTLESCROLLS_FORMAT_MILLISECONDS] = "<<1>>ミリ秒",
+    [BATTLESCROLLS_TOOLTIP_INTER_CAST_DESC] = "キャスト間の平均遅延時間。スキルのGCDまたはキャスト時間終了から次のアクション開始までを計測します。CMXのWeaving Averageに相当します。",
+    [BATTLESCROLLS_TOOLTIP_TIME_LOST_DESC] = "戦闘中のキャスト間の合計ロス時間。CMXのWeaving Totalに相当します。",
+    [BATTLESCROLLS_TOOLTIP_MISSED_LA_DESC] = "軽攻撃を挟まずにスキルを連続で使用した回数。",
+    [BATTLESCROLLS_TOOLTIP_DOUBLE_LA_DESC] = "スキルを挟まずに軽攻撃を連続で入力した回数。",
 
     -------------------------
     -- Time Headers
@@ -814,6 +839,11 @@ local strings = {
     [BATTLESCROLLS_PIVOT_METRIC_GROUP_DEATH_COUNT] = "死亡",
     [BATTLESCROLLS_PIVOT_METRIC_DURATION] = "持続時間",
     [BATTLESCROLLS_PIVOT_METRIC_DEATH_COUNT] = "死亡",
+    [BATTLESCROLLS_PIVOT_METRIC_AVG_WEAVE_TIME] = "キャスト遅延",
+    [BATTLESCROLLS_PIVOT_METRIC_TIME_LOST] = "ロスタイム",
+    [BATTLESCROLLS_PIVOT_METRIC_LIGHT_ATTACKS_PER_SEC] = "LA/s",
+    [BATTLESCROLLS_PIVOT_METRIC_WEAVING_ERRORS] = "軽攻撃抜け",
+    [BATTLESCROLLS_PIVOT_METRIC_DOUBLE_LA_ERRORS] = "二重軽攻撃",
 
     -- Aggregation options
     [BATTLESCROLLS_PIVOT_AGG_SUM] = "合計",

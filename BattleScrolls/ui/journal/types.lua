@@ -47,6 +47,7 @@ journal.StatsTab = {
     EFFECTS_GROUP = 10,
     GROUP = 11,
     SETUP = 12,
+    ACTIVITY = 13,
 }
 
 -------------------------
@@ -268,6 +269,7 @@ journal.AbilityIconStyle = {
 ---| 10 # EFFECTS_GROUP
 ---| 11 # GROUP
 ---| 12 # SETUP
+---| 13 # ACTIVITY
 
 ---@alias InstanceTab
 ---| 1 # ALL

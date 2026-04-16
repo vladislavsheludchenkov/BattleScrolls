@@ -394,6 +394,41 @@ local function extractOverview(decoded, abilityInfo, metricIds)
             values[metricId] = calc:getDurationS()
         elseif metricId == pivot.Metric.DEATH_COUNT then
             values[metricId] = decoded.deaths and decoded.deaths.deathCount or 0
+        elseif metricId == pivot.Metric.AVG_WEAVE_TIME then
+            local weaving = decoded.weaving
+            if weaving then
+                local totalSum, totalCount = 0, 0
+                for _, entry in ipairs(weaving.byAbility) do
+                    totalSum = totalSum + entry.afterSum
+                    totalCount = totalCount + entry.afterCount
+                end
+                values[metricId] = totalCount > 0 and (totalSum / totalCount) or 0
+            else
+                values[metricId] = 0
+            end
+        elseif metricId == pivot.Metric.LIGHT_ATTACKS_PER_SEC then
+            local weaving = decoded.weaving
+            local durationS = calc:getDurationS()
+            if weaving and durationS > 0 then
+                values[metricId] = weaving.lightAttackHits / durationS
+            else
+                values[metricId] = 0
+            end
+        elseif metricId == pivot.Metric.WEAVING_ERRORS then
+            values[metricId] = decoded.weaving and decoded.weaving.totalWeavingErrors or 0
+        elseif metricId == pivot.Metric.TIME_LOST then
+            local weaving = decoded.weaving
+            if weaving then
+                local totalSum = 0
+                for _, entry in ipairs(weaving.byAbility) do
+                    totalSum = totalSum + entry.afterSum
+                end
+                values[metricId] = totalSum / 1000
+            else
+                values[metricId] = 0
+            end
+        elseif metricId == pivot.Metric.DOUBLE_LA_ERRORS then
+            values[metricId] = decoded.weaving and decoded.weaving.doubleLaErrors or 0
         end
     end
     return values

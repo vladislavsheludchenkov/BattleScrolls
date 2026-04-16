@@ -90,6 +90,13 @@ pivot.Metric = {
     GROUP_ALIVE_PERCENT = "groupAlivePercent",
     GROUP_DEATH_COUNT = "groupDeathCount",
 
+    -- Activity / Weaving
+    AVG_WEAVE_TIME = "avgWeaveTime",
+    TIME_LOST = "timeLost",
+    LIGHT_ATTACKS_PER_SEC = "lightAttacksPerSec",
+    WEAVING_ERRORS = "weavingErrors",
+    DOUBLE_LA_ERRORS = "doubleLaErrors",
+
     -- Overview
     BOSS_DPS = "bossDps",
     BOSS_DAMAGE = "bossDamage",
@@ -406,6 +413,11 @@ pivot.DomainMetrics = {
         pivot.Metric.RAW_HPS_OUT,
         pivot.Metric.EFFECTIVE_HPS_IN,
         pivot.Metric.RAW_HPS_IN,
+        pivot.Metric.AVG_WEAVE_TIME,
+        pivot.Metric.TIME_LOST,
+        pivot.Metric.LIGHT_ATTACKS_PER_SEC,
+        pivot.Metric.WEAVING_ERRORS,
+        pivot.Metric.DOUBLE_LA_ERRORS,
         pivot.Metric.DURATION,
         pivot.Metric.DEATH_COUNT,
     },

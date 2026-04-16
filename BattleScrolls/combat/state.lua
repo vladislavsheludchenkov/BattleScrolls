@@ -157,6 +157,10 @@ BattleScrolls = BattleScrolls or {}
 ---@field playerDeathCount number Number of times player died this fight
 ---@field deathRecaps DeathRecapSnapshot[] All captured death recaps (appended on each death)
 ---@field playerSetup PlayerSetup|nil
+---@field weaving WeavingState Weaving/rotation tracking state (managed by combat/weaving.lua)
+---@field cruxStacks number Current Crux stack count (0-3, for Exhausting Fatecarver duration)
+---@field cruxRecentMax number Max Crux stacks seen within current event burst window
+---@field cruxWindowStartMs number Start of current Crux event burst window
 
 --- @type BattleScrollsState
 local state = {}
@@ -338,6 +342,7 @@ function BattleScrolls.state:Reset()
     self.lastDamageDoneMs = 0
     self.playerDeathCount = 0
     self.deathRecaps = {}
+    self.weaving = BattleScrolls.weaving.newState()
 
     -- Clear effect tracking state via effects module
     BattleScrolls.effects.clear(self)
@@ -384,6 +389,8 @@ function BattleScrolls.state:Snapshot()
     snapshot.playerDeathCount = self.playerDeathCount
     snapshot.deathRecaps = self.deathRecaps
     snapshot.playerSetup = self.playerSetup
+
+    snapshot.weaving = self.weaving
 
     return snapshot
 end
@@ -591,6 +598,9 @@ local ignoredHealingAbilityIds = BattleScrolls.constants.ignoredHealingAbilityId
 ---@type table<number, boolean>
 local portalEffectsSet = BattleScrolls.constants.portalEffectsSet
 
+-- Crux ability ID for Arcanist stack tracking (used in Initialize + weaving handler)
+local CRUX_ABILITY_ID = 184220
+
 ---Central combat event dispatcher with Lua-side filtering
 ---Routes events to appropriate handlers based on source/target type and result
 ---@param eventCode number
@@ -626,6 +636,13 @@ function BattleScrolls.state:OnCombatEvent(eventCode, result, isError, abilityNa
 
     -- Damage events
     if isDamageResult then
+        -- LA confirmation from damage events (melee/resto weapons only)
+        -- Projectile weapons use EFFECT_GAINED instead (faster, avoids late-damage cross-talk)
+        local weavingModule = BattleScrolls.weaving
+        if isPersonalSource and weavingModule.laAbilityIds[abilityID] and not weavingModule.laUsesEffectGained[abilityID] then
+            weavingModule:OnLightAttackConfirmed()
+        end
+
         -- Personal damage done (source is player/pet/companion)
         if isPersonalSource then
             self:OnPersonalDamageDone(eventCode, result, isError, abilityName, abilityGraphic, abilityActionSlotType, sourceName, sourceType, targetName, targetType, hitValue, powerType, damageType, log, sourceUnitID, targetUnitID, abilityID, overflow)
@@ -663,12 +680,55 @@ function BattleScrolls.state:OnCombatEvent(eventCode, result, isError, abilityNa
     end
 end
 
+-- Combat event filter tables (damage needs no source/target filter due to group damage catch-all;
+-- healing is split by source type for outgoing and source=GROUP+target type for incoming)
+local damageResults = {
+    ACTION_RESULT_DAMAGE,
+    ACTION_RESULT_CRITICAL_DAMAGE,
+    ACTION_RESULT_DOT_TICK,
+    ACTION_RESULT_DOT_TICK_CRITICAL,
+    ACTION_RESULT_BLOCKED_DAMAGE,
+    ACTION_RESULT_PRECISE_DAMAGE,
+    ACTION_RESULT_WRECKING_DAMAGE,
+}
+local healingResults = {
+    ACTION_RESULT_HEAL,
+    ACTION_RESULT_CRITICAL_HEAL,
+    ACTION_RESULT_HOT_TICK,
+    ACTION_RESULT_HOT_TICK_CRITICAL,
+}
+local personalSourceTypes = {
+    COMBAT_UNIT_TYPE_PLAYER,
+    COMBAT_UNIT_TYPE_PLAYER_PET,
+    COMBAT_UNIT_TYPE_PLAYER_COMPANION,
+}
+local personalTargetTypes = personalSourceTypes
+
+---@type string[]
+local combatEventNames = {}
+
+---Registers a filtered EVENT_COMBAT_EVENT handler and records the name for cleanup
+---@param name string Unique event namespace
+---@param callback fun(...)
+---@param ... any Filter pairs (filterType, filterValue, ...)
+local function registerCombatEvent(name, callback, ...)
+    combatEventNames[#combatEventNames + 1] = name
+    EVENT_MANAGER:RegisterForEvent(name, EVENT_COMBAT_EVENT, callback)
+    EVENT_MANAGER:AddFilterForEvent(name, EVENT_COMBAT_EVENT, ...)
+end
+
 ---Unregisters all event handlers for cleanup/hot reload
 function BattleScrolls.state:Cleanup()
-    EVENT_MANAGER:UnregisterForEvent("BattleScrolls_State", EVENT_COMBAT_EVENT)
+    for _, name in ipairs(combatEventNames) do
+        EVENT_MANAGER:UnregisterForEvent(name, EVENT_COMBAT_EVENT)
+    end
+    combatEventNames = {}
+
     EVENT_MANAGER:UnregisterForEvent("BattleScrolls_State", EVENT_PLAYER_COMBAT_STATE)
     EVENT_MANAGER:UnregisterForEvent("BattleScrolls_State", EVENT_PLAYER_ACTIVATED)
     EVENT_MANAGER:UnregisterForEvent("BattleScrolls_State", EVENT_BOSSES_CHANGED)
+    EVENT_MANAGER:UnregisterForEvent("BattleScrolls_Crux", EVENT_EFFECT_CHANGED)
+    BattleScrolls.weaving:Cleanup()
 
     for abilityId, _ in pairs(portalEffectsSet) do
         local eventName = string.format("BattleScrolls_State_%d", abilityId)
@@ -676,13 +736,68 @@ function BattleScrolls.state:Cleanup()
     end
 end
 
----Registers event handlers for combat tracking with Lua-side filtering
+---Registers event handlers for combat tracking with C++-level filtering
+---Splits EVENT_COMBAT_EVENT into multiple filtered registrations so the engine
+---only invokes our Lua handler for the specific result/source/target combinations
+---we actually process. Each handler verifies its expected filter conditions in Lua
+---as a safety measure against duplicate dispatch.
 function BattleScrolls.state:Initialize()
-    EVENT_MANAGER:RegisterForEvent("BattleScrolls_State", EVENT_COMBAT_EVENT, function(...)
-        self:OnCombatEvent(...)
-    end)
-    EVENT_MANAGER:AddFilterForEvent("BattleScrolls_State", EVENT_COMBAT_EVENT,
-            REGISTER_FILTER_IS_ERROR, false)
+    local bsLog = BattleScrolls.log
+
+    -- Damage: one registration per result type, no source/target filter
+    -- (group damage uses a catch-all condition that can't be expressed as a filter)
+    for i, expectedResult in ipairs(damageResults) do
+        registerCombatEvent("BattleScrolls_Dmg" .. i,
+                function(eventCode, result, isError, ...)
+                    if isError or result ~= expectedResult then
+                        bsLog.Warn(function()
+                            return "Combat filter leak (damage): expected result=" .. tostring(expectedResult) .. " got=" .. tostring(result)
+                        end)
+                        return
+                    end
+                    self:OnCombatEvent(eventCode, result, isError, ...)
+                end,
+                REGISTER_FILTER_COMBAT_RESULT, expectedResult,
+                REGISTER_FILTER_IS_ERROR, false)
+    end
+
+    -- Healing out + self-healing: personal source × healing result
+    for i, expectedResult in ipairs(healingResults) do
+        for j, expectedSourceType in ipairs(personalSourceTypes) do
+            registerCombatEvent("BattleScrolls_HealOut" .. i .. "_" .. j,
+                    function(eventCode, result, isError, abilityName, abilityGraphic, abilityActionSlotType, sourceName, sourceType, ...)
+                        if isError or result ~= expectedResult or sourceType ~= expectedSourceType then
+                            bsLog.Warn(function()
+                                return "Combat filter leak (healOut): expected result=" .. tostring(expectedResult) .. "/" .. tostring(expectedSourceType)
+                                        .. " got=" .. tostring(result) .. "/" .. tostring(sourceType)
+                            end)
+                            return
+                        end
+                        self:OnCombatEvent(eventCode, result, isError, abilityName, abilityGraphic, abilityActionSlotType, sourceName, sourceType, ...)
+                    end,
+                    REGISTER_FILTER_COMBAT_RESULT, expectedResult,
+                    REGISTER_FILTER_SOURCE_COMBAT_UNIT_TYPE, expectedSourceType,
+                    REGISTER_FILTER_IS_ERROR, false)
+        end
+    end
+
+    -- Healing in: personal target × healing result (source=GROUP checked in Lua)
+    -- NOTE: ESO doesn't support combining SOURCE and TARGET unit type filters on the
+    -- same registration — the source filter gets ignored. Filter by target only.
+    for i, expectedResult in ipairs(healingResults) do
+        for j, expectedTargetType in ipairs(personalTargetTypes) do
+            registerCombatEvent("BattleScrolls_HealIn" .. i .. "_" .. j,
+                    function(eventCode, result, isError, abilityName, abilityGraphic, abilityActionSlotType, sourceName, sourceType, targetName, targetType, ...)
+                        if isError or result ~= expectedResult or sourceType ~= COMBAT_UNIT_TYPE_GROUP or targetType ~= expectedTargetType then
+                            return
+                        end
+                        self:OnCombatEvent(eventCode, result, isError, abilityName, abilityGraphic, abilityActionSlotType, sourceName, sourceType, targetName, targetType, ...)
+                    end,
+                    REGISTER_FILTER_COMBAT_RESULT, expectedResult,
+                    REGISTER_FILTER_TARGET_COMBAT_UNIT_TYPE, expectedTargetType,
+                    REGISTER_FILTER_IS_ERROR, false)
+        end
+    end
 
     EVENT_MANAGER:RegisterForEvent("BattleScrolls_State", EVENT_PLAYER_COMBAT_STATE,
             function(_, inCombat)
@@ -713,7 +828,37 @@ function BattleScrolls.state:Initialize()
                 self:RefreshBosses()
             end
     )
+
+    -- Weaving module: SLOT events, LA/HA confirmation, LA abilityId discovery
+    BattleScrolls.weaving:Initialize()
+
+    -- Crux stack tracking for Exhausting Fatecarver channel duration adjustment.
+    -- Race condition: Crux events may fire before or after Fatecarver SLOT, and
+    -- multiple Crux events can fire in rapid succession (GAINED->UPDATED->FADED).
+    -- We track the max stack count seen within a recent window so that SLOT can
+    -- read the pre-consumption value regardless of event ordering.
+    self.cruxStacks = 0
+    self.cruxRecentMax = 0
+    self.cruxWindowStartMs = 0
+    EVENT_MANAGER:RegisterForEvent("BattleScrolls_Crux", EVENT_EFFECT_CHANGED,
+            function(_, changeType, _, _, _, _, _, stackCount)
+                local now = GetGameTimeMilliseconds()
+                local newStacks = changeType == EFFECT_RESULT_FADED and 0 or (stackCount or 0)
+                -- If this event is part of a burst (within 50ms), update the running max.
+                -- Otherwise start a fresh window.
+                if (now - self.cruxWindowStartMs) < 50 then
+                    self.cruxRecentMax = zo_max(self.cruxRecentMax, self.cruxStacks, newStacks)
+                else
+                    self.cruxRecentMax = zo_max(self.cruxStacks, newStacks)
+                    self.cruxWindowStartMs = now
+                end
+                self.cruxStacks = newStacks
+            end)
+    EVENT_MANAGER:AddFilterForEvent("BattleScrolls_Crux", EVENT_EFFECT_CHANGED,
+            REGISTER_FILTER_UNIT_TAG, "player",
+            REGISTER_FILTER_ABILITY_ID, CRUX_ABILITY_ID)
 end
+
 
 ---Updates cached ability metadata
 ---@param abilityId number
@@ -732,6 +877,7 @@ function BattleScrolls.state:UpdateAbilityInfo(abilityId, isDot, damageType)
     self.abilityInfo[abilityId].overTimeOrDirect[overTimeOrDirectKey] = true
     self.abilityInfo[abilityId].damageTypes[damageType] = true
 end
+
 
 -- Use accumulators module for combat result helpers
 local isOverTimeResult = BattleScrolls.accumulators.isOverTimeResult
@@ -1166,6 +1312,7 @@ function BattleScrolls.state:ChangePlayerCombatState(inCombat)
     if inCombat and not self.initialized then
         self.initialized = true
         self:RefreshBosses()
+        BattleScrolls.weaving:OnCombatStart()
 
         local nowMs = GetGameTimeMilliseconds()
         local cutoffMs = nowMs - PRE_COMBAT_LOOKBACK_MS

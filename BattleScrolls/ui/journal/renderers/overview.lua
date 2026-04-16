@@ -64,39 +64,6 @@ local function CalculateDynamicPriorities(dps, hps, dtps)
 end
 
 -------------------------
--- Proc Tooltip Builder
--------------------------
-
----Builds tooltip text for a proc entry, showing per-enemy breakdown
----@param procData ProcData
----@param unitNames table<number, string>
----@return string text Formatted tooltip text with per-enemy breakdown
-local function buildProcTooltipText(procData, unitNames)
-    local lines = {}
-
-    -- Summary line
-    local totalProcsStr = zo_strformat(GetString(BATTLESCROLLS_STAT_TOTAL_PROCS), procData.totalProcs)
-    lines[#lines + 1] = totalProcsStr
-
-    -- Median interval
-    if procData.medianIntervalMs > 0 then
-        lines[#lines + 1] = string.format("%s: %.1fs",
-            GetString(BATTLESCROLLS_STAT_MEDIAN_INTERVAL), procData.medianIntervalMs / 1000)
-    end
-
-    -- Per-enemy breakdown
-    if procData.procsByEnemy and #procData.procsByEnemy > 0 then
-        lines[#lines + 1] = ""
-        for _, enemy in ipairs(procData.procsByEnemy) do
-            local enemyName = unitNames[enemy.unitId] or string.format("#%d", enemy.unitId)
-            lines[#lines + 1] = string.format("%s: %d", enemyName, enemy.procCount)
-        end
-    end
-
-    return table.concat(lines, "\n")
-end
-
--------------------------
 -- Public API
 -------------------------
 
@@ -107,7 +74,6 @@ function OverviewRenderer.renderOverview(ctx)
     return LibEffect.Async(function()
         local list = ctx.list
         local encounter = ctx.encounter
-        local unitNames = ctx.unitNames
         local durationSec = ctx.durationSec
 
         -------------------------
@@ -297,43 +263,6 @@ function OverviewRenderer.renderOverview(ctx)
                 sublabel = ZO_CommaDelimitNumber(math.floor(healingInReal / durationSec)),
                 icon = StatIcons.HPS,
             })
-        end
-        LibEffect.Yield():Await()
-
-        -------------------------
-        -- Proc Tracking
-        -------------------------
-        if encounter.procs and #encounter.procs > 0 then
-            local isFirst = true
-            for _, procData in ipairs(encounter.procs) do
-                local abilityName = BattleScrolls.utils.GetScribeAwareAbilityDisplayName(procData.abilityId)
-                if abilityName == "" then
-                    abilityName = string.format("%s %d", GetString(BATTLESCROLLS_TOOLTIP_ABILITY), procData.abilityId)
-                end
-
-                local abilityIcon = GetAbilityIcon(procData.abilityId)
-                local valueStr
-                local totalProcsStr = zo_strformat(GetString(BATTLESCROLLS_STAT_TOTAL_PROCS), procData.totalProcs)
-                if procData.medianIntervalMs > 0 then
-                    valueStr = string.format("%s (%s %.1fs)", totalProcsStr, GetString(BATTLESCROLLS_STAT_MEDIAN_INTERVAL), procData.medianIntervalMs / 1000)
-                else
-                    valueStr = totalProcsStr
-                end
-
-                EntryBuilder.addEntry(list, {
-                    label = abilityName,
-                    sublabel = valueStr,
-                    icon = abilityIcon,
-                    frame = true,
-                    header = isFirst and GetString(BATTLESCROLLS_HEADER_PROC_TRACKING) or nil,
-                    tooltip = {
-                        type = "text",
-                        title = abilityName,
-                        text = buildProcTooltipText(procData, unitNames),
-                    },
-                })
-                isFirst = false
-            end
         end
     end)
 end

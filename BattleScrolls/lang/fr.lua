@@ -47,6 +47,31 @@ local strings = {
     [BATTLESCROLLS_TAB_EFFECTS_BOSS] = "Effets de boss",
     [BATTLESCROLLS_TAB_EFFECTS_GROUP] = "Effets du groupe",
     [BATTLESCROLLS_TAB_GROUP] = "Groupe",
+    [BATTLESCROLLS_TAB_ACTIVITY] = "Activité",
+
+    -------------------------
+    -- Weaving Stats
+    -------------------------
+    [BATTLESCROLLS_HEADER_WEAVING] = "Weaving",
+    [BATTLESCROLLS_HEADER_WEAVING_BY_ABILITY] = "Weaving par compétence",
+    [BATTLESCROLLS_STAT_AVG_WEAVE_TIME] = "Délai moyen d'incantation",
+    [BATTLESCROLLS_STAT_WEAVE_TIME_BEFORE] = "Temps de weave avant",
+    [BATTLESCROLLS_STAT_TIME_LOST] = "Temps perdu",
+    [BATTLESCROLLS_STAT_LIGHT_ATTACKS] = "Attaques légères",
+    [BATTLESCROLLS_STAT_HEAVY_ATTACKS] = "Attaques lourdes",
+    [BATTLESCROLLS_STAT_SKILL_ACTIVATIONS] = "Compétences",
+    [BATTLESCROLLS_STAT_CASTS] = "Incantations",
+    [BATTLESCROLLS_STAT_WEAVING_ERRORS] = "Erreurs de weaving",
+    [BATTLESCROLLS_STAT_MISSED_LA] = "Attaques légères manquées",
+    [BATTLESCROLLS_STAT_DOUBLE_LA] = "Attaques légères doublées",
+    [BATTLESCROLLS_TOOLTIP_DELAY_AFTER] = "Délai après incantation",
+    [BATTLESCROLLS_TOOLTIP_DELAY_BEFORE] = "Délai avant incantation",
+    [BATTLESCROLLS_FORMAT_SECONDS] = "<<1>>s",
+    [BATTLESCROLLS_FORMAT_MILLISECONDS] = "<<1>>ms",
+    [BATTLESCROLLS_TOOLTIP_INTER_CAST_DESC] = "Délai moyen entre les incantations. Mesuré à partir de la fin du GCD ou du temps d'incantation d'une compétence jusqu'au début de l'action suivante. Aussi connu sous le nom de Weaving Average dans CMX.",
+    [BATTLESCROLLS_TOOLTIP_TIME_LOST_DESC] = "Temps total entre les incantations pendant la rencontre. Aussi connu sous le nom de Weaving Total dans CMX.",
+    [BATTLESCROLLS_TOOLTIP_MISSED_LA_DESC] = "Compétence lancée directement après une autre compétence, sans attaque légère entre les deux.",
+    [BATTLESCROLLS_TOOLTIP_DOUBLE_LA_DESC] = "Deux attaques légères consécutives, sans compétence entre les deux.",
 
     -------------------------
     -- Time Headers
@@ -814,6 +839,11 @@ local strings = {
     [BATTLESCROLLS_PIVOT_METRIC_GROUP_DEATH_COUNT] = "Morts",
     [BATTLESCROLLS_PIVOT_METRIC_DURATION] = "Durée",
     [BATTLESCROLLS_PIVOT_METRIC_DEATH_COUNT] = "Morts",
+    [BATTLESCROLLS_PIVOT_METRIC_AVG_WEAVE_TIME] = "Délai moyen",
+    [BATTLESCROLLS_PIVOT_METRIC_TIME_LOST] = "Temps perdu",
+    [BATTLESCROLLS_PIVOT_METRIC_LIGHT_ATTACKS_PER_SEC] = "LA/s",
+    [BATTLESCROLLS_PIVOT_METRIC_WEAVING_ERRORS] = "LA manquées",
+    [BATTLESCROLLS_PIVOT_METRIC_DOUBLE_LA_ERRORS] = "LA doublées",
 
     -- Aggregation options
     [BATTLESCROLLS_PIVOT_AGG_SUM] = "Somme",

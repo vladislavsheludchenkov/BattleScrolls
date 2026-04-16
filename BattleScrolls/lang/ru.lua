@@ -48,6 +48,31 @@ local strings = {
     [BATTLESCROLLS_TAB_EFFECTS_BOSS] = "Эффекты боссов",
     [BATTLESCROLLS_TAB_EFFECTS_GROUP] = "Эффекты группы",
     [BATTLESCROLLS_TAB_GROUP] = "Группа",
+    [BATTLESCROLLS_TAB_ACTIVITY] = "Активность",
+
+    -------------------------
+    -- Weaving Stats
+    -------------------------
+    [BATTLESCROLLS_HEADER_WEAVING] = "Вивинг",
+    [BATTLESCROLLS_HEADER_WEAVING_BY_ABILITY] = "Вивинг по способности",
+    [BATTLESCROLLS_STAT_AVG_WEAVE_TIME] = "Средняя задержка каста",
+    [BATTLESCROLLS_STAT_WEAVE_TIME_BEFORE] = "Время вива до",
+    [BATTLESCROLLS_STAT_TIME_LOST] = "Потерянное время",
+    [BATTLESCROLLS_STAT_LIGHT_ATTACKS] = "Обычные атаки",
+    [BATTLESCROLLS_STAT_HEAVY_ATTACKS] = "Силовые атаки",
+    [BATTLESCROLLS_STAT_SKILL_ACTIVATIONS] = "Навыки",
+    [BATTLESCROLLS_STAT_CASTS] = "Касты",
+    [BATTLESCROLLS_STAT_WEAVING_ERRORS] = "Ошибки вивинга",
+    [BATTLESCROLLS_STAT_MISSED_LA] = "Пропущенные обычные атаки",
+    [BATTLESCROLLS_STAT_DOUBLE_LA] = "Двойные обычные атаки",
+    [BATTLESCROLLS_TOOLTIP_DELAY_AFTER] = "Задержка после каста",
+    [BATTLESCROLLS_TOOLTIP_DELAY_BEFORE] = "Задержка до каста",
+    [BATTLESCROLLS_FORMAT_SECONDS] = "<<1>>с",
+    [BATTLESCROLLS_FORMAT_MILLISECONDS] = "<<1>>мс",
+    [BATTLESCROLLS_TOOLTIP_INTER_CAST_DESC] = "Средняя задержка между кастами. Измеряется от окончания ГКД или времени каста навыка до начала следующего действия. Также известна как Weaving Average в CMX.",
+    [BATTLESCROLLS_TOOLTIP_TIME_LOST_DESC] = "Суммарное время простоя между кастами за бой. Также известно как Weaving Total в CMX.",
+    [BATTLESCROLLS_TOOLTIP_MISSED_LA_DESC] = "Навык активирован сразу после другого навыка, без обычной атаки между ними.",
+    [BATTLESCROLLS_TOOLTIP_DOUBLE_LA_DESC] = "Две обычные атаки подряд, без навыка между ними.",
 
     -------------------------
     -- Time Headers
@@ -816,6 +841,11 @@ local strings = {
     [BATTLESCROLLS_PIVOT_METRIC_GROUP_DEATH_COUNT] = "Смерти",
     [BATTLESCROLLS_PIVOT_METRIC_DURATION] = "Длительность",
     [BATTLESCROLLS_PIVOT_METRIC_DEATH_COUNT] = "Смерти",
+    [BATTLESCROLLS_PIVOT_METRIC_AVG_WEAVE_TIME] = "Задержка каста",
+    [BATTLESCROLLS_PIVOT_METRIC_TIME_LOST] = "Потерянное время",
+    [BATTLESCROLLS_PIVOT_METRIC_LIGHT_ATTACKS_PER_SEC] = "ЛА/с",
+    [BATTLESCROLLS_PIVOT_METRIC_WEAVING_ERRORS] = "Пропущенные ОА",
+    [BATTLESCROLLS_PIVOT_METRIC_DOUBLE_LA_ERRORS] = "Двойные ОА",
 
     -- Aggregation options
     [BATTLESCROLLS_PIVOT_AGG_SUM] = "Сумма",

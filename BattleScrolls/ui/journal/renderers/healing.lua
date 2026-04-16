@@ -480,12 +480,13 @@ end
 ---@param name string Ability name for tooltip title
 ---@return TooltipDescriptor|nil
 local function buildAbilityTooltip(critStats, name)
-    local lines = {}
-    tooltips.appendTickStats(lines, critStats)
-    if #lines > 0 then
-        return { type = "text", title = name, text = table.concat(lines, "\n") }
+    if not critStats or critStats.ticks == 0 then
+        return nil
     end
-    return nil
+    local lines = {}
+    table.insert(lines, string.format("%s: %s", GetString(BATTLESCROLLS_TOOLTIP_TOTAL), ZO_CommaDelimitNumber(critStats.total)))
+    tooltips.appendTickStats(lines, critStats)
+    return { type = "text", title = name, text = table.concat(lines, "\n") }
 end
 
 ---Builds tooltip for an ability with breakdown (multiple ability IDs sharing the same name)
@@ -494,21 +495,17 @@ end
 ---@return TooltipDescriptor|nil
 local function buildBreakdownTooltip(breakdown, critStats)
     local lines = {}
+    table.insert(lines, string.format("%s: %s", GetString(BATTLESCROLLS_TOOLTIP_TOTAL), ZO_CommaDelimitNumber(breakdown.totalHealing)))
     tooltips.appendTickStats(lines, critStats)
     if breakdown.entries and #breakdown.entries > 1 then
-        if #lines > 0 then
-            table.insert(lines, "")
-        end
+        table.insert(lines, "")
         for _, be in ipairs(breakdown.entries) do
             local pct = breakdown.totalHealing > 0 and (be.healing / breakdown.totalHealing * 100) or 0
-            table.insert(lines, string.format("%s: %s (%.1f%%)", be.displayName, ZO_CommaDelimitNumber(be.healing), pct))
-            tooltips.appendTickStats(lines, be.critStats, "  ")
+            table.insert(lines, string.format("  %s: %s (%.1f%%)", be.displayName, ZO_CommaDelimitNumber(be.healing), pct))
+            tooltips.appendTickStats(lines, be.critStats, "    ")
         end
     end
-    if #lines > 0 then
-        return { type = "text", title = breakdown.baseName, text = table.concat(lines, "\n") }
-    end
-    return nil
+    return { type = "text", title = breakdown.baseName, text = table.concat(lines, "\n") }
 end
 
 ---Core function to display healing ability breakdown (async with yields)

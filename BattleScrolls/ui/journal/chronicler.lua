@@ -432,6 +432,7 @@ function chronicler.computeTabVisibility(decodedEncounter)
         hasAnyEffects = (hasEffectsPlayer or hasEffectsBoss or hasEffectsGroup) or false,
         hasGroupData = decodedEncounter.sharedData ~= nil and #decodedEncounter.sharedData >= 2,
         hasSetup = decodedEncounter.setup ~= nil,
+        hasActivity = (decodedEncounter.procs and #decodedEncounter.procs > 0) or decodedEncounter.weaving ~= nil,
     }
 end
 
@@ -506,7 +507,20 @@ function chronicler.getEncounterTabBarEntries(journalUI)
         return entries
     end
 
-    -- 2. Damage (parent tab — sub-views: Boss Damage Done, Damage Done)
+    -- 2. Activity (standalone — weaving, procs)
+    if tabVis.hasActivity then
+        table.insert(entries, {
+            text = GetString(BATTLESCROLLS_TAB_ACTIVITY),
+            callback = function()
+                if journalUI.selectedTab ~= STATS_TAB.ACTIVITY then
+                    journalUI.selectedTab = STATS_TAB.ACTIVITY
+                    chronicler.refreshList(journalUI, true)
+                end
+            end,
+        })
+    end
+
+    -- 3. Damage (parent tab — sub-views: Boss Damage Done, Damage Done)
     local damageSubViews = getVisibleSubViews("DAMAGE", tabVis)
     if #damageSubViews > 0 then
         table.insert(entries, {

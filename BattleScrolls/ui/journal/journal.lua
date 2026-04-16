@@ -28,6 +28,7 @@ BattleScrolls_Journal_StatsTab = {
     EFFECTS_GROUP = 10,
     GROUP = 11,
     SETUP = 12,
+    ACTIVITY = 13,
 }
 
 BattleScrolls_Journal_InstanceTab = {
