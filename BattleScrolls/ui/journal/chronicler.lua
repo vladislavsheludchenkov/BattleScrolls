@@ -179,6 +179,10 @@ local function showSetupBarTooltip(data)
             abilitySection:AddCustomControl(row)
             tooltip:AddSection(abilitySection)
 
+            local metaSection = tooltip:AcquireSection(SCRIBING_SECTION_STYLE)
+            metaSection:AddLine(journal.utils.formatAbilityIdLine(ability.abilityId), SCRIBING_SCRIPT_STYLE)
+            tooltip:AddSection(metaSection)
+
             -- Scribing scripts: each on its own line with inline icon, tight spacing
             if ability.scripts and #ability.scripts > 0 then
                 local scriptSection = tooltip:AcquireSection(SCRIBING_SECTION_STYLE)

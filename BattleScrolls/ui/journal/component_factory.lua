@@ -203,12 +203,12 @@ local function populateHorizontalIcons(container, abilities)
         if isEmpty then
             entry.icon:SetHidden(true)
         else
-            local abilityIcon = GetAbilityIcon(ability.abilityId)
+            local abilityIcon = journal.utils.getAbilityIcon(ability.abilityId)
             entry.icon:SetTexture(abilityIcon)
             entry.icon:SetHidden(false)
         end
 
-        local isPassive = not isEmpty and journal.utils.isPassiveIcon(GetAbilityIcon(ability.abilityId))
+        local isPassive = not isEmpty and journal.utils.isPassiveIcon(journal.utils.getAbilityIcon(ability.abilityId))
         local frameInset = isUltimate and HORIZONTAL_ULT_FRAME_INSET or HORIZONTAL_FRAME_INSET
 
         entry.edgeFrame:ClearAnchors()
@@ -430,7 +430,7 @@ function ColumnBuilder:AbilityBar(abilityData, topValue, totalDamage, durationS)
     local abilityId = abilityData.abilityId
 
     local icon = bar:GetNamedChild("Icon")
-    local abilityIcon = abilityData.icon or GetAbilityIcon(abilityId)
+    local abilityIcon = abilityData.icon or journal.utils.getAbilityIcon(abilityId)
     icon:SetTexture(abilityIcon)
     setupIconFrame(bar, abilityIcon)
 
@@ -486,7 +486,7 @@ function ColumnBuilder:EffectBar(abilityId, percent, stats, isFavorite)
     local bar = self.pools.effectBar:Acquire()
 
     local icon = bar:GetNamedChild("Icon")
-    local abilityIcon = GetAbilityIcon(abilityId)
+    local abilityIcon = journal.utils.getAbilityIcon(abilityId)
     icon:SetTexture(abilityIcon)
     setupIconFrame(bar, abilityIcon)
 
@@ -544,7 +544,7 @@ function ColumnBuilder:EffectRow(abilityId, percent, stats, isFavorite)
     local row = self.pools.effectRow:Acquire()
 
     local icon = row:GetNamedChild("Icon")
-    local abilityIcon = GetAbilityIcon(abilityId)
+    local abilityIcon = journal.utils.getAbilityIcon(abilityId)
     icon:SetTexture(abilityIcon)
     setupIconFrame(row, abilityIcon)
 
@@ -670,7 +670,7 @@ function ColumnBuilder:DeathAttackRow(attack, isKillingBlow)
     local row = self.pools.deathRow:Acquire()
 
     local icon = row:GetNamedChild("Icon")
-    local abilityIcon = GetAbilityIcon(attack.abilityId)
+    local abilityIcon = journal.utils.getAbilityIcon(attack.abilityId)
     icon:SetTexture(abilityIcon)
     icon:ClearAnchors()
     icon:SetAnchor(LEFT, row, LEFT, DEATH_ICON_OFFSET_X, 0)

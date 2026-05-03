@@ -171,6 +171,7 @@ journal.StatIcons = {
     DIRECT_HEAL = "EsoUI/Art/Icons/scribing_primary_healing.dds",
     DOT = "EsoUI/Art/Icons/scribing_secondary_damageovertime.dds",
     HOT = "EsoUI/Art/Icons/scribing_secondary_healovertime.dds",
+    SHIELD = "EsoUI/Art/Icons/scribing_primary_damageshield.dds",
 
     -- AOE vs Single Target
     AOE = "EsoUI/Art/Icons/scribing_primary_multihit.dds",
@@ -225,6 +226,7 @@ journal.AbilityIconStyle = {
 ---@class CritStats
 ---@field total number Total damage/healing
 ---@field rawTotal number|nil Raw total (includes overkill)
+---@field raw number|nil Raw healing total
 ---@field ticks number Total tick count
 ---@field critTicks number Critical tick count
 ---@field minTick number|nil Minimum tick value

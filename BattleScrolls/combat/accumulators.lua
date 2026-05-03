@@ -176,6 +176,42 @@ function accumulators.healingDiffSource(healingDone, sourceUnitID, abilityID, hi
     accumulators.addToHealingBreakdown(healingDone.bySourceUnitIdByAbilityId[sourceUnitID][abilityID], hitValue, overflow, isCrit)
 end
 
+---Requalifies absorbed shield value from overheal to effective healing.
+---@param healingDone HealingDoneDiffSource
+---@param sourceUnitID number
+---@param abilityID number
+---@param absorbed number
+function accumulators.shieldAbsorbDiffSource(healingDone, sourceUnitID, abilityID, absorbed)
+    local bySource = healingDone.bySourceUnitIdByAbilityId[sourceUnitID]
+    if not bySource or not bySource[abilityID] then return end
+
+    local breakdown = bySource[abilityID]
+    local effective = math.min(absorbed, breakdown.overheal or 0)
+    if effective <= 0 then return end
+
+    breakdown.real = breakdown.real + effective
+    breakdown.overheal = breakdown.overheal - effective
+    healingDone.total.real = healingDone.total.real + effective
+    healingDone.total.overheal = math.max(0, healingDone.total.overheal - effective)
+end
+
+---Requalifies absorbed shield value from overheal to effective healing.
+---@param healingDone HealingDone
+---@param abilityID number
+---@param absorbed number
+function accumulators.shieldAbsorbDone(healingDone, abilityID, absorbed)
+    local breakdown = healingDone.byAbilityId[abilityID]
+    if not breakdown then return end
+
+    local effective = math.min(absorbed, breakdown.overheal or 0)
+    if effective <= 0 then return end
+
+    breakdown.real = breakdown.real + effective
+    breakdown.overheal = breakdown.overheal - effective
+    healingDone.total.real = healingDone.total.real + effective
+    healingDone.total.overheal = math.max(0, healingDone.total.overheal - effective)
+end
+
 -- ============================================================================
 -- HealingStats Factory and Clear
 -- ============================================================================

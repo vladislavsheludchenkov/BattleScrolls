@@ -38,9 +38,13 @@ function tooltips.appendTickStats(lines, stats, indent)
     end
     indent = indent or ""
     local critPercent = stats.critTicks / stats.ticks * 100
-    -- Use rawTotal for avg (includes overkill), falling back to total for old data
-    local rawTotal = stats.rawTotal and stats.rawTotal > 0 and stats.rawTotal or stats.total
-    local avgTick = math.floor(rawTotal / stats.ticks)
+    local tickTotal = stats.total
+    if stats.rawTotal and stats.rawTotal > 0 then
+        tickTotal = stats.rawTotal
+    elseif stats.raw and stats.raw > 0 then
+        tickTotal = stats.raw
+    end
+    local avgTick = math.floor(tickTotal / stats.ticks)
     table.insert(lines, string.format("%s%s: %.1f%% (%d/%d)", indent, GetString(BATTLESCROLLS_TOOLTIP_CRIT), critPercent, stats.critTicks, stats.ticks))
     table.insert(lines, string.format("%s%s: %s", indent, GetString(BATTLESCROLLS_TOOLTIP_AVG_TICK), ZO_CommaDelimitNumber(avgTick)))
     table.insert(lines, string.format("%s%s: %s", indent, GetString(BATTLESCROLLS_TOOLTIP_MIN_TICK), ZO_CommaDelimitNumber(stats.minTick)))

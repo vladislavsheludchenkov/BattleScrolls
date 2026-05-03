@@ -272,8 +272,8 @@ local strings = {
     [BATTLESCROLLS_STAT_EFFECTIVE_HPS] = "Эфф. HPS",
     [BATTLESCROLLS_STAT_OVERHEAL] = "Переисцеление",
 
-    [BATTLESCROLLS_HEADER_RAW_HOT_VS_DIRECT] = "Полное: HoT / Прямое",
-    [BATTLESCROLLS_HEADER_EFFECTIVE_HOT_VS_DIRECT] = "Эфф.: HoT / Прямое",
+    [BATTLESCROLLS_HEADER_RAW_HOT_VS_DIRECT] = "Полное по типу",
+    [BATTLESCROLLS_HEADER_EFFECTIVE_HOT_VS_DIRECT] = "Эфф. по типу",
     [BATTLESCROLLS_HEADER_RAW_HEALING_BY_TARGET] = "Полное по цели",
     [BATTLESCROLLS_HEADER_RAW_HEALING_BY_ABILITY] = "Полное по способности",
     [BATTLESCROLLS_HEADER_EFFECTIVE_HEALING_BY_TARGET] = "Эфф. по цели",
@@ -283,6 +283,7 @@ local strings = {
 
     [BATTLESCROLLS_STAT_DIRECT_HEALING] = "Прямое исцеление",
     [BATTLESCROLLS_STAT_HEALING_OVER_TIME] = "Периодическое исцеление",
+    [BATTLESCROLLS_STAT_SHIELD_HEALING] = "Щиты урона",
 
     -------------------------
     -- Effects Stats
@@ -335,6 +336,7 @@ local strings = {
     [BATTLESCROLLS_TOOLTIP_MEDIAN_INTERVAL] = "Медианный интервал",
 
     [BATTLESCROLLS_TOOLTIP_ABILITY] = "Способность",
+    [BATTLESCROLLS_TOOLTIP_ABILITY_ID] = "ID способности",
 
     -------------------------
     -- Damage Types
@@ -360,6 +362,7 @@ local strings = {
     [BATTLESCROLLS_DELIVERY_DOT] = "Периодический",
     [BATTLESCROLLS_DELIVERY_DIRECT] = "Прямой",
     [BATTLESCROLLS_DELIVERY_HOT] = "Периодическое",
+    [BATTLESCROLLS_DELIVERY_SHIELD] = "Щит",
 
     -------------------------
     -- Filter Dialog

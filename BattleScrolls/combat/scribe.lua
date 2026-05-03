@@ -496,8 +496,8 @@ function scribe:ImportEncounterFromStateAsync()
         return
     end
 
-    -- Flush any unconfirmed pending LA before snapshotting
-    BattleScrolls.weaving:FlushPendingLa()
+    -- Finalize closed weaving gaps before snapshotting
+    BattleScrolls.weaving:FlushPendingGaps()
 
     -- Capture references to state data (state:Reset() creates new tables, doesn't modify old ones)
     local capturedLocation = self.location
@@ -763,6 +763,7 @@ function scribe:ImportEncounterFromStateAsync()
             decodedAbilityInfo):Await()
         -- Atomic: set fields and insert encounter together
         instance._instanceData = encodedFields._instanceData
+        instance._instanceDataVersion = encodedFields._instanceDataVersion
         table.insert(instance.encounters, compactEncounter)
         instance._estimatedSize = nil
 

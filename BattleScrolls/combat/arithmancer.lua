@@ -48,6 +48,25 @@ local function getAbilities(damageDone)
     return damageDone
 end
 
+---@param info AbilityInfo|nil
+---@return AbilityDeliveryType|nil
+function Arithmancer.GetAbilityDeliveryType(info)
+    return info and info.deliveryType or nil
+end
+
+---@param info AbilityInfo|nil
+---@return "hot"|"direct"|"shield"
+local function getHealingDeliveryKey(info)
+    local deliveryType = Arithmancer.GetAbilityDeliveryType(info)
+    if deliveryType and deliveryType.shield then
+        return "shield"
+    end
+    if deliveryType and deliveryType.overTime then
+        return "hot"
+    end
+    return "direct"
+end
+
 ---Gets abilities map from a DamageDone structure (public API)
 ---Handles both verbose (has .byAbilityId) and decoded compact (abilities directly)
 ---@param damageDone DamageDoneStorage
@@ -87,8 +106,8 @@ function Arithmancer.ComputeByDotOrDirect(damageDone, abilityInfo)
     local result = { dot = 0, direct = 0 }
     for abilityId, breakdown in pairs(getAbilities(damageDone)) do
         local info = abilityInfo[abilityId]
-        -- overTimeOrDirect is a table: { overTime = true/nil, direct = true/nil }
-        local isDot = info and info.overTimeOrDirect and info.overTimeOrDirect.overTime
+        local deliveryType = Arithmancer.GetAbilityDeliveryType(info)
+        local isDot = deliveryType and deliveryType.overTime
         if isDot then
             result.dot = result.dot + breakdown.total
         else
@@ -123,19 +142,19 @@ end
 
 ---Computes HOT vs Direct breakdown from a HealingDone structure
 ---@param healingDone HealingDone|HealingDoneDiffSource
----@param abilityInfo table<number, AbilityInfo> Ability metadata for determining HOT/Direct
----@return { hot: { raw: number, real: number }, direct: { raw: number, real: number } }
+---@param abilityInfo table<number, AbilityInfo> Ability metadata for determining healing delivery
+---@return { hot: { raw: number, real: number }, direct: { raw: number, real: number }, shield: { raw: number, real: number } }
 function Arithmancer.ComputeByHotVsDirect(healingDone, abilityInfo)
     local result = {
         hot = { raw = 0, real = 0 },
         direct = { raw = 0, real = 0 },
+        shield = { raw = 0, real = 0 },
     }
     -- Handle HealingDone (has byAbilityId directly)
     if healingDone.byAbilityId then
         for abilityId, breakdown in pairs(healingDone.byAbilityId) do
             local info = abilityInfo[abilityId]
-            local isHot = info and info.overTimeOrDirect and info.overTimeOrDirect.overTime
-            local key = isHot and "hot" or "direct"
+            local key = getHealingDeliveryKey(info)
             result[key].raw = result[key].raw + (breakdown.raw or 0)
             result[key].real = result[key].real + (breakdown.real or 0)
         end
@@ -145,8 +164,7 @@ function Arithmancer.ComputeByHotVsDirect(healingDone, abilityInfo)
         for _, byAbility in pairs(healingDone.bySourceUnitIdByAbilityId) do
             for abilityId, breakdown in pairs(byAbility) do
                 local info = abilityInfo[abilityId]
-                local isHot = info and info.overTimeOrDirect and info.overTimeOrDirect.overTime
-                local key = isHot and "hot" or "direct"
+                local key = getHealingDeliveryKey(info)
                 result[key].raw = result[key].raw + (breakdown.raw or 0)
                 result[key].real = result[key].real + (breakdown.real or 0)
             end

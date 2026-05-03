@@ -2,7 +2,7 @@
 -- Weaving
 -- Light attack weaving and rotation tracking for Battle Scrolls
 --
--- Tracks skill activations, LA/HA hits, weaving time between
+-- Tracks skill activations, confirmed LA/HA hits, cast delay between
 -- skills, and weaving errors (missed LAs, double LAs).
 --
 -- Uses EVENT_ACTION_SLOT_ABILITY_USED for activation timing
@@ -13,7 +13,7 @@
 --   weaving:Cleanup()             -- Unregister all events
 --   weaving:OnCombatStart()       -- Re-discover LA IDs on combat entry
 --   weaving:OnLightAttackConfirmed() -- LA confirmed by combat event
---   weaving:FlushPendingLa()      -- Flush unconfirmed LA at combat end
+--   weaving:FlushPendingGaps()    -- Finalize pending skill gaps at combat end
 --   weaving.newState()            -- Factory for WeavingState subtable
 -----------------------------------------------------------
 
@@ -27,15 +27,28 @@ BattleScrolls = BattleScrolls or {}
 ---@field lastSkillStartTime number|nil Effective start time of last skill activation (transient)
 ---@field lastSkillEndTime number|nil Estimated end time of last skill activation (transient)
 ---@field lastSkillAbilityId number|nil Ability ID of last skill activation (transient)
----@field lastActivationType "skill"|"la"|"ha"|nil Type of last action (transient)
----@field pendingLa boolean LA SLOT fired, waiting for combat event confirmation
----@field pendingLaPrevSkillId number|nil Skill before the pending LA (for phantom error attribution)
+---@field currentGapCandidateLaCount number LA inputs after the last skill, before the next skill closes the gap
+---@field currentGapConfirmedLaCount number Confirmed LAs assigned to the open gap after the last skill
+---@field currentGapHeavyAttackCount number Confirmed HAs assigned to the open gap after the last skill
+---@field ungappedLaCandidateCount number LA inputs before the first tracked skill
+---@field ungappedLaCandidateDeadlineMs number Last timestamp that can accept ungapped LA confirmations
+---@field pendingGaps table<number, WeavingPendingGap> Closed skill gaps waiting for delayed LA confirmations
+---@field pendingGapHead number Queue head index for pendingGaps
+---@field pendingGapTail number Queue tail index for pendingGaps
+---@field pendingGapPool WeavingPendingGap[] Reusable gap records
 ---@field weavingByAbilityId table<number, WeavingAccumulator> Per-ability weaving accumulators
 ---@field lightAttackHits number Light attack count (confirmed by combat events)
 ---@field heavyAttackHits number Heavy attack count (from ACTION_RESULT_BEGIN)
 ---@field skillActivations number Total skill/ultimate activations
 ---@field totalWeavingErrors number Total skill->skill count (no LA in between)
 ---@field doubleLaErrors number Total la->la count (double light attack without a skill)
+
+---@class WeavingPendingGap
+---@field prevSkillAbilityId number Skill before the closed gap
+---@field deadlineMs number Last timestamp that can accept delayed LA confirmations for this gap
+---@field candidateLaCount number LA inputs observed inside this gap
+---@field confirmedLaCount number Confirmed LAs assigned to this gap
+---@field heavyAttackCount number Confirmed HAs assigned to this gap
 
 ---@class BattleScrollsWeaving
 local weaving = {}
@@ -50,6 +63,7 @@ BattleScrolls.weaving = weaving
 local LA_SLOT = 1
 local SKILL_SLOT_MIN = 3
 local SKILL_SLOT_MAX = 8
+local LA_CONFIRM_GRACE_MS = 500
 
 -- Exhausting Fatecarver: channel time extends by 338ms per Crux stack consumed
 local CRUX_MS_PER_STACK = 338
@@ -87,9 +101,15 @@ function weaving.newState()
         lastSkillStartTime = nil,
         lastSkillEndTime = nil,
         lastSkillAbilityId = nil,
-        lastActivationType = nil,
-        pendingLa = false,
-        pendingLaPrevSkillId = nil,
+        currentGapCandidateLaCount = 0,
+        currentGapConfirmedLaCount = 0,
+        currentGapHeavyAttackCount = 0,
+        ungappedLaCandidateCount = 0,
+        ungappedLaCandidateDeadlineMs = 0,
+        pendingGaps = {},
+        pendingGapHead = 1,
+        pendingGapTail = 0,
+        pendingGapPool = {},
         weavingByAbilityId = {},
         lightAttackHits = 0,
         heavyAttackHits = 0,
@@ -137,33 +157,158 @@ local function attributeWeavingTime(w, prevSkillAbilityId, thisSkillAbilityId, t
     beforeEntry.beforeCount = beforeEntry.beforeCount + 1
 end
 
----Retcons a phantom LA as a missed-LA error on the skill before it
 ---@param w WeavingState
-local function retconPhantomLa(w)
-    if w.pendingLaPrevSkillId then
-        local entry = getOrCreateWeavingEntry(w, w.pendingLaPrevSkillId)
+---@return WeavingPendingGap
+local function acquirePendingGap(w)
+    local pool = w.pendingGapPool
+    local gap = pool[#pool]
+    if gap then
+        pool[#pool] = nil
+        return gap
+    end
+    return {}
+end
+
+---@param w WeavingState
+---@param gap WeavingPendingGap
+local function releasePendingGap(w, gap)
+    gap.prevSkillAbilityId = nil
+    gap.deadlineMs = nil
+    gap.candidateLaCount = nil
+    gap.confirmedLaCount = nil
+    gap.heavyAttackCount = nil
+    w.pendingGapPool[#w.pendingGapPool + 1] = gap
+end
+
+---@param w WeavingState
+local function resetCurrentGap(w)
+    w.currentGapCandidateLaCount = 0
+    w.currentGapConfirmedLaCount = 0
+    w.currentGapHeavyAttackCount = 0
+end
+
+---Classifies a closed skill gap after delayed LA confirmations have settled.
+---@param w WeavingState
+---@param gap WeavingPendingGap
+local function finalizeGap(w, gap)
+    if gap.confirmedLaCount == 0 and gap.heavyAttackCount == 0 then
+        local entry = getOrCreateWeavingEntry(w, gap.prevSkillAbilityId)
         entry.errors = entry.errors + 1
         w.totalWeavingErrors = w.totalWeavingErrors + 1
+    elseif gap.confirmedLaCount > 1 then
+        w.doubleLaErrors = w.doubleLaErrors + gap.confirmedLaCount - 1
     end
+end
+
+---@param w WeavingState
+---@param prevSkillAbilityId number
+---@param now number
+local function enqueuePendingGap(w, prevSkillAbilityId, now)
+    local gap = acquirePendingGap(w)
+    gap.prevSkillAbilityId = prevSkillAbilityId
+    gap.deadlineMs = now + LA_CONFIRM_GRACE_MS
+    gap.candidateLaCount = w.currentGapCandidateLaCount
+    gap.confirmedLaCount = w.currentGapConfirmedLaCount
+    gap.heavyAttackCount = w.currentGapHeavyAttackCount
+
+    w.pendingGapTail = w.pendingGapTail + 1
+    w.pendingGaps[w.pendingGapTail] = gap
+    resetCurrentGap(w)
+end
+
+---@param w WeavingState
+---@param now number
+local function finalizeExpiredGaps(w, now)
+    if w.ungappedLaCandidateCount > 0 and w.ungappedLaCandidateDeadlineMs <= now then
+        w.ungappedLaCandidateCount = 0
+        w.ungappedLaCandidateDeadlineMs = 0
+    end
+
+    while w.pendingGapHead <= w.pendingGapTail do
+        local gap = w.pendingGaps[w.pendingGapHead]
+        if not gap or gap.deadlineMs > now then
+            return
+        end
+        w.pendingGaps[w.pendingGapHead] = nil
+        w.pendingGapHead = w.pendingGapHead + 1
+        finalizeGap(w, gap)
+        releasePendingGap(w, gap)
+    end
+
+    w.pendingGapHead = 1
+    w.pendingGapTail = 0
+end
+
+---@param w WeavingState
+local function finalizeAllPendingGaps(w)
+    while w.pendingGapHead <= w.pendingGapTail do
+        local gap = w.pendingGaps[w.pendingGapHead]
+        w.pendingGaps[w.pendingGapHead] = nil
+        w.pendingGapHead = w.pendingGapHead + 1
+        if gap then
+            finalizeGap(w, gap)
+            releasePendingGap(w, gap)
+        end
+    end
+
+    w.pendingGapHead = 1
+    w.pendingGapTail = 0
+end
+
+---@param w WeavingState
+---@param now number
+local function recordLightAttackCandidate(w, now)
+    if w.lastSkillAbilityId then
+        w.currentGapCandidateLaCount = w.currentGapCandidateLaCount + 1
+    else
+        w.ungappedLaCandidateCount = w.ungappedLaCandidateCount + 1
+        w.ungappedLaCandidateDeadlineMs = now + LA_CONFIRM_GRACE_MS
+    end
+end
+
+---@param w WeavingState
+local function attachHeavyAttackConfirmation(w)
+    if w.lastSkillAbilityId then
+        w.currentGapHeavyAttackCount = w.currentGapHeavyAttackCount + 1
+    end
+end
+
+---@param w WeavingState
+---@param now number
+---@return boolean
+local function attachLightAttackConfirmation(w, now)
+    for i = w.pendingGapHead, w.pendingGapTail do
+        local gap = w.pendingGaps[i]
+        if gap and now <= gap.deadlineMs and gap.confirmedLaCount < gap.candidateLaCount then
+            gap.confirmedLaCount = gap.confirmedLaCount + 1
+            return true
+        end
+    end
+
+    if w.lastSkillAbilityId and w.currentGapConfirmedLaCount < w.currentGapCandidateLaCount then
+        w.currentGapConfirmedLaCount = w.currentGapConfirmedLaCount + 1
+        return true
+    end
+
+    if w.ungappedLaCandidateCount > 0 and now <= w.ungappedLaCandidateDeadlineMs then
+        w.ungappedLaCandidateCount = w.ungappedLaCandidateCount - 1
+        return true
+    end
+
+    return false
 end
 
 -- ============================================================================
 -- Event Handlers
 -- ============================================================================
 
----Flushes any unconfirmed pending LA at combat end.
----Only retcons as error if the last activation was a skill (phantom LA between two skills).
----If combat ended on an LA (lastActivationType == "la"), it's just the final action, not an error.
-function weaving:FlushPendingLa()
+---Finalizes closed skill gaps at combat end.
+---The currently open gap after the last skill is not classified because it has no following skill.
+function weaving:FlushPendingGaps()
     local state = BattleScrolls.state
     if not state then return end
     local w = state.weaving
-    if w.pendingLa then
-        if w.lastActivationType == "skill" then
-            retconPhantomLa(w)
-        end
-        w.pendingLa = false
-    end
+    finalizeAllPendingGaps(w)
 end
 
 ---Handles ability slot activation for weaving time tracking
@@ -174,6 +319,8 @@ function weaving:OnActionSlotAbilityUsed(actionSlotIndex)
         return
     end
     local w = state.weaving
+    local now = GetGameTimeMilliseconds()
+    finalizeExpiredGaps(w, now)
 
     if actionSlotIndex == LA_SLOT then
         -- Runtime discovery: register EFFECT_GAINED handler for new LA ability IDs
@@ -183,23 +330,9 @@ function weaving:OnActionSlotAbilityUsed(actionSlotIndex)
             self:RegisterLaConfirmHandler(laId)
         end
 
-        -- Double LA: two consecutive LA SLOTs without a skill in between
-        if w.lastActivationType == "la" then
-            w.doubleLaErrors = w.doubleLaErrors + 1
-        end
-
-        -- If previous LA was never confirmed, retcon it as a missed LA error
-        if w.pendingLa then
-            retconPhantomLa(w)
-        end
-
-        w.pendingLa = true
-        w.pendingLaPrevSkillId = w.lastSkillAbilityId
-        w.lastActivationType = "la"
+        recordLightAttackCandidate(w, now)
     elseif actionSlotIndex >= SKILL_SLOT_MIN and actionSlotIndex <= SKILL_SLOT_MAX then
         -- Skill or ultimate
-        local now = GetGameTimeMilliseconds()
-
         -- Resolve ability ID: scribing abilities return craftedAbilityId from GetSlotBoundId
         local abilityId
         local slotType = GetSlotType(actionSlotIndex)
@@ -210,16 +343,12 @@ function weaving:OnActionSlotAbilityUsed(actionSlotIndex)
             abilityId = GetSlotBoundId(actionSlotIndex)
         end
 
-        -- Compute weaving time for LA weaves (SLOT-based, immediate)
+        -- Compute cast delay for every closed skill gap.
         if w.lastSkillEndTime then
             attributeWeavingTime(w, w.lastSkillAbilityId, abilityId, now, w.lastSkillEndTime)
-        end
-
-        -- Detect weaving error: skill->skill without a weapon attack
-        if w.lastActivationType == "skill" and w.lastSkillAbilityId then
-            local entry = getOrCreateWeavingEntry(w, w.lastSkillAbilityId)
-            entry.errors = entry.errors + 1
-            w.totalWeavingErrors = w.totalWeavingErrors + 1
+            enqueuePendingGap(w, w.lastSkillAbilityId, now)
+        else
+            resetCurrentGap(w)
         end
 
         -- Track per-ability activation count
@@ -255,7 +384,6 @@ function weaving:OnActionSlotAbilityUsed(actionSlotIndex)
         w.lastSkillStartTime = effectiveStart
         w.lastSkillEndTime = effectiveStart + zo_max(1000, durationMs or 0)
         w.lastSkillAbilityId = abilityId
-        w.lastActivationType = "skill"
         w.skillActivations = w.skillActivations + 1
     end
     -- Slot 2 (heavy attack) intentionally ignored here — counted via ACTION_RESULT_BEGIN
@@ -263,17 +391,18 @@ end
 
 ---Handles combat event confirmation that an LA actually executed.
 ---Called from per-abilityId EFFECT_GAINED handlers (projectile) or from state's OnCombatEvent (melee).
-function weaving:OnLightAttackConfirmed()
+---@param _abilityId number|nil
+function weaving:OnLightAttackConfirmed(_abilityId)
     local state = BattleScrolls.state
     if not state or not state.initialized then
         return
     end
     local w = state.weaving
-    if not w.pendingLa then
-        return
+    local now = GetGameTimeMilliseconds()
+    if attachLightAttackConfirmation(w, now) then
+        w.lightAttackHits = w.lightAttackHits + 1
     end
-    w.pendingLa = false
-    w.lightAttackHits = w.lightAttackHits + 1
+    finalizeExpiredGaps(w, now)
 end
 
 ---Handles ACTION_RESULT_BEGIN for heavy attack counting
@@ -284,9 +413,11 @@ function weaving:OnHeavyAttackBegin(abilityActionSlotType)
         return
     end
     if abilityActionSlotType == ACTION_SLOT_TYPE_HEAVY_ATTACK then
+        local now = GetGameTimeMilliseconds()
         local w = state.weaving
+        finalizeExpiredGaps(w, now)
+        attachHeavyAttackConfirmation(w)
         w.heavyAttackHits = w.heavyAttackHits + 1
-        w.lastActivationType = "ha"
     end
 end
 
@@ -316,7 +447,7 @@ function weaving:RegisterLaConfirmHandler(laAbilityId)
     registerCombatEvent(eventName,
             function()
                 self_.laUsesEffectGained[laAbilityId] = true
-                self_:OnLightAttackConfirmed()
+                self_:OnLightAttackConfirmed(laAbilityId)
             end,
             REGISTER_FILTER_COMBAT_RESULT, ACTION_RESULT_EFFECT_GAINED,
             REGISTER_FILTER_ABILITY_ID, laAbilityId,

@@ -271,8 +271,8 @@ local strings = {
     [BATTLESCROLLS_STAT_EFFECTIVE_HPS] = "HPS effectif",
     [BATTLESCROLLS_STAT_OVERHEAL] = "Sur-soins",
 
-    [BATTLESCROLLS_HEADER_RAW_HOT_VS_DIRECT] = "Brut: HoT vs Direct",
-    [BATTLESCROLLS_HEADER_EFFECTIVE_HOT_VS_DIRECT] = "Effectif: HoT vs Direct",
+    [BATTLESCROLLS_HEADER_RAW_HOT_VS_DIRECT] = "Soins bruts par type",
+    [BATTLESCROLLS_HEADER_EFFECTIVE_HOT_VS_DIRECT] = "Soins effectifs par type",
     [BATTLESCROLLS_HEADER_RAW_HEALING_BY_TARGET] = "Soins bruts par cible",
     [BATTLESCROLLS_HEADER_RAW_HEALING_BY_ABILITY] = "Soins bruts par compétence",
     [BATTLESCROLLS_HEADER_EFFECTIVE_HEALING_BY_TARGET] = "Soins effectifs par cible",
@@ -282,6 +282,7 @@ local strings = {
 
     [BATTLESCROLLS_STAT_DIRECT_HEALING] = "Soins directs",
     [BATTLESCROLLS_STAT_HEALING_OVER_TIME] = "Soins persistants",
+    [BATTLESCROLLS_STAT_SHIELD_HEALING] = "Boucliers",
 
     -------------------------
     -- Effects Stats
@@ -334,6 +335,7 @@ local strings = {
     [BATTLESCROLLS_TOOLTIP_MEDIAN_INTERVAL] = "Intervalle médian",
 
     [BATTLESCROLLS_TOOLTIP_ABILITY] = "Compétence",
+    [BATTLESCROLLS_TOOLTIP_ABILITY_ID] = "ID de compétence",
 
     -------------------------
     -- Damage Types
@@ -359,6 +361,7 @@ local strings = {
     [BATTLESCROLLS_DELIVERY_DOT] = "DoT",
     [BATTLESCROLLS_DELIVERY_DIRECT] = "Direct",
     [BATTLESCROLLS_DELIVERY_HOT] = "HoT",
+    [BATTLESCROLLS_DELIVERY_SHIELD] = "Bouclier",
 
     -------------------------
     -- Filter Dialog

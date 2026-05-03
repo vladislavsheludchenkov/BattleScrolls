@@ -1,0 +1,17 @@
+New features:
+- Damage shields applied on you and your group members are now tracked as healing. Shield applications count as raw healing, and shield value that actually absorbs damage is counted as effective healing
+- Healing breakdowns now include Damage Shields as their own healing type, next to Direct and HoT healing. This shows up in healing tabs, overview panels, and Healing Out aggregations
+
+Known issues:
+- In rare cases, shield ticks may be attributed to a wrong ability. This only happens when there are multiple shields applied on the same target within 50 ms of each other
+
+Minor changes:
+- Ability tooltips now show the actual ESO ability ID in damage, healing, effects, proc, weaving, and setup views
+- Fixed several wrong or generic ability icons caused by ESO reporting hidden/helper ability IDs, including Pragmatic Fatecarver, Radiant Glory, Cephaliarch's Flail, potions, Essence Drain, Undaunted Command, Purify/Blood Feast synergies, Runeguard, Purifying Light, Practiced Incantation, and Harmony trait
+- It takes more HPS now to fill the personal meter bar
+- Healing composition labels now say "Healing by Type" and hide insignificant one-sided breakdowns
+
+Bugfixes:
+- Weaving stats should produce fewer false missed and double light attacks
+- Enemies are more reliably classified as bosses when effect tracking is disabled
+- Some healing ability tooltips no longer have average tick lower than min tick

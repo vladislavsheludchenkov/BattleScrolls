@@ -164,6 +164,33 @@ end
 -- Icon Helpers
 -------------------------
 
+---@type table<number, number>
+local abilityIconAbilityIdOverrides = {
+    [201265] = 186370, -- pragmatic fatecarver shield -> damage
+    [69118] = 63956, -- radiant glory heal -> damage
+    [201275] = 183006, -- cephaliarch's flail heal -> damage
+    [45221] = 68401, -- crafted potion heal -> crown potion heal
+    [30978] = 30973, -- essence drain rank 1 heal -> essence drain passive
+    [45518] = 45517, -- essence drain rank 2 heal -> essence drain passive
+    [55606] = 55584, -- undaunted command rank 1 heal -> undaunted command passive
+    [55677] = 55676, -- undaunted command rank 2 heal -> undaunted command passive
+    [44013] = 26305, -- Purify heal -> Purify synergy
+    [41964] = 41963, -- Blood Feast heal -> Blood Feast synergy
+    [194645] = 183401, -- Runeguard of Still Waters heal -> Runeguard of Still Waters active ability
+    [21908] = 21765, -- Purifying Light heal -> Purifying Light active ability
+    [190960] = 108098, -- Harmony trait heal -> lapidary research passive (harmony itself doesn't have an ability with an icon)
+    [22225] = 22223, -- Rite of Passage heal -> Rite of Passage ultimate skill
+    [22228] = 22226, -- Practiced Incantation heal -> Practiced Incantation ultimate skill
+    [22231] = 22229, -- Remembrance heal -> Remembrance ultimate skill
+}
+
+---Gets a UI icon for an ability, applying display-only ability-id remaps.
+---@param abilityId number
+---@return string
+function utils.getAbilityIcon(abilityId)
+    return GetAbilityIcon(abilityIconAbilityIdOverrides[abilityId] or abilityId)
+end
+
 ---Determines if an icon indicates a passive ability
 ---@param abilityIcon string|nil The icon path
 ---@return boolean
@@ -177,7 +204,9 @@ function utils.isPassiveIcon(abilityIcon)
         or string.find(abilityIcon, "ability_sorcerer_026", 1, true) ~= nil
         or string.find(abilityIcon, "ability_sorcerer_047", 1, true) ~= nil
         or string.find(abilityIcon, "ability_sorcerer_054", 1, true) ~= nil
+        or string.find(abilityIcon, "ability_templar_003", 1, true) ~= nil
         or string.find(abilityIcon, "ability_templar_012", 1, true) ~= nil
+        or string.find(abilityIcon, "ability_templar_013", 1, true) ~= nil
         or string.find(abilityIcon, "ability_templar_014", 1, true) ~= nil
         or string.find(abilityIcon, "ability_templar_028", 1, true) ~= nil
         or string.find(abilityIcon, "ability_weapon_001", 1, true) ~= nil
@@ -218,6 +247,39 @@ function utils.getAbilityDisplayName(abilityId)
         return string.format("%s %d", GetString(BATTLESCROLLS_TOOLTIP_ABILITY), abilityId)
     end
     return abilityName
+end
+
+---Formats an ability ID line for ability-specific tooltip bodies.
+---@param abilityId number
+---@return string
+function utils.formatAbilityIdLine(abilityId)
+    return string.format("%s: %d", GetString(BATTLESCROLLS_TOOLTIP_ABILITY_ID), abilityId)
+end
+
+---Appends a separated ability ID line to an ability-specific tooltip lines table.
+---@param lines string[]
+---@param abilityId number|nil
+function utils.appendAbilityIdLine(lines, abilityId)
+    if not abilityId or abilityId <= 0 then
+        return
+    end
+    if #lines > 0 then
+        lines[#lines + 1] = ""
+    end
+    lines[#lines + 1] = utils.formatAbilityIdLine(abilityId)
+end
+
+---Returns body text with an appended ability ID line.
+---@param text string|nil
+---@param abilityId number|nil
+---@return string
+function utils.textWithAbilityId(text, abilityId)
+    local lines = {}
+    if text and text ~= "" then
+        lines[#lines + 1] = text
+    end
+    utils.appendAbilityIdLine(lines, abilityId)
+    return table.concat(lines, "\n")
 end
 
 -------------------------
@@ -496,7 +558,7 @@ function utils.populateAbilityRow(row, abilityId, isUltimate)
     local circleFrame = row:GetNamedChild("CircleFrame")
     local nameLabel = row:GetNamedChild("Name")
 
-    local abilityIcon = GetAbilityIcon(abilityId)
+    local abilityIcon = utils.getAbilityIcon(abilityId)
     icon:SetTexture(abilityIcon)
 
     local isPassive = utils.isPassiveIcon(abilityIcon)

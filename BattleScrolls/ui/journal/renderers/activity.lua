@@ -153,6 +153,8 @@ local function buildWeavingAbilityTooltipText(entry, totalActivations)
         lines[#lines + 1] = string.format("%s: %d", GetString(BATTLESCROLLS_STAT_MISSED_LA), entry.weavingErrors)
     end
 
+    utils.appendAbilityIdLine(lines, entry.abilityId)
+
     return table.concat(lines, "\n")
 end
 
@@ -199,6 +201,8 @@ local function buildProcTooltipText(procData, unitNames)
         end
     end
 
+    utils.appendAbilityIdLine(lines, procData.abilityId)
+
     return table.concat(lines, "\n")
 end
 
@@ -228,7 +232,7 @@ function ActivityRenderer.renderActivity(ctx)
                     abilityName = string.format("%s %d", GetString(BATTLESCROLLS_TOOLTIP_ABILITY), procData.abilityId)
                 end
 
-                local abilityIcon = GetAbilityIcon(procData.abilityId)
+                local abilityIcon = utils.getAbilityIcon(procData.abilityId)
                 local valueStr
                 local totalProcsStr = zo_strformat(GetString(BATTLESCROLLS_STAT_TOTAL_PROCS), procData.totalProcs)
                 if procData.medianIntervalMs > 0 then
@@ -373,7 +377,7 @@ function ActivityRenderer.renderActivity(ctx)
                     if i > maxAbilities then break end
 
                     local abilityName = utils.getAbilityDisplayName(entry.abilityId)
-                    local abilityIcon = GetAbilityIcon(entry.abilityId)
+                    local abilityIcon = utils.getAbilityIcon(entry.abilityId)
 
                     -- Sublabel: casts first (primary), then avg delay (secondary)
                     local sublabel
@@ -492,7 +496,7 @@ function ActivityRenderer.buildActivityPanelSpec(ctx)
                     if name == "" then
                         name = string.format("ID %d", procData.abilityId)
                     end
-                    local icon = GetAbilityIcon(procData.abilityId)
+                    local icon = utils.getAbilityIcon(procData.abilityId)
                     local text
                     if procData.medianIntervalMs > 0 then
                         text = string.format("%s — %d (%s)", name, procData.totalProcs, formatSeconds(procData.medianIntervalMs / 1000))
@@ -521,7 +525,7 @@ function ActivityRenderer.buildActivityPanelSpec(ctx)
                 for i, entry in ipairs(sorted) do
                     if i > maxAbilities then break end
                     local name = zo_strformat("<<C:1>>", utils.getAbilityDisplayName(entry.abilityId))
-                    local icon = GetAbilityIcon(entry.abilityId)
+                    local icon = utils.getAbilityIcon(entry.abilityId)
                     local text
                     if entry.afterCount > 0 then
                         local avgMs = entry.afterSum / entry.afterCount

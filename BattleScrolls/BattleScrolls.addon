@@ -38,6 +38,7 @@ combat/effects_events.lua
 combat/effects_reconcile.lua
 combat/deathrecap.lua
 combat/state.lua
+combat/shields.lua
 combat/scribe.lua
 combat/ticker.lua
 combat/setup.lua

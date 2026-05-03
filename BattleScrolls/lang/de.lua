@@ -271,8 +271,8 @@ local strings = {
     [BATTLESCROLLS_STAT_EFFECTIVE_HPS] = "Effektive HPS",
     [BATTLESCROLLS_STAT_OVERHEAL] = "Überheilung",
 
-    [BATTLESCROLLS_HEADER_RAW_HOT_VS_DIRECT] = "Gesamt: HoT vs. Direkt",
-    [BATTLESCROLLS_HEADER_EFFECTIVE_HOT_VS_DIRECT] = "Effektiv: HoT vs. Direkt",
+    [BATTLESCROLLS_HEADER_RAW_HOT_VS_DIRECT] = "Gesamte Heilung nach Art",
+    [BATTLESCROLLS_HEADER_EFFECTIVE_HOT_VS_DIRECT] = "Effektive Heilung nach Art",
     [BATTLESCROLLS_HEADER_RAW_HEALING_BY_TARGET] = "Gesamte Heilung nach Ziel",
     [BATTLESCROLLS_HEADER_RAW_HEALING_BY_ABILITY] = "Gesamte Heilung nach Fähigkeit",
     [BATTLESCROLLS_HEADER_EFFECTIVE_HEALING_BY_TARGET] = "Effektive Heilung nach Ziel",
@@ -282,6 +282,7 @@ local strings = {
 
     [BATTLESCROLLS_STAT_DIRECT_HEALING] = "Direkte Heilung",
     [BATTLESCROLLS_STAT_HEALING_OVER_TIME] = "Heilung über Zeit",
+    [BATTLESCROLLS_STAT_SHIELD_HEALING] = "Schadensschilde",
 
     -------------------------
     -- Effects Stats
@@ -334,6 +335,7 @@ local strings = {
     [BATTLESCROLLS_TOOLTIP_MEDIAN_INTERVAL] = "Median-Intervall",
 
     [BATTLESCROLLS_TOOLTIP_ABILITY] = "Fähigkeit",
+    [BATTLESCROLLS_TOOLTIP_ABILITY_ID] = "Fähigkeits-ID",
 
     -------------------------
     -- Damage Types
@@ -359,6 +361,7 @@ local strings = {
     [BATTLESCROLLS_DELIVERY_DOT] = "DoT",
     [BATTLESCROLLS_DELIVERY_DIRECT] = "Direkt",
     [BATTLESCROLLS_DELIVERY_HOT] = "HoT",
+    [BATTLESCROLLS_DELIVERY_SHIELD] = "Schild",
 
     -------------------------
     -- Filter Dialog

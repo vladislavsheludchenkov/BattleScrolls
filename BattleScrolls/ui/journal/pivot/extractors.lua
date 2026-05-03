@@ -361,11 +361,12 @@ extractors.dimensions[pivot.Dimension.DELIVERY] = {
             -- HoT vs Direct healing using Arithmancer
             local healingOut = decoded.healingStats and decoded.healingStats.healingOutToGroup
             if not healingOut then return {} end
-            local hotRaw, directRaw = 0, 0
+            local hotRaw, directRaw, shieldRaw = 0, 0, 0
             for _, healData in pairs(healingOut) do
                 local result = Arithmancer.ComputeByHotVsDirect(healData, abilityInfo)
                 hotRaw = hotRaw + (result.hot and result.hot.raw or 0)
                 directRaw = directRaw + (result.direct and result.direct.raw or 0)
+                shieldRaw = shieldRaw + (result.shield and result.shield.raw or 0)
             end
             local byDelivery = {}
             if hotRaw > 0 then
@@ -374,12 +375,16 @@ extractors.dimensions[pivot.Dimension.DELIVERY] = {
             if directRaw > 0 then
                 byDelivery[GetString(BATTLESCROLLS_DELIVERY_DIRECT)] = {{ raw = directRaw, real = directRaw, overheal = 0, ticks = 0, critTicks = 0, minTick = 0, maxTick = 0 }}
             end
+            if shieldRaw > 0 then
+                byDelivery[GetString(BATTLESCROLLS_DELIVERY_SHIELD)] = {{ raw = shieldRaw, real = shieldRaw, overheal = 0, ticks = 0, critTicks = 0, minTick = 0, maxTick = 0 }}
+            end
             return byDelivery
         end
         -- Damage
         return groupDamageBreakdowns(decoded.damageByUnitId, function(_, _, abilityId)
             local info = abilityInfo[abilityId]
-            local isDot = info and info.overTimeOrDirect and info.overTimeOrDirect.overTime
+            local deliveryType = Arithmancer.GetAbilityDeliveryType(info)
+            local isDot = deliveryType and deliveryType.overTime
             return isDot and GetString(BATTLESCROLLS_DELIVERY_DOT) or GetString(BATTLESCROLLS_DELIVERY_DIRECT)
         end)
     end,

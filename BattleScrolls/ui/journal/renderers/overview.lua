@@ -63,6 +63,42 @@ local function CalculateDynamicPriorities(dps, hps, dtps)
     return encounterPriority, damagePriority, healingPriority, damageTakenPriority
 end
 
+---@class OverviewHealingDeliveryPercents
+---@field hot number|nil
+---@field shield number|nil
+
+---@param hotRaw number
+---@param directRaw number
+---@param shieldRaw number
+---@return OverviewHealingDeliveryPercents
+local function computeOverviewHealingDeliveryPercents(hotRaw, directRaw, shieldRaw)
+    local totalRaw = hotRaw + directRaw + shieldRaw
+    if totalRaw <= 0 then return { hot = nil, shield = nil } end
+
+    local hotPercent = hotRaw / totalRaw * 100
+    local directPercent = directRaw / totalRaw * 100
+    local shieldPercent = shieldRaw / totalRaw * 100
+    local visibleCount = (hotPercent > 5 and 1 or 0)
+        + (directPercent > 5 and 1 or 0)
+        + (shieldPercent > 5 and 1 or 0)
+    if visibleCount <= 1 then return { hot = nil, shield = nil } end
+
+    return {
+        hot = hotPercent > 5 and hotPercent or nil,
+        shield = shieldPercent > 5 and shieldPercent or nil,
+    }
+end
+
+---@param totals { hot: number, direct: number, shield: number }
+---@param healingData HealingDone|HealingDoneDiffSource
+---@param abilityInfo table<number, AbilityInfo>
+local function addHealingDeliveryTotals(totals, healingData, abilityInfo)
+    local hotVsDirect = BattleScrolls.arithmancer.ComputeByHotVsDirect(healingData, abilityInfo)
+    totals.hot = totals.hot + (hotVsDirect.hot and hotVsDirect.hot.raw or 0)
+    totals.direct = totals.direct + (hotVsDirect.direct and hotVsDirect.direct.raw or 0)
+    totals.shield = totals.shield + (hotVsDirect.shield and hotVsDirect.shield.raw or 0)
+end
+
 -------------------------
 -- Public API
 -------------------------
@@ -361,8 +397,8 @@ function OverviewRenderer.buildOverviewPanelSpec(ctx)
             local critRate = qualityData.critRate
             local maxHit = qualityData.maxHit
 
-            -- Compute HoT% for the prevalent healing type
-            local prevalentHotPercent = nil
+            -- Compute delivery percentages for the prevalent healing type
+            local prevalentDelivery = { hot = nil, shield = nil }
             if prevalentHealingType and encounter.healingStats then
                 local healingRawData = nil
 
@@ -372,43 +408,29 @@ function OverviewRenderer.buildOverviewPanelSpec(ctx)
                     -- Aggregate across all targets for healing out
                     local healingOutToGroup = encounter.healingStats.healingOutToGroup
                     if healingOutToGroup then
-                        local totalHot, totalDirect = 0, 0
+                        local totals = { hot = 0, direct = 0, shield = 0 }
                         for _, targetData in pairs(healingOutToGroup) do
-                            local hotVsDirect = Arithmancer.ComputeByHotVsDirect(targetData, abilityInfo)
-                            totalHot = totalHot + (hotVsDirect.hot and hotVsDirect.hot.raw or 0)
-                            totalDirect = totalDirect + (hotVsDirect.direct and hotVsDirect.direct.raw or 0)
+                            addHealingDeliveryTotals(totals, targetData, abilityInfo)
                         end
-                        local totalRaw = totalHot + totalDirect
-                        if totalRaw > 0 then
-                            prevalentHotPercent = totalHot / totalRaw * 100
-                        end
+                        prevalentDelivery = computeOverviewHealingDeliveryPercents(totals.hot, totals.direct, totals.shield)
                     end
                 elseif prevalentHealingType == "healingIn" then
                     -- Aggregate across all sources for healing in
                     local healingInFromGroup = encounter.healingStats.healingInFromGroup
                     if healingInFromGroup then
-                        local totalHot, totalDirect = 0, 0
+                        local totals = { hot = 0, direct = 0, shield = 0 }
                         for _, sourceData in pairs(healingInFromGroup) do
-                            local hotVsDirect = Arithmancer.ComputeByHotVsDirect(sourceData, abilityInfo)
-                            totalHot = totalHot + (hotVsDirect.hot and hotVsDirect.hot.raw or 0)
-                            totalDirect = totalDirect + (hotVsDirect.direct and hotVsDirect.direct.raw or 0)
+                            addHealingDeliveryTotals(totals, sourceData, abilityInfo)
                         end
-                        local totalRaw = totalHot + totalDirect
-                        if totalRaw > 0 then
-                            prevalentHotPercent = totalHot / totalRaw * 100
-                        end
+                        prevalentDelivery = computeOverviewHealingDeliveryPercents(totals.hot, totals.direct, totals.shield)
                     end
                 end
 
                 -- For selfHealing, compute directly
-                if healingRawData and not prevalentHotPercent then
-                    local hotVsDirect = Arithmancer.ComputeByHotVsDirect(healingRawData, abilityInfo)
-                    local totalHot = hotVsDirect.hot and hotVsDirect.hot.raw or 0
-                    local totalDirect = hotVsDirect.direct and hotVsDirect.direct.raw or 0
-                    local totalRaw = totalHot + totalDirect
-                    if totalRaw > 0 then
-                        prevalentHotPercent = totalHot / totalRaw * 100
-                    end
+                if healingRawData and not prevalentDelivery.hot and not prevalentDelivery.shield then
+                    local totals = { hot = 0, direct = 0, shield = 0 }
+                    addHealingDeliveryTotals(totals, healingRawData, abilityInfo)
+                    prevalentDelivery = computeOverviewHealingDeliveryPercents(totals.hot, totals.direct, totals.shield)
                 end
             end
 
@@ -446,7 +468,8 @@ function OverviewRenderer.buildOverviewPanelSpec(ctx)
                     q2:StatRow(GetString(BATTLESCROLLS_HEALING_RAW_HPS), utils.formatNumber(prevalentHealingData.rawHps)),
                     q2:StatRow(GetString(BATTLESCROLLS_HEALING_EFFECTIVE_HPS), utils.formatNumber(prevalentHealingData.effectiveHps)),
                     q2:StatRow(GetString(BATTLESCROLLS_HEALING_OVERHEAL), utils.formatPercent(prevalentHealingData.overhealPercent)),
-                    prevalentHotPercent and q2:StatRow(GetString(BATTLESCROLLS_DELIVERY_HOT), utils.formatPercent(prevalentHotPercent)))
+                    prevalentDelivery.hot and q2:StatRow(GetString(BATTLESCROLLS_DELIVERY_HOT), utils.formatPercent(prevalentDelivery.hot)),
+                    prevalentDelivery.shield and q2:StatRow(GetString(BATTLESCROLLS_DELIVERY_SHIELD), utils.formatPercent(prevalentDelivery.shield)))
                 or nil
 
             local dtSection = hasDamageTaken

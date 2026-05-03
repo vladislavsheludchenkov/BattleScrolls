@@ -12,7 +12,7 @@ BattleScrolls = BattleScrolls or {}
 local binaryStorage = {}
 BattleScrolls.binaryStorage = binaryStorage
 
-local CURRENT_VERSION = 12
+local CURRENT_VERSION = 13
 
 -- Import BitEncoder/BitDecoder from bitcodec module
 local BitEncoder = BattleScrolls.bitcodec.BitEncoder
@@ -1226,8 +1226,8 @@ end
 function binaryStorage.decodeEncounterAsync(binaryEncounter)
     return LibEffect.Async(function()
         local _v = binaryEncounter._v
-        if _v < 7 or _v > 12 then
-            error("Invalid binary encounter version: " .. tostring(_v) .. " (expected 7-12)")
+        if _v < 7 or _v > CURRENT_VERSION then
+            error("Invalid binary encounter version: " .. tostring(_v) .. " (expected 7-" .. tostring(CURRENT_VERSION) .. ")")
         end
 
         local decoder = BitDecoder.new(binaryEncounter._data)
@@ -1304,8 +1304,9 @@ local BITS_DAMAGE_TYPE = 4  -- DamageType enum (16 values max)
 
 ---Reads abilityInfo from decoder
 ---@param decoder BitDecoder
+---@param version number
 ---@return table<number, AbilityInfoStorage>
-local function readAbilityInfo(decoder)
+local function readAbilityInfo(decoder, version)
     local result = {}
     local count = decoder:readUInt(BITS.MAP_COUNT)
 
@@ -1314,6 +1315,7 @@ local function readAbilityInfo(decoder)
 
         local overTime = decoder:readBit()
         local direct = decoder:readBit()
+        local shield = version >= 13 and decoder:readBit() or false
 
         local typeCount = decoder:readUInt(4)
         local damageTypes = {}
@@ -1322,8 +1324,9 @@ local function readAbilityInfo(decoder)
             damageTypes[damageType] = true
         end
 
+        local deliveryType = { overTime = overTime or nil, direct = direct or nil, shield = shield or nil }
         result[abilityId] = {
-            overTimeOrDirect = { overTime = overTime or nil, direct = direct or nil },
+            deliveryType = deliveryType,
             damageTypes = damageTypes,
         }
     end
@@ -1334,6 +1337,7 @@ end
 ---Encoded instance fields result
 ---@class EncodedInstanceFields
 ---@field _instanceData string[] Base64 encoded data chunks
+---@field _instanceDataVersion number Binary schema used for instance data
 
 ---Encodes instance-level abilityInfo to binary format asynchronously.
 ---Returns an Effect that resolves to the encoded fields.
@@ -1353,9 +1357,10 @@ function binaryStorage.encodeInstanceFieldsAsync(abilityInfo)
             written = written + 1
             encoder:writeUInt(abilityId, BITS.ABILITY_ID)
 
-            local overTimeOrDirect = info.overTimeOrDirect or {}
-            encoder:writeBit(overTimeOrDirect.overTime)
-            encoder:writeBit(overTimeOrDirect.direct)
+            local deliveryType = info.deliveryType or {}
+            encoder:writeBit(deliveryType.overTime)
+            encoder:writeBit(deliveryType.direct)
+            encoder:writeBit(deliveryType.shield)
 
             local typeCount = writeTableCount(encoder, info.damageTypes or {}, 4)
 
@@ -1374,6 +1379,7 @@ function binaryStorage.encodeInstanceFieldsAsync(abilityInfo)
 
         return {
             _instanceData = chunks,
+            _instanceDataVersion = CURRENT_VERSION,
         }
     end)
 end
@@ -1392,10 +1398,9 @@ function binaryStorage.decodeInstanceFieldsAsync(instance)
         local decoder = BitDecoder.new(instance._instanceData)
         LibEffect.YieldWithGC():Await()
 
-        local abilityInfo = readAbilityInfo(decoder)
+        local abilityInfo = readAbilityInfo(decoder, instance._instanceDataVersion or 12)
         LibEffect.YieldWithGC():Await()
 
         return { abilityInfo, {} }
     end)
 end
-

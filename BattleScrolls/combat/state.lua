@@ -57,12 +57,12 @@ BattleScrolls = BattleScrolls or {}
 
 ---@class HealingDoneDiffSource
 ---@field total HealingTotals
----@field byHotVsDirect { hot: HealingTotals, direct: HealingTotals }
+---@field byHotVsDirect { hot: HealingTotals, direct: HealingTotals, shield: HealingTotals }
 ---@field bySourceUnitIdByAbilityId table<number, table<number, HealingBreakdown>> Nested: sourceUnitId -> abilityId -> healing
 
 ---@class HealingDone
 ---@field total HealingTotals
----@field byHotVsDirect { hot: HealingTotals, direct: HealingTotals }
+---@field byHotVsDirect { hot: HealingTotals, direct: HealingTotals, shield: HealingTotals }
 ---@field byAbilityId table<number, HealingBreakdown>
 
 ---@class HealingStats
@@ -106,8 +106,13 @@ BattleScrolls = BattleScrolls or {}
 ---@field beginTime number|nil ESO effect begin time (nil for backfilled effects, set on first UPDATED)
 
 ---Cached ability metadata
+---@class AbilityDeliveryType
+---@field overTime boolean|nil DOT/HOT delivery
+---@field direct boolean|nil Direct delivery
+---@field shield boolean|nil Damage shield delivery
+
 ---@class AbilityInfo
----@field overTimeOrDirect { overTime: boolean|nil, direct: boolean|nil }
+---@field deliveryType AbilityDeliveryType
 ---@field damageTypes table<number, boolean> Set of ESO damage type constants
 
 ---State observer interface for combat lifecycle notifications
@@ -634,13 +639,19 @@ function BattleScrolls.state:OnCombatEvent(eventCode, result, isError, abilityNa
     local isDamageResult = damageResultsSet[result]
     local isHealingResult = healingResultsSet[result]
 
+    local shieldTracker = BattleScrolls.shields
+    if shieldTracker and shieldTracker.RememberUnitIdentity then
+        shieldTracker:RememberUnitIdentity(sourceType, sourceUnitID, sourceName)
+        shieldTracker:RememberUnitIdentity(targetType, targetUnitID, targetName)
+    end
+
     -- Damage events
     if isDamageResult then
         -- LA confirmation from damage events (melee/resto weapons only)
         -- Projectile weapons use EFFECT_GAINED instead (faster, avoids late-damage cross-talk)
         local weavingModule = BattleScrolls.weaving
         if isPersonalSource and weavingModule.laAbilityIds[abilityID] and not weavingModule.laUsesEffectGained[abilityID] then
-            weavingModule:OnLightAttackConfirmed()
+            weavingModule:OnLightAttackConfirmed(abilityID)
         end
 
         -- Personal damage done (source is player/pet/companion)
@@ -863,19 +874,36 @@ end
 ---Updates cached ability metadata
 ---@param abilityId number
 ---@param isDot boolean
----@param damageType DamageType
-function BattleScrolls.state:UpdateAbilityInfo(abilityId, isDot, damageType)
+---@param damageType number|nil
+---@param isShield boolean|nil
+function BattleScrolls.state:UpdateAbilityInfo(abilityId, isDot, damageType, isShield)
     if not self.abilityInfo[abilityId] then
         self.abilityInfo[abilityId] = {
-            overTimeOrDirect = {},
+            deliveryType = {},
             damageTypes = {}
         }
     end
-    ---@type "overTime" | "direct"
-    local overTimeOrDirectKey = isDot and "overTime" or "direct"
 
-    self.abilityInfo[abilityId].overTimeOrDirect[overTimeOrDirectKey] = true
-    self.abilityInfo[abilityId].damageTypes[damageType] = true
+    local info = self.abilityInfo[abilityId]
+    info.deliveryType = info.deliveryType or {}
+
+    if isShield then
+        info.deliveryType.shield = true
+    else
+        ---@type "overTime" | "direct"
+        local deliveryKey = isDot and "overTime" or "direct"
+        info.deliveryType[deliveryKey] = true
+    end
+
+    if damageType then
+        info.damageTypes[damageType] = true
+    end
+end
+
+---Marks an ability as damage-shield delivery without adding damage type metadata.
+---@param abilityId number
+function BattleScrolls.state:MarkShieldAbility(abilityId)
+    self:UpdateAbilityInfo(abilityId, false, nil, true)
 end
 
 

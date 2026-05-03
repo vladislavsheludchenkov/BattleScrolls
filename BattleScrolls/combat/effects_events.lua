@@ -3,8 +3,9 @@ if not SemisPlaygroundCheckAccess() then
 end
 
 -- Effect Event Registration for BattleScrolls
--- Demand-driven: only subscribes to events during combat, and only to categories
--- enabled in settings. Death/alive events always subscribe during combat.
+-- Owns combat-time EVENT_EFFECT_CHANGED subscriptions and routes them to
+-- lightweight core consumers (boss identity, shields) plus optional effect
+-- uptime tracking.
 
 BattleScrolls = BattleScrolls or {}
 
@@ -19,6 +20,10 @@ BattleScrolls.effectsEvents = effectsEvents
 
 ---@type string
 local PATTERN_GROUP = "^group"
+
+local trackPlayerEffectsThisCombat = false
+local trackBossEffectsThisCombat = false
+local trackGroupEffectsThisCombat = false
 
 -- =============================================================================
 -- SETTINGS HELPERS
@@ -51,12 +56,22 @@ end
 -- EVENT HANDLERS
 -- =============================================================================
 
-local function onPlayerEffect(_eventCode, changeType, effectSlot, _effectName, _unitTag, beginTime, _endTime,
-                              stackCount, _iconName, _deprecatedBuffType, effectType, _abilityType,
-                              _statusEffectType, _unitName, _unitId, abilityId, sourceType)
+local function onPlayerEffect(eventCode, changeType, effectSlot, effectName, unitTag, beginTime, endTime,
+                              stackCount, iconName, deprecatedBuffType, effectType, abilityType,
+                              statusEffectType, unitName, unitId, abilityId, sourceType)
     local s = BattleScrolls.state
     if not s then return end
-    effects.handlePlayerEffect(s, changeType, effectSlot, effectType, stackCount, abilityId, sourceType, beginTime)
+
+    local shieldTracker = BattleScrolls.shields
+    if shieldTracker and shieldTracker.OnEffectChanged then
+        shieldTracker:OnEffectChanged(eventCode, changeType, effectSlot, effectName, unitTag, beginTime, endTime,
+            stackCount, iconName, deprecatedBuffType, effectType, abilityType,
+            statusEffectType, unitName, unitId, abilityId, sourceType)
+    end
+
+    if trackPlayerEffectsThisCombat then
+        effects.handlePlayerEffect(s, changeType, effectSlot, effectType, stackCount, abilityId, sourceType, beginTime)
+    end
 end
 
 local function onBossEffect(_eventCode, changeType, effectSlot, _effectName, unitTag, beginTime, _endTime,
@@ -74,15 +89,29 @@ local function onBossEffect(_eventCode, changeType, effectSlot, _effectName, uni
         end
         s:CorrelateBossUnitId(unitTag, unitId, unitName)
     end
-    effects.handleBossEffect(s, changeType, effectSlot, unitTag, effectType, stackCount, abilityId, unitId, sourceType, beginTime)
+    if trackBossEffectsThisCombat then
+        effects.handleBossEffect(s, changeType, effectSlot, unitTag, effectType, stackCount, abilityId, unitId, sourceType, beginTime)
+    end
 end
 
-local function onGroupEffect(_eventCode, changeType, effectSlot, _effectName, unitTag, beginTime, endTime,
-                             stackCount, _iconName, _deprecatedBuffType, effectType, _abilityType,
-                             _statusEffectType, _unitName, unitId, abilityId, sourceType)
+local function onGroupEffect(eventCode, changeType, effectSlot, effectName, unitTag, beginTime, endTime,
+                             stackCount, iconName, deprecatedBuffType, effectType, abilityType,
+                             statusEffectType, unitName, unitId, abilityId, sourceType)
     local s = BattleScrolls.state
     if not s then return end
-    effects.handleGroupEffect(s, changeType, effectSlot, unitTag, effectType, stackCount, abilityId, unitId, sourceType, beginTime, endTime)
+    if AreUnitsEqual("player", unitTag) then return end
+    if IsGroupCompanionUnitTag(unitTag) then return end
+
+    local shieldTracker = BattleScrolls.shields
+    if shieldTracker and shieldTracker.OnEffectChanged then
+        shieldTracker:OnEffectChanged(eventCode, changeType, effectSlot, effectName, unitTag, beginTime, endTime,
+            stackCount, iconName, deprecatedBuffType, effectType, abilityType,
+            statusEffectType, unitName, unitId, abilityId, sourceType)
+    end
+
+    if trackGroupEffectsThisCombat then
+        effects.handleGroupEffect(s, changeType, effectSlot, unitTag, effectType, stackCount, abilityId, unitId, sourceType, beginTime, endTime)
+    end
 end
 
 local function onPlayerDeathState(_eventCode, unitTag, isDead)
@@ -231,25 +260,23 @@ local function subscribeAliveEvents()
     EVENT_MANAGER:RegisterForEvent("BS_Effects_FullUpdate", EVENT_EFFECTS_FULL_UPDATE, onEffectsFullUpdate)
 end
 
----Subscribes to effect change events based on current settings
+---Subscribes to effect change events needed by core combat plumbing.
 local function subscribeEffectEvents()
-    if isPlayerEffectsNeeded() then
-        EVENT_MANAGER:RegisterForEvent("BS_Effects_Player", EVENT_EFFECT_CHANGED, onPlayerEffect)
-        EVENT_MANAGER:AddFilterForEvent("BS_Effects_Player", EVENT_EFFECT_CHANGED,
-            REGISTER_FILTER_UNIT_TAG, "player")
-    end
+    trackPlayerEffectsThisCombat = isPlayerEffectsNeeded()
+    trackBossEffectsThisCombat = isBossEffectsNeeded()
+    trackGroupEffectsThisCombat = isGroupEffectsNeeded()
 
-    if isBossEffectsNeeded() then
-        EVENT_MANAGER:RegisterForEvent("BS_Effects_Boss", EVENT_EFFECT_CHANGED, onBossEffect)
-        EVENT_MANAGER:AddFilterForEvent("BS_Effects_Boss", EVENT_EFFECT_CHANGED,
-            REGISTER_FILTER_UNIT_TAG_PREFIX, "boss")
-    end
+    EVENT_MANAGER:RegisterForEvent("BS_Effects_Player", EVENT_EFFECT_CHANGED, onPlayerEffect)
+    EVENT_MANAGER:AddFilterForEvent("BS_Effects_Player", EVENT_EFFECT_CHANGED,
+        REGISTER_FILTER_UNIT_TAG, "player")
 
-    if isGroupEffectsNeeded() then
-        EVENT_MANAGER:RegisterForEvent("BS_Effects_Group", EVENT_EFFECT_CHANGED, onGroupEffect)
-        EVENT_MANAGER:AddFilterForEvent("BS_Effects_Group", EVENT_EFFECT_CHANGED,
-            REGISTER_FILTER_UNIT_TAG_PREFIX, "group")
-    end
+    EVENT_MANAGER:RegisterForEvent("BS_Effects_Boss", EVENT_EFFECT_CHANGED, onBossEffect)
+    EVENT_MANAGER:AddFilterForEvent("BS_Effects_Boss", EVENT_EFFECT_CHANGED,
+        REGISTER_FILTER_UNIT_TAG_PREFIX, "boss")
+
+    EVENT_MANAGER:RegisterForEvent("BS_Effects_Group", EVENT_EFFECT_CHANGED, onGroupEffect)
+    EVENT_MANAGER:AddFilterForEvent("BS_Effects_Group", EVENT_EFFECT_CHANGED,
+        REGISTER_FILTER_UNIT_TAG_PREFIX, "group")
 end
 
 ---Unsubscribes from all events
@@ -269,6 +296,10 @@ local function unsubscribeAll()
     EVENT_MANAGER:UnregisterForEvent("BS_Effects_Created_Group", EVENT_UNIT_CREATED)
     EVENT_MANAGER:UnregisterForEvent("BS_Effects_Connected_Group", EVENT_GROUP_MEMBER_CONNECTED_STATUS)
     EVENT_MANAGER:UnregisterForEvent("BS_Effects_FullUpdate", EVENT_EFFECTS_FULL_UPDATE)
+
+    trackPlayerEffectsThisCombat = false
+    trackBossEffectsThisCombat = false
+    trackGroupEffectsThisCombat = false
 end
 
 -- =============================================================================

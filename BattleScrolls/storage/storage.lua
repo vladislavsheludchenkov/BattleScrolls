@@ -57,7 +57,7 @@ BattleScrolls = BattleScrolls or {}
 ---@field weavingErrors number Times a skill→skill happened after this skill (no LA in between)
 
 ---@class WeavingData
----@field lightAttackHits number Light attack count (from slot activation)
+---@field lightAttackHits number Light attack count (confirmed by combat events)
 ---@field heavyAttackHits number Heavy attack count (from ACTION_RESULT_BEGIN)
 ---@field skillActivations number Total skill/ultimate activations
 ---@field totalWeavingErrors number Total skill→skill count (no LA in between)
@@ -129,6 +129,7 @@ BattleScrolls = BattleScrolls or {}
 ---@field abilityInfo table<number, AbilityInfoStorage>|nil Uncompressed ability info (nil if compressed)
 ---@field unitNames table<number, string>|nil Uncompressed unit names (nil if compressed)
 ---@field _instanceData string[]|nil Compressed abilityInfo (base64 chunks)
+---@field _instanceDataVersion number|nil Schema version for _instanceData
 ---@field encounters CompactEncounter[] Array of encounters in this instance
 
 ---@alias Instance InstanceState|InstanceStorage
@@ -890,4 +891,3 @@ end
 function storage.DecodeInstanceFieldsAsync(instance)
     return BattleScrolls.binaryStorage.decodeInstanceFieldsAsync(instance)
 end
-

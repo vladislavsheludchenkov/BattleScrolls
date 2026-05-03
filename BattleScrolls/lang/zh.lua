@@ -271,8 +271,8 @@ local strings = {
     [BATTLESCROLLS_STAT_EFFECTIVE_HPS] = "有效HPS",
     [BATTLESCROLLS_STAT_OVERHEAL] = "过量治疗",
 
-    [BATTLESCROLLS_HEADER_RAW_HOT_VS_DIRECT] = "总：HoT vs 直接",
-    [BATTLESCROLLS_HEADER_EFFECTIVE_HOT_VS_DIRECT] = "有效：HoT vs 直接",
+    [BATTLESCROLLS_HEADER_RAW_HOT_VS_DIRECT] = "总治疗（按类型）",
+    [BATTLESCROLLS_HEADER_EFFECTIVE_HOT_VS_DIRECT] = "有效治疗（按类型）",
     [BATTLESCROLLS_HEADER_RAW_HEALING_BY_TARGET] = "总治疗（按目标）",
     [BATTLESCROLLS_HEADER_RAW_HEALING_BY_ABILITY] = "总治疗（按技能）",
     [BATTLESCROLLS_HEADER_EFFECTIVE_HEALING_BY_TARGET] = "有效治疗（按目标）",
@@ -282,6 +282,7 @@ local strings = {
 
     [BATTLESCROLLS_STAT_DIRECT_HEALING] = "直接治疗",
     [BATTLESCROLLS_STAT_HEALING_OVER_TIME] = "持续治疗",
+    [BATTLESCROLLS_STAT_SHIELD_HEALING] = "伤害护盾",
 
     -------------------------
     -- Effects Stats
@@ -334,6 +335,7 @@ local strings = {
     [BATTLESCROLLS_TOOLTIP_MEDIAN_INTERVAL] = "中位数间隔",
 
     [BATTLESCROLLS_TOOLTIP_ABILITY] = "技能",
+    [BATTLESCROLLS_TOOLTIP_ABILITY_ID] = "技能 ID",
 
     -------------------------
     -- Damage Types
@@ -359,6 +361,7 @@ local strings = {
     [BATTLESCROLLS_DELIVERY_DOT] = "DoT",
     [BATTLESCROLLS_DELIVERY_DIRECT] = "直接",
     [BATTLESCROLLS_DELIVERY_HOT] = "HoT",
+    [BATTLESCROLLS_DELIVERY_SHIELD] = "护盾",
 
     -------------------------
     -- Filter Dialog

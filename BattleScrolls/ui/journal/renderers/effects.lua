@@ -155,11 +155,12 @@ local function displayEffectEntriesAsync(list, sortedEffects, durationMs, header
         local isFirst = true
         for i, entry in ipairs(sortedEffects) do
             local abilityName = utils.getAbilityDisplayName(entry.abilityId)
-            local abilityIcon = GetAbilityIcon(entry.abilityId)
+            local abilityIcon = utils.getAbilityIcon(entry.abilityId)
             local valueStr = formatValueFn(entry.stats, durationMs)
             local isFavorite = favorites[entry.abilityId] or false
 
             local lines = tooltips.buildEffectTooltipLines(entry.stats, durationMs)
+            utils.appendAbilityIdLine(lines, entry.abilityId)
 
             EntryBuilder.addEntry(list, {
                 label = abilityName,
@@ -572,11 +573,12 @@ function EffectsRenderer.renderEffectsGroup(ctx)
         local isFirst = true
         for i, entry in ipairs(sorted) do
             local abilityName = utils.getAbilityDisplayName(entry.abilityId)
-            local abilityIcon = GetAbilityIcon(entry.abilityId)
+            local abilityIcon = utils.getAbilityIcon(entry.abilityId)
             local valueStr = formatGroupEffectValueBrief(entry.avgUptimePercent, entry.stats.memberCount, entry.avgPlayerUptimePercent)
             local isFavorite = favorites[entry.abilityId] or false
 
             local lines = tooltips.buildGroupEffectTooltipLines(entry.stats, entry.avgEffectiveAliveTimeMs, entry.memberBreakdown)
+            utils.appendAbilityIdLine(lines, entry.abilityId)
 
             EntryBuilder.addEntry(list, {
                 label = abilityName,

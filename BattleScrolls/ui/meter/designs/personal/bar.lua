@@ -374,7 +374,7 @@ function design:Render(_calc, ctx)
         local groupSize = math.max(1, GetGroupSize())
         local basePeople = math.min(groupSize, 6)
         local extraPeople = math.max(0, groupSize - 6)
-        local targetHPS = 6000 * basePeople + 2000 * extraPeople
+        local targetHPS = 8000 * basePeople + 2000 * extraPeople
         local rawHPS = ctx.personalRawHPS
         barPercent = (rawHPS / targetHPS) * 50
     else

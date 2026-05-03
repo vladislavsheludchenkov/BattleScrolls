@@ -103,8 +103,8 @@ local function buildAbilityTooltipText(merged)
     if merged.damageTypeDesc then
         table.insert(lines, string.format("%s: %s", GetString(BATTLESCROLLS_TOOLTIP_TYPE), merged.damageTypeDesc))
     end
-    if merged.overTimeOrDirectDesc then
-        table.insert(lines, string.format("%s: %s", GetString(BATTLESCROLLS_TOOLTIP_DELIVERY), merged.overTimeOrDirectDesc))
+    if merged.deliveryDesc then
+        table.insert(lines, string.format("%s: %s", GetString(BATTLESCROLLS_TOOLTIP_DELIVERY), merged.deliveryDesc))
     end
 
     if merged.breakdown then
@@ -117,11 +117,13 @@ local function buildAbilityTooltipText(merged)
             local pct = merged.totalDamage > 0 and (entry.damage / merged.totalDamage * 100) or 0
             table.insert(lines, string.format("  %s: %s (%.1f%%)", entry.displayName, ZO_CommaDelimitNumber(entry.damage), pct))
             tooltips.appendTickStats(lines, entry.critStats, "    ")
+            table.insert(lines, "    " .. utils.formatAbilityIdLine(entry.abilityId))
         end
     else
         -- Single variant
         table.insert(lines, "")
         tooltips.appendTickStats(lines, merged.critStats)
+        utils.appendAbilityIdLine(lines, merged.abilityId)
     end
 
     return table.concat(lines, "\n")
@@ -203,12 +205,13 @@ local function displayAbilityBreakdownAsync(list, abilityEntries, totalDamage, d
             return nil
         end
 
-        -- Get dot/direct description for an ability
-        local function getOverTimeOrDirectDesc(abilityId)
+        -- Get delivery description for an ability
+        local function getDeliveryDesc(abilityId)
             local info = getAbilityInfo(abilityId)
-            if info and info.overTimeOrDirect then
-                local hasOverTime = info.overTimeOrDirect.overTime
-                local hasDirect = info.overTimeOrDirect.direct
+            local deliveryType = BattleScrolls.arithmancer.GetAbilityDeliveryType(info)
+            if deliveryType then
+                local hasOverTime = deliveryType.overTime
+                local hasDirect = deliveryType.direct
                 if hasOverTime and hasDirect then
                     return GetString(BATTLESCROLLS_DELIVERY_MIXED)
                 elseif hasOverTime then
@@ -267,7 +270,7 @@ local function displayAbilityBreakdownAsync(list, abilityEntries, totalDamage, d
                     },
                     baseName = entry.baseName,
                     damageTypeDesc = getDamageTypeDesc(entry.abilityId),
-                    overTimeOrDirectDesc = getOverTimeOrDirectDesc(entry.abilityId),
+                    deliveryDesc = getDeliveryDesc(entry.abilityId),
                 }
             end
             local agg = aggregated[key]
@@ -347,7 +350,7 @@ local function displayAbilityBreakdownAsync(list, abilityEntries, totalDamage, d
                 abilityId = topEntry.abilityId,
                 critStats = group.stats,
                 damageTypeDesc = topEntry.damageTypeDesc,
-                overTimeOrDirectDesc = topEntry.overTimeOrDirectDesc,
+                deliveryDesc = topEntry.deliveryDesc,
                 breakdown = nil,
             }
 
@@ -357,13 +360,13 @@ local function displayAbilityBreakdownAsync(list, abilityEntries, totalDamage, d
 
                 -- Collect unique damage types for aggregate description
                 local uniqueDamageTypes = {}
-                local uniqueOverTimeOrDirects = {}
+                local uniqueDeliveries = {}
                 for _, entry in ipairs(group.entries) do
                     if entry.damageTypeDesc then
                         uniqueDamageTypes[entry.damageTypeDesc] = true
                     end
-                    if entry.overTimeOrDirectDesc then
-                        uniqueOverTimeOrDirects[entry.overTimeOrDirectDesc] = true
+                    if entry.deliveryDesc then
+                        uniqueDeliveries[entry.deliveryDesc] = true
                     end
                 end
 
@@ -375,29 +378,29 @@ local function displayAbilityBreakdownAsync(list, abilityEntries, totalDamage, d
                 table.sort(allDamageTypes)
                 mergedEntry.damageTypeDesc = #allDamageTypes > 0 and table.concat(allDamageTypes, ", ") or nil
 
-                -- Build aggregate dot/direct description
-                local allOverTimeOrDirect = {}
-                for otd in pairs(uniqueOverTimeOrDirects) do
-                    table.insert(allOverTimeOrDirect, otd)
+                -- Build aggregate delivery description
+                local allDeliveries = {}
+                for delivery in pairs(uniqueDeliveries) do
+                    table.insert(allDeliveries, delivery)
                 end
-                table.sort(allOverTimeOrDirect)
-                mergedEntry.overTimeOrDirectDesc = #allOverTimeOrDirect > 0 and table.concat(allOverTimeOrDirect, ", ") or nil
+                table.sort(allDeliveries)
+                mergedEntry.deliveryDesc = #allDeliveries > 0 and table.concat(allDeliveries, ", ") or nil
 
                 local hasDifferentDamageTypes = coreUtils.countKeys(uniqueDamageTypes) > 1
-                local hasDifferentOverTimeOrDirect = coreUtils.countKeys(uniqueOverTimeOrDirects) > 1
+                local hasDifferentDelivery = coreUtils.countKeys(uniqueDeliveries) > 1
 
                 for _, entry in ipairs(group.entries) do
                     local suffixParts = {}
                     if hasDifferentDamageTypes and entry.damageTypeDesc then
                         table.insert(suffixParts, entry.damageTypeDesc)
                     end
-                    if hasDifferentOverTimeOrDirect and entry.overTimeOrDirectDesc then
-                        table.insert(suffixParts, entry.overTimeOrDirectDesc)
+                    if hasDifferentDelivery and entry.deliveryDesc then
+                        table.insert(suffixParts, entry.deliveryDesc)
                     end
 
                     local displayName
                     if #suffixParts > 0 then
-                        displayName = ZO_GenerateCommaSeparatedListWithAnd(suffixParts)
+                        displayName = table.concat(suffixParts, " ")
                     else
                         displayName = string.format("ID %d", entry.abilityId)
                     end
@@ -426,7 +429,7 @@ local function displayAbilityBreakdownAsync(list, abilityEntries, totalDamage, d
                     totalDamage = group.totalDamage,
                     critStats = group.stats,
                     damageTypeDesc = mergedEntry.damageTypeDesc,
-                    overTimeOrDirectDesc = mergedEntry.overTimeOrDirectDesc,
+                    deliveryDesc = mergedEntry.deliveryDesc,
                     entries = breakdownEntries,
                 }
             end
@@ -454,7 +457,7 @@ local function displayAbilityBreakdownAsync(list, abilityEntries, totalDamage, d
                 break
             end
 
-            local abilityIcon = GetAbilityIcon(merged.abilityId)
+            local abilityIcon = utils.getAbilityIcon(merged.abilityId)
             local valueStr = utils.formatDamageWithPercent(merged.totalDamage, totalDamage, durationSec)
             local tooltipText = buildAbilityTooltipText(merged)
 
@@ -859,7 +862,7 @@ function DamageRenderer.renderDamageTaken(ctx)
                 local resolvedRows = {}
                 for j, attack in ipairs(recap.attacks) do
                     resolvedRows[#resolvedRows + 1] = {
-                        icon = GetAbilityIcon(attack.abilityId),
+                        icon = utils.getAbilityIcon(attack.abilityId),
                         label = utils.getAbilityDisplayName(attack.abilityId),
                         value = utils.formatCompact(attack.damage),
                         isHighlighted = (j == #recap.attacks),

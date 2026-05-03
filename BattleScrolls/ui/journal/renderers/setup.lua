@@ -288,7 +288,7 @@ local function resolveFoodDisplay(food, playerAliveTimeMs)
     end
     local icon = itemLink
         and GetItemLinkIcon(itemLink)
-        or GetAbilityIcon(food.abilityId)
+        or journal.utils.getAbilityIcon(food.abilityId)
     local uptimeSuffix = nil
     if food.uptimeMs and playerAliveTimeMs and playerAliveTimeMs > 0 then
         local uptimePercent = food.uptimeMs / playerAliveTimeMs * 100
@@ -316,7 +316,7 @@ local function getMundusConstellationIcon(abilityId)
         local icon = ZO_STAT_MUNDUS_ICONS[mundusType]
         if icon then return icon end
     end
-    return GetAbilityIcon(abilityId)
+    return journal.utils.getAbilityIcon(abilityId)
 end
 
 ---Builds the CHARACTER section (race/class, skill lines, mundus, food).
@@ -680,7 +680,7 @@ local function buildAbilityRows(col, setupData, showWeaponTypes, tightFit, compa
 
         local allAbilities = collectScribedAbilities(setupData.abilities)
         for _, scribed in ipairs(allAbilities) do
-            local icon = GetAbilityIcon(scribed.abilityId)
+            local icon = journal.utils.getAbilityIcon(scribed.abilityId)
             local name = BattleScrolls.utils.GetScribeAwareAbilityDisplayName(scribed.abilityId)
             local text = ZO_SELECTED_TEXT:Colorize(name) .. ": " .. scribed.scripts
             local row = col:IconTextRow(icon, text, ZO_NORMAL_TEXT)
@@ -860,7 +860,7 @@ function setup.renderSetup(ctx)
                             icon = getMundusConstellationIcon(abilityId),
                             sublabel = GetString(BATTLESCROLLS_SETUP_MUNDUS),
                             header = isFirst and GetString(BATTLESCROLLS_SETUP_CHARACTER) or nil,
-                            tooltip = { type = "text", title = name, text = desc or "" },
+                            tooltip = { type = "text", title = name, text = journal.utils.textWithAbilityId(desc, abilityId) },
                         })
                         isFirst = false
                     end
@@ -877,7 +877,7 @@ function setup.renderSetup(ctx)
                             foodTooltip = { type = "item", itemLink = itemLink }
                         else
                             local desc = zo_strformat("<<1>>", GetAbilityDescription(food.abilityId, nil, ""))
-                            foodTooltip = { type = "text", title = name, text = desc or "" }
+                            foodTooltip = { type = "text", title = name, text = journal.utils.textWithAbilityId(desc, food.abilityId) }
                         end
                         EntryBuilder.addEntry(list, {
                             label = name,

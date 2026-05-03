@@ -271,8 +271,8 @@ local strings = {
     [BATTLESCROLLS_STAT_EFFECTIVE_HPS] = "実効HPS",
     [BATTLESCROLLS_STAT_OVERHEAL] = "過剰回復",
 
-    [BATTLESCROLLS_HEADER_RAW_HOT_VS_DIRECT] = "総: HoT vs 直接",
-    [BATTLESCROLLS_HEADER_EFFECTIVE_HOT_VS_DIRECT] = "実効: HoT vs 直接",
+    [BATTLESCROLLS_HEADER_RAW_HOT_VS_DIRECT] = "総回復（タイプ別）",
+    [BATTLESCROLLS_HEADER_EFFECTIVE_HOT_VS_DIRECT] = "実効回復（タイプ別）",
     [BATTLESCROLLS_HEADER_RAW_HEALING_BY_TARGET] = "総回復（ターゲット別）",
     [BATTLESCROLLS_HEADER_RAW_HEALING_BY_ABILITY] = "総回復（スキル別）",
     [BATTLESCROLLS_HEADER_EFFECTIVE_HEALING_BY_TARGET] = "実効回復（ターゲット別）",
@@ -282,6 +282,7 @@ local strings = {
 
     [BATTLESCROLLS_STAT_DIRECT_HEALING] = "直接回復",
     [BATTLESCROLLS_STAT_HEALING_OVER_TIME] = "継続回復",
+    [BATTLESCROLLS_STAT_SHIELD_HEALING] = "ダメージシールド",
 
     -------------------------
     -- Effects Stats
@@ -334,6 +335,7 @@ local strings = {
     [BATTLESCROLLS_TOOLTIP_MEDIAN_INTERVAL] = "中央値間隔",
 
     [BATTLESCROLLS_TOOLTIP_ABILITY] = "スキル",
+    [BATTLESCROLLS_TOOLTIP_ABILITY_ID] = "スキルID",
 
     -------------------------
     -- Damage Types
@@ -359,6 +361,7 @@ local strings = {
     [BATTLESCROLLS_DELIVERY_DOT] = "継続",
     [BATTLESCROLLS_DELIVERY_DIRECT] = "直接",
     [BATTLESCROLLS_DELIVERY_HOT] = "継続回復",
+    [BATTLESCROLLS_DELIVERY_SHIELD] = "シールド",
 
     -------------------------
     -- Filter Dialog

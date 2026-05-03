@@ -314,8 +314,8 @@ ZO_CreateStringId("BATTLESCROLLS_STAT_EFFECTIVE_HEALING", "Effective Healing")
 ZO_CreateStringId("BATTLESCROLLS_STAT_EFFECTIVE_HPS", "Effective HPS")
 ZO_CreateStringId("BATTLESCROLLS_STAT_OVERHEAL", "Overheal")
 
-ZO_CreateStringId("BATTLESCROLLS_HEADER_RAW_HOT_VS_DIRECT", "Raw HoT vs Direct")
-ZO_CreateStringId("BATTLESCROLLS_HEADER_EFFECTIVE_HOT_VS_DIRECT", "Effective HoT vs Direct")
+ZO_CreateStringId("BATTLESCROLLS_HEADER_RAW_HOT_VS_DIRECT", "Raw Healing by Type")
+ZO_CreateStringId("BATTLESCROLLS_HEADER_EFFECTIVE_HOT_VS_DIRECT", "Effective Healing by Type")
 ZO_CreateStringId("BATTLESCROLLS_HEADER_RAW_HEALING_BY_TARGET", "Raw Healing By Target")
 ZO_CreateStringId("BATTLESCROLLS_HEADER_RAW_HEALING_BY_ABILITY", "Raw Healing By Ability")
 ZO_CreateStringId("BATTLESCROLLS_HEADER_EFFECTIVE_HEALING_BY_TARGET", "Effective Healing By Target")
@@ -325,6 +325,7 @@ ZO_CreateStringId("BATTLESCROLLS_HEADER_EFFECTIVE_HEALING_BY_SOURCE", "Effective
 
 ZO_CreateStringId("BATTLESCROLLS_STAT_DIRECT_HEALING", "Direct Healing")
 ZO_CreateStringId("BATTLESCROLLS_STAT_HEALING_OVER_TIME", "Healing over Time")
+ZO_CreateStringId("BATTLESCROLLS_STAT_SHIELD_HEALING", "Damage Shields")
 
 -------------------------
 -- Effects Stats
@@ -377,6 +378,7 @@ ZO_CreateStringId("BATTLESCROLLS_TOOLTIP_MEAN_INTERVAL", "Mean interval")
 ZO_CreateStringId("BATTLESCROLLS_TOOLTIP_MEDIAN_INTERVAL", "Median interval")
 
 ZO_CreateStringId("BATTLESCROLLS_TOOLTIP_ABILITY", "Ability")
+ZO_CreateStringId("BATTLESCROLLS_TOOLTIP_ABILITY_ID", "Ability ID")
 
 -------------------------
 -- Damage Types
@@ -402,6 +404,7 @@ ZO_CreateStringId("BATTLESCROLLS_DELIVERY_MIXED", "Mixed")
 ZO_CreateStringId("BATTLESCROLLS_DELIVERY_DOT", "DoT")
 ZO_CreateStringId("BATTLESCROLLS_DELIVERY_DIRECT", "Direct")
 ZO_CreateStringId("BATTLESCROLLS_DELIVERY_HOT", "HoT")
+ZO_CreateStringId("BATTLESCROLLS_DELIVERY_SHIELD", "Shield")
 
 -------------------------
 -- Filter Dialog
