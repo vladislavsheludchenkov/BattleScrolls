@@ -28,6 +28,14 @@ end
 ---@class BattleScrollsConstants
 ---@field BOSS_TAGS table<number, string> Pre-computed boss tag strings ("boss1" to "boss12")
 ---@field SingleTargetDamageProcAbilityIds table<number, boolean> A set of ability IDs that damage one target, regardless of if it's targeted specifically or hit by an AOE.
+---@field DAMAGE_SHIELDED_ABILITY_ID number Synthetic ability id for damage absorbed by damage shields
+---@field HEAL_ABSORBED_ABILITY_ID number Synthetic ability id for healing absorbed by heal absorption effects
+---@field HEALTH_RECOVERY_ABILITY_ID number Synthetic ability id for natural health recovery
+---@field INFERRED_PLAYER_UNIT_ID number Synthetic player unit id used until ESO reports the real id
+---@field INFERRED_COMPANION_UNIT_ID number Synthetic companion unit id used until ESO reports the real id
+---@field DAMAGE_SHIELDED_ICON string Synthetic shielded damage icon
+---@field HEAL_ABSORBED_ICON string Synthetic absorbed healing icon
+---@field HEALTH_RECOVERY_ICON string Synthetic health recovery icon
 
 ---@type BattleScrollsConstants
 local constants = {}
@@ -46,6 +54,17 @@ BATTLESCROLLS_KEYBIND_ICON_SCALE = nil
 constants.huge = 2 ^ 20
 
 constants.BOSS_TAGS = BOSS_TAGS
+
+-- Synthetic ability/unit ids must fit binary storage bit widths:
+-- ability id is 20-bit unsigned, unit id is 24-bit unsigned.
+constants.DAMAGE_SHIELDED_ABILITY_ID = 1048574
+constants.HEAL_ABSORBED_ABILITY_ID = 1048573
+constants.HEALTH_RECOVERY_ABILITY_ID = 1048575
+constants.INFERRED_PLAYER_UNIT_ID = 16777215
+constants.INFERRED_COMPANION_UNIT_ID = 16777214
+constants.DAMAGE_SHIELDED_ICON = "EsoUI/Art/Icons/scribing_primary_damageshield.dds"
+constants.HEAL_ABSORBED_ICON = "EsoUI/Art/Icons/scribing_primary_trauma.dds"
+constants.HEALTH_RECOVERY_ICON = GetAbilityIcon(61698) -- Major Fortitude
 
 constants.SingleTargetDamageProcAbilityIds = {
     [185843] = true, -- Inspired Scholarship
@@ -76,7 +95,7 @@ constants.damageResultsSet = {
     [ACTION_RESULT_CRITICAL_DAMAGE] = true,
     [ACTION_RESULT_DAMAGE] = true,
     [ACTION_RESULT_BLOCKED_DAMAGE] = true,
-    -- ACTION_RESULT_DAMAGE_SHIELDED excluded: doesn't have correct source and ability name
+    -- ACTION_RESULT_DAMAGE_SHIELDED handled separately with a synthetic ability ID
     [ACTION_RESULT_PRECISE_DAMAGE] = true,
     [ACTION_RESULT_WRECKING_DAMAGE] = true,
 }
@@ -86,6 +105,7 @@ constants.healingResultsSet = {
     [ACTION_RESULT_HEAL] = true,
     [ACTION_RESULT_CRITICAL_HEAL] = true,
     [ACTION_RESULT_HOT_TICK_CRITICAL] = true,
+    -- ACTION_RESULT_HEAL_ABSORBED handled separately with a synthetic ability ID
 }
 
 -- Healing ability IDs to ignore (e.g., pet initialization heals)

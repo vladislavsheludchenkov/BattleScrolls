@@ -42,6 +42,7 @@ end
 ---Create shared ArithmancerInstances and dispatch to all listeners
 local function tick()
     local state = BattleScrolls.state
+    state:NotifyPreTick()
     local calc = BattleScrolls.arithmancer:Make(state)
     local bossCalc = BattleScrolls.arithmancer:ForBosses(state)
     for _, listener in ipairs(listeners) do

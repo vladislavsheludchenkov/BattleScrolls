@@ -23,6 +23,15 @@ local HealingRenderer = {}
 
 -- Yield frequency for loops (yield every N iterations)
 local YIELD_INTERVAL = 20
+local DETAILED_ABILITY_LIMIT = 50
+local DETAILED_UNIT_LIMIT = 20
+local HEAL_ABSORBED_ABILITY_ID = BattleScrolls.constants.HEAL_ABSORBED_ABILITY_ID
+
+---@param abilityId number
+---@return boolean
+local function isHealingPercentExcludedAbility(abilityId)
+    return abilityId == HEAL_ABSORBED_ABILITY_ID
+end
 
 -- Special unit ID marker for self in combined healing views
 local SELF_UNIT_ID = FilterConstants.SELF_UNIT_ID
@@ -49,12 +58,14 @@ end
 ---@param hotPercent number|nil
 ---@param directPercent number|nil
 ---@param shieldPercent number|nil
+---@param regenPercent number|nil
 ---@return Control|nil
-local function buildHealingComposition(col, hotPercent, directPercent, shieldPercent)
+local function buildHealingComposition(col, hotPercent, directPercent, shieldPercent, regenPercent)
     return col:Section(GetString(BATTLESCROLLS_OVERVIEW_COMPOSITION),
         hotPercent and col:StatRow(GetString(BATTLESCROLLS_DELIVERY_HOT), utils.formatPercent(hotPercent)),
         directPercent and col:StatRow(GetString(BATTLESCROLLS_DELIVERY_DIRECT), utils.formatPercent(directPercent)),
-        shieldPercent and col:StatRow(GetString(BATTLESCROLLS_DELIVERY_SHIELD), utils.formatPercent(shieldPercent))
+        shieldPercent and col:StatRow(GetString(BATTLESCROLLS_DELIVERY_SHIELD), utils.formatPercent(shieldPercent)),
+        regenPercent and col:StatRow(GetString(BATTLESCROLLS_DELIVERY_REGEN), utils.formatPercent(regenPercent))
     )
 end
 
@@ -72,6 +83,13 @@ end
 -------------------------
 -- Healing Display Helpers
 -------------------------
+
+---@param healing number
+---@param durationSec number
+---@return string
+local function formatHealingWithoutPercent(healing, durationSec)
+    return string.format("%s (%s)", ZO_CommaDelimitNumber(healing), utils.formatTargetHPS(healing, durationSec))
+end
 
 ---Builds a text tooltip descriptor from title and text, or nil if no title
 ---@param ttTitle string|nil
@@ -96,7 +114,7 @@ end
 local function displayHealingSummary(list, totalRaw, totalReal, durationSec, rawHpsTtTitle, rawHpsTtText, effHpsTtTitle, effHpsTtText, overhealTtTitle, overhealTtText)
     -- Guard against division by zero for very short fights
     if durationSec <= 0 then durationSec = 1 end
-    local overhealAmount = totalRaw - totalReal
+    local overhealAmount = math.max(0, totalRaw - totalReal)
     local overhealPercent = totalRaw > 0 and (overhealAmount / totalRaw * 100) or 0
 
     EntryBuilder.addEntry(list, {
@@ -139,7 +157,7 @@ end
 ---@param headerText string
 ---@param maxEntries number|nil
 local function displayHealingUnitBreakdownWithSelf(list, unitData, total, durationSec, unitNames, headerText, maxEntries)
-    maxEntries = maxEntries or 10
+    maxEntries = maxEntries or DETAILED_UNIT_LIMIT
     local sorted = utils.sortDamageBreakdown(unitData)
     local isFirst = true
     unitNames = unitNames or {}
@@ -170,19 +188,23 @@ end
 
 ---Displays healing delivery breakdown
 ---@param list any
----@param byHotVsDirect table {hot: {raw, real}, direct: {raw, real}, shield: {raw, real}}
----@param total number
+---@param byHotVsDirect table {hot: {raw, real}, direct: {raw, real}, shield: {raw, real}, regen: {raw, real}, absorbed: {raw, real}}
+---@param durationSec number
 ---@param healingField string "raw" or "real"
 ---@param headerText string
-local function displayHotVsDirectBreakdown(list, byHotVsDirect, total, healingField, headerText)
+local function displayHotVsDirectBreakdown(list, byHotVsDirect, durationSec, healingField, headerText)
     local hotHealing = byHotVsDirect.hot and byHotVsDirect.hot[healingField] or 0
     local directHealing = byHotVsDirect.direct and byHotVsDirect.direct[healingField] or 0
     local shieldHealing = byHotVsDirect.shield and byHotVsDirect.shield[healingField] or 0
+    local regenHealing = byHotVsDirect.regen and byHotVsDirect.regen[healingField] or 0
+    local absorbedHealing = byHotVsDirect.absorbed and byHotVsDirect.absorbed[healingField] or 0
+    local deliveryTotal = hotHealing + directHealing + shieldHealing + regenHealing
 
-    if hotHealing > 0 or directHealing > 0 or shieldHealing > 0 then
-        local hotPercent = total > 0 and (hotHealing / total * 100) or 0
-        local directPercent = total > 0 and (directHealing / total * 100) or 0
-        local shieldPercent = total > 0 and (shieldHealing / total * 100) or 0
+    if hotHealing > 0 or directHealing > 0 or shieldHealing > 0 or regenHealing > 0 or absorbedHealing > 0 then
+        local hotPercent = deliveryTotal > 0 and (hotHealing / deliveryTotal * 100) or 0
+        local directPercent = deliveryTotal > 0 and (directHealing / deliveryTotal * 100) or 0
+        local shieldPercent = deliveryTotal > 0 and (shieldHealing / deliveryTotal * 100) or 0
+        local regenPercent = deliveryTotal > 0 and (regenHealing / deliveryTotal * 100) or 0
         local isFirst = true
 
         if directHealing > 0 then
@@ -203,11 +225,29 @@ local function displayHotVsDirectBreakdown(list, byHotVsDirect, total, healingFi
             })
             isFirst = false
         end
+        if regenHealing > 0 then
+            EntryBuilder.addEntry(list, {
+                label = GetString(BATTLESCROLLS_STAT_REGEN_HEALING),
+                sublabel = string.format("%s (%.1f%%)", ZO_CommaDelimitNumber(regenHealing), regenPercent),
+                icon = StatIcons.REGEN,
+                header = isFirst and headerText or nil,
+            })
+            isFirst = false
+        end
         if shieldHealing > 0 then
             EntryBuilder.addEntry(list, {
                 label = GetString(BATTLESCROLLS_STAT_SHIELD_HEALING),
                 sublabel = string.format("%s (%.1f%%)", ZO_CommaDelimitNumber(shieldHealing), shieldPercent),
                 icon = StatIcons.SHIELD,
+                header = isFirst and headerText or nil,
+            })
+            isFirst = false
+        end
+        if absorbedHealing > 0 then
+            EntryBuilder.addEntry(list, {
+                label = GetString(BATTLESCROLLS_HEALING_UNKNOWN_ABSORBED),
+                sublabel = formatHealingWithoutPercent(absorbedHealing, durationSec),
+                icon = StatIcons.HEAL_ABSORPTION,
                 header = isFirst and headerText or nil,
             })
         end
@@ -413,13 +453,15 @@ end
 ---Aggregates healing delivery breakdown across multiple units
 ---@param healingData table Map of unitId to HealingDone/HealingDoneDiffSource
 ---@param abilityInfo table<number, AbilityInfo> Ability metadata for computing byHotVsDirect
----@return table {hot: {raw: number, real: number}, direct: {raw: number, real: number}, shield: {raw: number, real: number}}
+---@return table {hot: {raw: number, real: number}, direct: {raw: number, real: number}, shield: {raw: number, real: number}, regen: {raw: number, real: number}, absorbed: {raw: number, real: number}}
 local function aggregateHotVsDirectAcrossUnits(healingData, abilityInfo)
     local Arithmancer = BattleScrolls.arithmancer
     local result = {
         hot = { raw = 0, real = 0 },
         direct = { raw = 0, real = 0 },
         shield = { raw = 0, real = 0 },
+        regen = { raw = 0, real = 0 },
+        absorbed = { raw = 0, real = 0 },
     }
     for _, data in pairs(healingData) do
         local hotVsDirect = Arithmancer.ComputeByHotVsDirect(data, abilityInfo)
@@ -435,12 +477,20 @@ local function aggregateHotVsDirectAcrossUnits(healingData, abilityInfo)
             result.shield.raw = result.shield.raw + (hotVsDirect.shield.raw or 0)
             result.shield.real = result.shield.real + (hotVsDirect.shield.real or 0)
         end
+        if hotVsDirect.regen then
+            result.regen.raw = result.regen.raw + (hotVsDirect.regen.raw or 0)
+            result.regen.real = result.regen.real + (hotVsDirect.regen.real or 0)
+        end
+        if hotVsDirect.absorbed then
+            result.absorbed.raw = result.absorbed.raw + (hotVsDirect.absorbed.raw or 0)
+            result.absorbed.real = result.absorbed.real + (hotVsDirect.absorbed.real or 0)
+        end
     end
     return result
 end
 
 ---Adds self-healing delivery data to an aggregated table
----@param aggregated table {hot: {raw, real}, direct: {raw, real}, shield: {raw, real}}
+---@param aggregated table {hot: {raw, real}, direct: {raw, real}, shield: {raw, real}, regen: {raw, real}, absorbed: {raw, real}}
 ---@param selfHealing HealingDoneDiffSource Self-healing data
 ---@param abilityInfo table<number, AbilityInfo> Ability metadata for computing byHotVsDirect
 local function addSelfToHotVsDirect(aggregated, selfHealing, abilityInfo)
@@ -458,6 +508,14 @@ local function addSelfToHotVsDirect(aggregated, selfHealing, abilityInfo)
     if selfHotVsDirect.shield then
         aggregated.shield.raw = aggregated.shield.raw + (selfHotVsDirect.shield.raw or 0)
         aggregated.shield.real = aggregated.shield.real + (selfHotVsDirect.shield.real or 0)
+    end
+    if selfHotVsDirect.regen then
+        aggregated.regen.raw = aggregated.regen.raw + (selfHotVsDirect.regen.raw or 0)
+        aggregated.regen.real = aggregated.regen.real + (selfHotVsDirect.regen.real or 0)
+    end
+    if selfHotVsDirect.absorbed then
+        aggregated.absorbed.raw = aggregated.absorbed.raw + (selfHotVsDirect.absorbed.raw or 0)
+        aggregated.absorbed.real = aggregated.absorbed.real + (selfHotVsDirect.absorbed.real or 0)
     end
 end
 
@@ -523,23 +581,35 @@ local function buildAbilityTooltipText(merged)
     local lines = {}
     table.insert(lines, string.format("%s: %s", GetString(BATTLESCROLLS_TOOLTIP_TOTAL), ZO_CommaDelimitNumber(merged.totalHealing)))
 
+    if merged.critStats then
+        local raw = merged.critStats.raw or 0
+        local real = merged.critStats.real or 0
+        local overheal = merged.critStats.overheal or 0
+        if raw > 0 or real > 0 or overheal > 0 then
+            table.insert(lines, string.format("%s: %s", GetString(BATTLESCROLLS_STAT_RAW_HEALING), ZO_CommaDelimitNumber(raw)))
+            table.insert(lines, string.format("%s: %s", GetString(BATTLESCROLLS_STAT_EFFECTIVE_HEALING), ZO_CommaDelimitNumber(real)))
+            table.insert(lines, string.format("%s: %s", GetString(BATTLESCROLLS_STAT_OVERHEAL), ZO_CommaDelimitNumber(overheal)))
+        end
+    end
+
     if merged.deliveryDesc then
         table.insert(lines, string.format("%s: %s", GetString(BATTLESCROLLS_TOOLTIP_DELIVERY), merged.deliveryDesc))
     end
 
     if merged.breakdown then
-        tooltips.appendTickStats(lines, merged.critStats)
+        tooltips.appendTickStats(lines, merged.critStats, nil, merged.abilityId)
 
         table.insert(lines, "")
         for _, be in ipairs(merged.breakdown.entries) do
             local pct = merged.totalHealing > 0 and (be.healing / merged.totalHealing * 100) or 0
             table.insert(lines, string.format("  %s: %s (%.1f%%)", be.displayName, ZO_CommaDelimitNumber(be.healing), pct))
-            tooltips.appendTickStats(lines, be.critStats, "    ")
-            table.insert(lines, "    " .. utils.formatAbilityIdLine(be.abilityId))
+            tooltips.appendTickStats(lines, be.critStats, "    ", be.abilityId)
+            utils.appendAbilityIdLine(lines, be.abilityId, "    ")
         end
     else
         table.insert(lines, "")
-        tooltips.appendTickStats(lines, merged.critStats)
+        tooltips.appendTickStats(lines, merged.critStats, nil, merged.abilityId)
+        table.insert(lines, "")
         utils.appendAbilityIdLine(lines, merged.abilityId)
     end
 
@@ -550,28 +620,36 @@ end
 ---Groups by ability name, shows breakdown in tooltip when multiple ability IDs share the same name
 ---@param list any
 ---@param byAbilityId table<number, {healing: number, stats: {total: number, raw: number|nil, real: number|nil, overheal: number|nil, ticks: number, critTicks: number, minTick: number|nil, maxTick: number|nil}}> Map of abilityId to {healing, stats}
----@param total number
 ---@param durationSec number
 ---@param abilityInfo table<number, AbilityInfo>
 ---@param headerText string
 ---@param maxEntries number|nil
 ---@return Effect
-local function displayHealingAbilityBreakdownCoreAsync(list, byAbilityId, total, durationSec, abilityInfo, headerText, maxEntries)
+local function displayHealingAbilityBreakdownCoreAsync(list, byAbilityId, durationSec, abilityInfo, headerText, maxEntries)
     return LibEffect.Async(function()
-        maxEntries = maxEntries or 15
+        maxEntries = maxEntries or DETAILED_ABILITY_LIMIT
 
         -- Helper to get delivery description for an ability
         abilityInfo = abilityInfo or {}
         local function getDeliveryDesc(abilityId)
+            if abilityId == HEAL_ABSORBED_ABILITY_ID then
+                return GetString(BATTLESCROLLS_HEALING_UNKNOWN_ABSORBED)
+            end
             local info = abilityInfo[abilityId]
             local deliveryType = BattleScrolls.arithmancer.GetAbilityDeliveryType(info)
             if deliveryType then
                 local hasHot = deliveryType.overTime
                 local hasDirect = deliveryType.direct
                 local hasShield = deliveryType.shield
-                local count = (hasHot and 1 or 0) + (hasDirect and 1 or 0) + (hasShield and 1 or 0)
+                local hasRegen = deliveryType.regen
+                local hasHealAbsorption = deliveryType.healAbsorption
+                local count = (hasHot and 1 or 0) + (hasDirect and 1 or 0) + (hasShield and 1 or 0) + (hasRegen and 1 or 0) + (hasHealAbsorption and 1 or 0)
                 if count > 1 then
                     return GetString(BATTLESCROLLS_DELIVERY_MIXED)
+                elseif hasHealAbsorption then
+                    return GetString(BATTLESCROLLS_HEALING_UNKNOWN_ABSORBED)
+                elseif hasRegen then
+                    return GetString(BATTLESCROLLS_DELIVERY_REGEN)
                 elseif hasShield then
                     return GetString(BATTLESCROLLS_DELIVERY_SHIELD)
                 elseif hasHot then
@@ -655,6 +733,7 @@ local function displayHealingAbilityBreakdownCoreAsync(list, byAbilityId, total,
                 critStats = group.critStats,
                 deliveryDesc = nil,
                 breakdown = nil,
+                isSupplemental = isHealingPercentExcludedAbility(topEntry.abilityId),
             }
 
             local uniqueDelivery = {}
@@ -719,8 +798,18 @@ local function displayHealingAbilityBreakdownCoreAsync(list, byAbilityId, total,
         end
         LibEffect.Yield():Await()
 
+        local eligibleTotalHealing = 0
+        for _, merged in ipairs(mergedAbilities) do
+            if not merged.isSupplemental then
+                eligibleTotalHealing = eligibleTotalHealing + merged.totalHealing
+            end
+        end
+
         -- Sort by total healing descending
         table.sort(mergedAbilities, function(a, b)
+            if a.isSupplemental ~= b.isSupplemental then
+                return not a.isSupplemental
+            end
             return a.totalHealing > b.totalHealing
         end)
 
@@ -732,7 +821,9 @@ local function displayHealingAbilityBreakdownCoreAsync(list, byAbilityId, total,
             end
 
             local abilityIcon = utils.getAbilityIcon(merged.abilityId)
-            local valueStr = utils.formatHealingWithPercent(merged.totalHealing, total, durationSec)
+            local valueStr = merged.isSupplemental
+                and formatHealingWithoutPercent(merged.totalHealing, durationSec)
+                or utils.formatHealingWithPercent(merged.totalHealing, eligibleTotalHealing, durationSec)
 
             local tooltipText = buildAbilityTooltipText(merged)
 
@@ -757,13 +848,12 @@ end
 ---Aggregates by abilityId first, then delegates to core display function
 ---@param list any
 ---@param abilityData table Sorted array of {sourceUnitId, abilityId, healing, stats}
----@param total number
 ---@param durationSec number
 ---@param abilityInfo table<number, AbilityInfo>
 ---@param headerText string
 ---@param maxEntries number|nil
 ---@return Effect
-local function displayHealingAbilityBreakdownAsync(list, abilityData, total, durationSec, abilityInfo, headerText, maxEntries)
+local function displayHealingAbilityBreakdownAsync(list, abilityData, durationSec, abilityInfo, headerText, maxEntries)
     return LibEffect.Async(function()
         -- Aggregate by abilityId (sum across different sources), including stats
         local byAbilityId = {}
@@ -796,7 +886,7 @@ local function displayHealingAbilityBreakdownAsync(list, abilityData, total, dur
             end
         end
 
-        displayHealingAbilityBreakdownCoreAsync(list, byAbilityId, total, durationSec, abilityInfo, headerText, maxEntries):Await()
+        displayHealingAbilityBreakdownCoreAsync(list, byAbilityId, durationSec, abilityInfo, headerText, maxEntries):Await()
     end)
 end
 
@@ -804,14 +894,13 @@ end
 ---Directly delegates to core display function
 ---@param list any
 ---@param abilityData table<number, {healing: number, stats: {total: number, raw: number|nil, real: number|nil, overheal: number|nil, ticks: number, critTicks: number, minTick: number|nil, maxTick: number|nil}}> Map of abilityId to {healing, stats}
----@param total number
 ---@param durationSec number
 ---@param abilityInfo table<number, AbilityInfo>
 ---@param headerText string
 ---@param maxEntries number|nil
 ---@return Effect
-local function displaySimpleHealingAbilityBreakdownAsync(list, abilityData, total, durationSec, abilityInfo, headerText, maxEntries)
-    return displayHealingAbilityBreakdownCoreAsync(list, abilityData, total, durationSec, abilityInfo, headerText, maxEntries)
+local function displaySimpleHealingAbilityBreakdownAsync(list, abilityData, durationSec, abilityInfo, headerText, maxEntries)
+    return displayHealingAbilityBreakdownCoreAsync(list, abilityData, durationSec, abilityInfo, headerText, maxEntries)
 end
 
 -------------------------
@@ -855,18 +944,18 @@ local function refreshHealingViewAsync(list, durationSec, abilityInfo, unitNames
 
         if totalRaw == 0 then return end
 
-        -- Summary
-        displayHealingSummary(list, totalRaw, totalReal, durationSec, config.rawHpsTtTitle, config.rawHpsTtText, config.effHpsTtTitle, config.effHpsTtText, config.overhealTtTitle, config.overhealTtText)
-        LibEffect.Yield():Await()
-
         -- Aggregate HoT vs Direct
         local hotVsDirect = aggregateHotVsDirectAcrossUnits(filteredData, abilityInfo)
         if includeSelf then
             addSelfToHotVsDirect(hotVsDirect, config.selfHealing, abilityInfo)
         end
 
+        -- Summary
+        displayHealingSummary(list, totalRaw, totalReal, durationSec, config.rawHpsTtTitle, config.rawHpsTtText, config.effHpsTtTitle, config.effHpsTtText, config.overhealTtTitle, config.overhealTtText)
+        LibEffect.Yield():Await()
+
         -- === RAW SECTIONS ===
-        displayHotVsDirectBreakdown(list, hotVsDirect, totalRaw, "raw", GetString(BATTLESCROLLS_HEADER_RAW_HOT_VS_DIRECT))
+        displayHotVsDirectBreakdown(list, hotVsDirect, durationSec, "raw", GetString(BATTLESCROLLS_HEADER_RAW_HOT_VS_DIRECT))
         LibEffect.Yield():Await()
 
         -- Unit breakdown (raw)
@@ -885,18 +974,18 @@ local function refreshHealingViewAsync(list, durationSec, abilityInfo, unitNames
                 mergeSelfAbilitiesIntoArray(sortedRaw, selfAbilitiesRaw)
             end
             table.sort(sortedRaw, function(a, b) return a.healing > b.healing end)
-            displayHealingAbilityBreakdownAsync(list, sortedRaw, totalRaw, durationSec, abilityInfo, GetString(BATTLESCROLLS_HEADER_RAW_HEALING_BY_ABILITY)):Await()
+            displayHealingAbilityBreakdownAsync(list, sortedRaw, durationSec, abilityInfo, GetString(BATTLESCROLLS_HEADER_RAW_HEALING_BY_ABILITY)):Await()
         else
             local byAbilityRaw = aggregateHealingByAbilityAsync(filteredData, "raw", false):Await()
             if includeSelf then
                 mergeSelfAbilitiesIntoMapAsync(byAbilityRaw, config.selfHealing.bySourceUnitIdByAbilityId, "raw"):Await()
             end
-            displaySimpleHealingAbilityBreakdownAsync(list, byAbilityRaw, totalRaw, durationSec, abilityInfo, GetString(BATTLESCROLLS_HEADER_RAW_HEALING_BY_ABILITY)):Await()
+            displaySimpleHealingAbilityBreakdownAsync(list, byAbilityRaw, durationSec, abilityInfo, GetString(BATTLESCROLLS_HEADER_RAW_HEALING_BY_ABILITY)):Await()
         end
 
         -- === EFFECTIVE SECTIONS ===
         if totalReal > 0 then
-            displayHotVsDirectBreakdown(list, hotVsDirect, totalReal, "real", GetString(BATTLESCROLLS_HEADER_EFFECTIVE_HOT_VS_DIRECT))
+            displayHotVsDirectBreakdown(list, hotVsDirect, durationSec, "real", GetString(BATTLESCROLLS_HEADER_EFFECTIVE_HOT_VS_DIRECT))
             LibEffect.Yield():Await()
 
             -- Unit breakdown (effective)
@@ -915,13 +1004,13 @@ local function refreshHealingViewAsync(list, durationSec, abilityInfo, unitNames
                     mergeSelfAbilitiesIntoArray(sortedReal, selfAbilitiesReal)
                 end
                 table.sort(sortedReal, function(a, b) return a.healing > b.healing end)
-                displayHealingAbilityBreakdownAsync(list, sortedReal, totalReal, durationSec, abilityInfo, GetString(BATTLESCROLLS_HEADER_EFFECTIVE_HEALING_BY_ABILITY)):Await()
+                displayHealingAbilityBreakdownAsync(list, sortedReal, durationSec, abilityInfo, GetString(BATTLESCROLLS_HEADER_EFFECTIVE_HEALING_BY_ABILITY)):Await()
             else
                 local byAbilityReal = aggregateHealingByAbilityAsync(filteredData, "real", true):Await()
                 if includeSelf then
                     mergeSelfAbilitiesIntoMapAsync(byAbilityReal, config.selfHealing.bySourceUnitIdByAbilityId, "real"):Await()
                 end
-                displaySimpleHealingAbilityBreakdownAsync(list, byAbilityReal, totalReal, durationSec, abilityInfo, GetString(BATTLESCROLLS_HEADER_EFFECTIVE_HEALING_BY_ABILITY)):Await()
+                displaySimpleHealingAbilityBreakdownAsync(list, byAbilityReal, durationSec, abilityInfo, GetString(BATTLESCROLLS_HEADER_EFFECTIVE_HEALING_BY_ABILITY)):Await()
             end
         end
     end)
@@ -968,6 +1057,9 @@ function HealingRenderer.renderSelfHealing(ctx)
 
         if totalRaw == 0 then return end
 
+        -- Compute HoT vs Direct breakdown
+        local selfHotVsDirect = Arithmancer.ComputeByHotVsDirect(selfHealing, ctx.abilityInfo)
+
         -- Summary with group self-healing tooltips
         local rawHpsTtTitle, rawHpsTtText = tooltips.buildSelfHealingGroupTooltip(ctx.encounter, false)
         local effHpsTtTitle, effHpsTtText = tooltips.buildSelfHealingGroupTooltip(ctx.encounter, true)
@@ -975,23 +1067,20 @@ function HealingRenderer.renderSelfHealing(ctx)
         displayHealingSummary(ctx.list, totalRaw, totalReal, ctx.durationSec, rawHpsTtTitle, rawHpsTtText, effHpsTtTitle, effHpsTtText, overhealTtTitle, overhealTtText)
         LibEffect.Yield():Await()
 
-        -- Compute HoT vs Direct breakdown
-        local selfHotVsDirect = Arithmancer.ComputeByHotVsDirect(selfHealing, ctx.abilityInfo)
-
         -- Raw sections
-        displayHotVsDirectBreakdown(ctx.list, selfHotVsDirect, totalRaw, "raw", GetString(BATTLESCROLLS_HEADER_RAW_HOT_VS_DIRECT))
+        displayHotVsDirectBreakdown(ctx.list, selfHotVsDirect, ctx.durationSec, "raw", GetString(BATTLESCROLLS_HEADER_RAW_HOT_VS_DIRECT))
         LibEffect.Yield():Await()
 
         local sortedAbilitiesRaw = aggregateHealingBySourceAbilityAsync(selfHealing.bySourceUnitIdByAbilityId, "raw", false):Await()
-        displayHealingAbilityBreakdownAsync(ctx.list, sortedAbilitiesRaw, totalRaw, ctx.durationSec, ctx.abilityInfo, GetString(BATTLESCROLLS_HEADER_RAW_HEALING_BY_ABILITY)):Await()
+        displayHealingAbilityBreakdownAsync(ctx.list, sortedAbilitiesRaw, ctx.durationSec, ctx.abilityInfo, GetString(BATTLESCROLLS_HEADER_RAW_HEALING_BY_ABILITY)):Await()
 
         -- Effective sections
         if totalReal > 0 then
-            displayHotVsDirectBreakdown(ctx.list, selfHotVsDirect, totalReal, "real", GetString(BATTLESCROLLS_HEADER_EFFECTIVE_HOT_VS_DIRECT))
+            displayHotVsDirectBreakdown(ctx.list, selfHotVsDirect, ctx.durationSec, "real", GetString(BATTLESCROLLS_HEADER_EFFECTIVE_HOT_VS_DIRECT))
             LibEffect.Yield():Await()
 
             local sortedAbilitiesReal = aggregateHealingBySourceAbilityAsync(selfHealing.bySourceUnitIdByAbilityId, "real", true):Await()
-            displayHealingAbilityBreakdownAsync(ctx.list, sortedAbilitiesReal, totalReal, ctx.durationSec, ctx.abilityInfo, GetString(BATTLESCROLLS_HEADER_EFFECTIVE_HEALING_BY_ABILITY)):Await()
+            displayHealingAbilityBreakdownAsync(ctx.list, sortedAbilitiesReal, ctx.durationSec, ctx.abilityInfo, GetString(BATTLESCROLLS_HEADER_EFFECTIVE_HEALING_BY_ABILITY)):Await()
         end
     end)
 end
@@ -1015,6 +1104,24 @@ end
 -------------------------
 -- Overview Panel Data Extraction Helpers
 -------------------------
+
+---@param abilityTotals table<number, number>
+---@param maxCount number
+---@return { abilityId: number, name: string, total: number, isSupplemental: boolean|nil, shareTotal: number }[]
+local function mergeHealingOverviewAbilities(abilityTotals, maxCount)
+    local eligibleTotal = 0
+    for abilityId, total in pairs(abilityTotals) do
+        if not isHealingPercentExcludedAbility(abilityId) then
+            eligibleTotal = eligibleTotal + total
+        end
+    end
+
+    local abilities = utils.mergeAbilitiesByName(abilityTotals, maxCount, isHealingPercentExcludedAbility)
+    for _, ability in ipairs(abilities) do
+        ability.shareTotal = eligibleTotal
+    end
+    return abilities
+end
 
 ---Extracts top healing abilities from healingOutToGroup (bySourceUnitIdByAbilityId structure) (async)
 ---Aggregates across all targets, merges abilities by display name
@@ -1048,7 +1155,7 @@ function HealingRenderer.extractHealingOutAbilitiesAsync(healingOutToGroup, maxC
         LibEffect.YieldWithGC():Await()
 
         -- Merge by ability name and return top N
-        return utils.mergeAbilitiesByName(abilityTotals, maxCount)
+        return mergeHealingOverviewAbilities(abilityTotals, maxCount)
     end)
 end
 
@@ -1075,7 +1182,7 @@ function HealingRenderer.extractSelfHealingAbilitiesAsync(selfHealing, maxCount)
         LibEffect.YieldWithGC():Await()
 
         -- Merge by ability name and return top N
-        return utils.mergeAbilitiesByName(abilityTotals, maxCount)
+        return mergeHealingOverviewAbilities(abilityTotals, maxCount)
     end)
 end
 
@@ -1104,7 +1211,7 @@ function HealingRenderer.extractHealingInAbilitiesAsync(healingInFromGroup, maxC
         LibEffect.YieldWithGC():Await()
 
         -- Merge by ability name and return top N
-        return utils.mergeAbilitiesByName(abilityTotals, maxCount)
+        return mergeHealingOverviewAbilities(abilityTotals, maxCount)
     end)
 end
 
@@ -1174,31 +1281,57 @@ end
 local function mergeAbilityArrays(abilities1, abilities2, maxCount)
     local byName = {}
     local order = {}
+    local shareTotal = 0
+    if abilities1[1] and abilities1[1].shareTotal then
+        shareTotal = shareTotal + abilities1[1].shareTotal
+    end
+    if abilities2[1] and abilities2[1].shareTotal then
+        shareTotal = shareTotal + abilities2[1].shareTotal
+    end
 
     -- Add abilities from first array
     for _, ability in ipairs(abilities1) do
         if not byName[ability.name] then
-            byName[ability.name] = { abilityId = ability.abilityId, name = ability.name, total = 0 }
+            byName[ability.name] = {
+                abilityId = ability.abilityId,
+                name = ability.name,
+                total = 0,
+                isSupplemental = ability.isSupplemental,
+            }
             table.insert(order, ability.name)
         end
         byName[ability.name].total = byName[ability.name].total + ability.total
+        byName[ability.name].isSupplemental = byName[ability.name].isSupplemental and ability.isSupplemental
     end
 
     -- Add/merge abilities from second array
     for _, ability in ipairs(abilities2) do
         if not byName[ability.name] then
-            byName[ability.name] = { abilityId = ability.abilityId, name = ability.name, total = 0 }
+            byName[ability.name] = {
+                abilityId = ability.abilityId,
+                name = ability.name,
+                total = 0,
+                isSupplemental = ability.isSupplemental,
+            }
             table.insert(order, ability.name)
         end
         byName[ability.name].total = byName[ability.name].total + ability.total
+        byName[ability.name].isSupplemental = byName[ability.name].isSupplemental and ability.isSupplemental
     end
 
     -- Convert to sorted array
     local result = {}
     for _, name in ipairs(order) do
-        table.insert(result, byName[name])
+        local ability = byName[name]
+        ability.shareTotal = shareTotal
+        table.insert(result, ability)
     end
-    table.sort(result, function(a, b) return a.total > b.total end)
+    table.sort(result, function(a, b)
+        if a.isSupplemental ~= b.isSupplemental then
+            return not a.isSupplemental
+        end
+        return a.total > b.total
+    end)
 
     -- Limit to maxCount
     local limited = {}
@@ -1248,24 +1381,30 @@ end
 ---@param hotRaw number
 ---@param directRaw number
 ---@param shieldRaw number
+---@param regenRaw number
 ---@return number|nil hotPercent
 ---@return number|nil directPercent
 ---@return number|nil shieldPercent
-local function computeVisibleDeliveryPercents(hotRaw, directRaw, shieldRaw)
-    local totalRaw = hotRaw + directRaw + shieldRaw
-    if totalRaw <= 0 then return nil, nil, nil end
+---@return number|nil regenPercent
+local function computeVisibleDeliveryPercents(hotRaw, directRaw, shieldRaw, regenRaw)
+    regenRaw = regenRaw or 0
+    local totalRaw = hotRaw + directRaw + shieldRaw + regenRaw
+    if totalRaw <= 0 then return nil, nil, nil, nil end
 
     local hotPercent = hotRaw / totalRaw * 100
     local directPercent = directRaw / totalRaw * 100
     local shieldPercent = shieldRaw / totalRaw * 100
+    local regenPercent = regenRaw / totalRaw * 100
     local visibleCount = (hotPercent > 5 and 1 or 0)
         + (directPercent > 5 and 1 or 0)
         + (shieldPercent > 5 and 1 or 0)
-    if visibleCount <= 1 then return nil, nil, nil end
+        + (regenPercent > 5 and 1 or 0)
+    if visibleCount <= 1 then return nil, nil, nil, nil end
 
     return hotPercent > 5 and hotPercent or nil,
         directPercent > 5 and directPercent or nil,
-        shieldPercent > 5 and shieldPercent or nil
+        shieldPercent > 5 and shieldPercent or nil,
+        regenPercent > 5 and regenPercent or nil
 end
 
 ---Computes healing delivery composition data for panel display
@@ -1276,9 +1415,10 @@ end
 ---@return number|nil hotPercent
 ---@return number|nil directPercent
 ---@return number|nil shieldPercent
+---@return number|nil regenPercent
 local function computeHotDirectPercents(filteredData, selfHealing, includeSelf, abilityInfo)
     if not filteredData and not (includeSelf and selfHealing) then
-        return nil, nil, nil
+        return nil, nil, nil, nil
     end
     local hotVsDirect
     if filteredData then
@@ -1288,6 +1428,8 @@ local function computeHotDirectPercents(filteredData, selfHealing, includeSelf, 
             hot = { raw = 0, real = 0 },
             direct = { raw = 0, real = 0 },
             shield = { raw = 0, real = 0 },
+            regen = { raw = 0, real = 0 },
+            absorbed = { raw = 0, real = 0 },
         }
     end
     if includeSelf and selfHealing then
@@ -1296,7 +1438,8 @@ local function computeHotDirectPercents(filteredData, selfHealing, includeSelf, 
     return computeVisibleDeliveryPercents(
         hotVsDirect.hot.raw or 0,
         hotVsDirect.direct.raw or 0,
-        hotVsDirect.shield.raw or 0)
+        hotVsDirect.shield.raw or 0,
+        hotVsDirect.regen.raw or 0)
 end
 
 ---Builds the panel spec for Healing Out tab
@@ -1337,8 +1480,8 @@ function HealingRenderer.buildHealingOutPanelSpec(ctx)
             LibEffect.Yield():Await()
 
             -- Composition section (HoT vs Direct)
-            local hotPercent, directPercent, shieldPercent = computeHotDirectPercents(filteredHealingOut, selfHealing, includeSelf, abilityInfo)
-            local compositionSection = buildHealingComposition(q2, hotPercent, directPercent, shieldPercent)
+            local hotPercent, directPercent, shieldPercent, regenPercent = computeHotDirectPercents(filteredHealingOut, selfHealing, includeSelf, abilityInfo)
+            local compositionSection = buildHealingComposition(q2, hotPercent, directPercent, shieldPercent, regenPercent)
             LibEffect.Yield():Await()
 
             -- Quality section (Crit Rate, Max Heal)
@@ -1421,13 +1564,14 @@ function HealingRenderer.buildSelfHealingPanelSpec(ctx)
             -- Composition section (healing delivery)
             local Arithmancer = BattleScrolls.arithmancer
             local hotVsDirect = Arithmancer.ComputeByHotVsDirect(selfHealing, abilityInfo)
-            local hotPercent, directPercent, shieldPercent = computeVisibleDeliveryPercents(
+            local hotPercent, directPercent, shieldPercent, regenPercent = computeVisibleDeliveryPercents(
                 hotVsDirect.hot.raw or 0,
                 hotVsDirect.direct.raw or 0,
-                hotVsDirect.shield.raw or 0)
+                hotVsDirect.shield.raw or 0,
+                hotVsDirect.regen.raw or 0)
             local compositionSection
-            if hotPercent or directPercent or shieldPercent then
-                compositionSection = buildHealingComposition(q2, hotPercent, directPercent, shieldPercent)
+            if hotPercent or directPercent or shieldPercent or regenPercent then
+                compositionSection = buildHealingComposition(q2, hotPercent, directPercent, shieldPercent, regenPercent)
             end
             LibEffect.Yield():Await()
 
@@ -1500,13 +1644,14 @@ function HealingRenderer.buildHealingInPanelSpec(ctx)
             local hasSelfData = includeSelf and selfHealing
             local compositionSection
             if hasGroupData or hasSelfData then
-                local totalHot, totalDirect, totalShield = 0, 0, 0
+                local totalHot, totalDirect, totalShield, totalRegen = 0, 0, 0, 0
                 if hasGroupData then
                     for _, sourceData in pairs(filteredHealingIn) do
                         local hotVsDirect = Arithmancer.ComputeByHotVsDirect(sourceData, abilityInfo)
                         totalHot = totalHot + (hotVsDirect.hot and hotVsDirect.hot.raw or 0)
                         totalDirect = totalDirect + (hotVsDirect.direct and hotVsDirect.direct.raw or 0)
                         totalShield = totalShield + (hotVsDirect.shield and hotVsDirect.shield.raw or 0)
+                        totalRegen = totalRegen + (hotVsDirect.regen and hotVsDirect.regen.raw or 0)
                     end
                 end
                 if hasSelfData then
@@ -1514,10 +1659,11 @@ function HealingRenderer.buildHealingInPanelSpec(ctx)
                     totalHot = totalHot + (selfHotVsDirect.hot and selfHotVsDirect.hot.raw or 0)
                     totalDirect = totalDirect + (selfHotVsDirect.direct and selfHotVsDirect.direct.raw or 0)
                     totalShield = totalShield + (selfHotVsDirect.shield and selfHotVsDirect.shield.raw or 0)
+                    totalRegen = totalRegen + (selfHotVsDirect.regen and selfHotVsDirect.regen.raw or 0)
                 end
-                local hotPercent, directPercent, shieldPercent = computeVisibleDeliveryPercents(totalHot, totalDirect, totalShield)
-                if hotPercent or directPercent or shieldPercent then
-                    compositionSection = buildHealingComposition(q2, hotPercent, directPercent, shieldPercent)
+                local hotPercent, directPercent, shieldPercent, regenPercent = computeVisibleDeliveryPercents(totalHot, totalDirect, totalShield, totalRegen)
+                if hotPercent or directPercent or shieldPercent or regenPercent then
+                    compositionSection = buildHealingComposition(q2, hotPercent, directPercent, shieldPercent, regenPercent)
                 end
             end
             LibEffect.Yield():Await()

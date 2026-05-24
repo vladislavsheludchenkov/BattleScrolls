@@ -254,6 +254,7 @@ local strings = {
     [BATTLESCROLLS_HEADER_BY_ABILITY] = "По способности",
     [BATTLESCROLLS_HEADER_BY_DAMAGE_TYPE] = "По типу урона",
     [BATTLESCROLLS_HEADER_DIRECT_VS_DOT] = "Прямой / Периодический",
+    [BATTLESCROLLS_HEADER_DAMAGE_DELIVERY] = "Способ урона",
     [BATTLESCROLLS_HEADER_AOE_VS_SINGLE] = "По площади / По одиночной цели",
     [BATTLESCROLLS_HEADER_BY_TARGET] = "По цели",
     [BATTLESCROLLS_HEADER_BY_SOURCE] = "По источнику",
@@ -284,6 +285,10 @@ local strings = {
     [BATTLESCROLLS_STAT_DIRECT_HEALING] = "Прямое исцеление",
     [BATTLESCROLLS_STAT_HEALING_OVER_TIME] = "Периодическое исцеление",
     [BATTLESCROLLS_STAT_SHIELD_HEALING] = "Щиты урона",
+    [BATTLESCROLLS_STAT_REGEN_HEALING] = "Восстановление здоровья",
+    [BATTLESCROLLS_DAMAGE_UNKNOWN_SHIELDED] = "Неизвестно (поглощено щитом)",
+    [BATTLESCROLLS_HEALING_UNKNOWN_ABSORBED] = "Неизвестно (поглощено)",
+    [BATTLESCROLLS_HEALING_HEALTH_RECOVERY] = "Восстановление здоровья",
 
     -------------------------
     -- Effects Stats
@@ -363,6 +368,8 @@ local strings = {
     [BATTLESCROLLS_DELIVERY_DIRECT] = "Прямой",
     [BATTLESCROLLS_DELIVERY_HOT] = "Периодическое",
     [BATTLESCROLLS_DELIVERY_SHIELD] = "Щит",
+    [BATTLESCROLLS_DELIVERY_REGEN] = "Регенерация",
+    [BATTLESCROLLS_DELIVERY_HEAL_ABSORPTION] = "Поглощение лечения",
 
     -------------------------
     -- Filter Dialog
@@ -872,7 +879,7 @@ local strings = {
     [BATTLESCROLLS_PIVOT_COLUMNS_CAPPED] = "Результаты ограничены <<1>> столбцами",
     [BATTLESCROLLS_PIVOT_TIP_DOMAIN_OVERVIEW] = "Сводка по всем данным: урон, исцеление и эффекты. Показывает общие итоги вместо отдельных разбивок.",
     [BATTLESCROLLS_PIVOT_TIP_ENC_BOSS_NAMES] = "Показывает только сражения с выбранными боссами. Имена боссов выбираются на следующем шаге.",
-    [BATTLESCROLLS_PIVOT_TIP_DIM_DELIVERY] = "Разделяет данные по способу нанесения: Прямой, DoT (урон с течением времени), HoT (исцеление с течением времени) или Смешанный.",
+    [BATTLESCROLLS_PIVOT_TIP_DIM_DELIVERY] = "Разделяет данные по способу: Прямой, DoT (урон с течением времени), Поглощение лечения, HoT (исцеление с течением времени), Регенерация, Щит или Смешанный.",
     [BATTLESCROLLS_PIVOT_TIP_DIM_DAMAGE_TYPE] = "Разделяет данные по типу урона: физический, огонь, молния, лёд, магия, яд, болезнь, кровотечение, Обливион и другие.",
     [BATTLESCROLLS_PIVOT_TIP_DOMAIN_GROUP] = "Боевые показатели каждого участника группы: DPS, общий урон, процент критов. Для времени действия баффов/дебаффов используйте Эффекты группы.",
     [BATTLESCROLLS_PIVOT_TIP_AGGREGATION] = "Как объединяются значения, когда несколько сражений попадают в одну ячейку. Например, средний DPS показывает среднее значение по сражениям, а максимум — лучший бой.",

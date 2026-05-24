@@ -33,7 +33,9 @@ function BattleScrolls.OnAddOnLoaded(_, addonName)
         end
 
         BattleScrolls.state:Initialize()
+        BattleScrolls.healthRecovery:Initialize()
         BattleScrolls.shields:Initialize()
+        BattleScrolls.trauma:Initialize()
         BattleScrolls.deathRecap:Initialize()
         BattleScrolls.effectsEvents:Initialize()
         BattleScrolls.effectsReconciler:Initialize()

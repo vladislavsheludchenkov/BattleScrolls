@@ -883,6 +883,11 @@ function effects.handlePlayerDeath(ctx)
         ctx.playerAliveState.isDead = true
     end
 
+    local healthRecovery = BattleScrolls.healthRecovery
+    if healthRecovery and healthRecovery.OnPlayerDeathState then
+        healthRecovery:OnPlayerDeathState(true)
+    end
+
     -- Finalize all active player effects (only if effect tracking enabled)
     if not effects.isEnabled() then return end
 
@@ -912,6 +917,11 @@ function effects.handlePlayerAlive(ctx)
     if ctx.playerAliveState then
         ctx.playerAliveState.isDead = false
         ctx.playerAliveState.lastAliveStartMs = GetGameTimeMilliseconds()
+    end
+
+    local healthRecovery = BattleScrolls.healthRecovery
+    if healthRecovery and healthRecovery.OnPlayerDeathState then
+        healthRecovery:OnPlayerDeathState(false)
     end
 
     -- Backfill player effects (only if effect tracking enabled)

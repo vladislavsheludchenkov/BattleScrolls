@@ -199,6 +199,49 @@ local function computeOverlap(startA, endA, startB, endB)
     return overlapEnd - overlapStart
 end
 
+---Returns whether a stored shared-data entry has the same logical sender encounter.
+---@param entry SharedDataEntry
+---@param displayName string
+---@param sharedData SharedEncounterData
+---@return boolean
+local function isSameSharedEncounter(entry, displayName, sharedData)
+    local data = entry.data
+    return entry.displayName == displayName
+        and data ~= nil
+        and data.timestampS == sharedData.timestampS
+        and data.durationMs == sharedData.durationMs
+end
+
+---Insert or replace a shared-data entry by sender encounter identity.
+---@param entries SharedDataEntry[]
+---@param entry SharedDataEntry
+---@return boolean inserted True when this is the first matching entry in the list.
+local function upsertSharedDataEntry(entries, entry)
+    local existingIndex = nil
+    local i = 1
+    while i <= #entries do
+        local existing = entries[i]
+        if isSameSharedEncounter(existing, entry.displayName, entry.data) then
+            if existingIndex then
+                table.remove(entries, i)
+            else
+                existingIndex = i
+                i = i + 1
+            end
+        else
+            i = i + 1
+        end
+    end
+
+    if existingIndex then
+        entries[existingIndex] = entry
+        return false
+    end
+
+    table.insert(entries, entry)
+    return true
+end
+
 ---Attempt to match shared data to an existing encounter
 ---Uses time overlap across all candidates (live combat, stored history, pending encoding)
 ---@param unitTag string Sender's unit tag
@@ -300,11 +343,10 @@ local function matchShare(unitTag, sharedData)
     }
 
     -- Apply match
-    local matched = false
+    local inserted = false
     if bestType == "live" then
         state.pendingSharedData = state.pendingSharedData or {}
-        table.insert(state.pendingSharedData, entry)
-        matched = true
+        inserted = upsertSharedDataEntry(state.pendingSharedData, entry)
         -- BattleScrolls.log.Debug(function()
         --     return string.format("EncounterShare: matched %s to live combat", displayName)
         -- end)
@@ -315,16 +357,15 @@ local function matchShare(unitTag, sharedData)
         -- end)
     elseif bestTarget then
         bestTarget.sharedData = bestTarget.sharedData or {}
-        table.insert(bestTarget.sharedData, entry)
-        matched = true
+        inserted = upsertSharedDataEntry(bestTarget.sharedData, entry)
         -- BattleScrolls.log.Debug(function()
         --     return string.format("EncounterShare: matched %s to %s encounter (ts=%d)",
         --         displayName, bestType, bestTarget.timestampS or bestTarget.startS)
         -- end)
     end
 
-    -- Request full setup only if the share was matched to a real encounter
-    if matched and sharedData.setupHash then
+    -- Request full setup only when the share was first matched to a real encounter.
+    if inserted and sharedData.setupHash then
         local setupShareModule = BattleScrolls.setupShare
         if setupShareModule then
             setupShareModule:onEncounterHashReceived(displayName, sharedData.setupHash)
@@ -498,6 +539,9 @@ function scribe:ImportEncounterFromStateAsync()
 
     -- Finalize closed weaving gaps before snapshotting
     BattleScrolls.weaving:FlushPendingGaps()
+    if BattleScrolls.healthRecovery then
+        BattleScrolls.healthRecovery:Finalize(state)
+    end
 
     -- Capture references to state data (state:Reset() creates new tables, doesn't modify old ones)
     local capturedLocation = self.location
@@ -600,17 +644,16 @@ function scribe:ImportEncounterFromStateAsync()
         end
 
         -- Compute setup hash for sharing (before send, after setup finalization)
-        local setupHash = nil
-        if encounter.setup then
-            local setupShareModule = BattleScrolls.setupShare
-            if setupShareModule then
-                local compact = setupShareModule.convertToCompact(encounter.setup)
-                setupHash = setupShareModule.computeHash(compact)
-                setupShareModule:cacheLocalSetup(setupHash, compact)
-                local localName = BattleScrolls.utils.GetUndecoratedDisplayName()
-                setupShareModule:storeSetup(localName, setupHash, compact)
-            end
+        local setup = encounter.setup
+        if not setup then
+            error("Encounter finalized without player setup")
         end
+        local setupShareModule = BattleScrolls.setupShare
+        local compact = setupShareModule.convertToCompact(setup)
+        local setupHash = setupShareModule.computeHash(compact)
+        setupShareModule:cacheLocalSetup(setupHash, compact)
+        local localName = BattleScrolls.utils.GetUndecoratedDisplayName()
+        setupShareModule:storeSetup(localName, setupHash, compact)
 
         -- Send encounter data to group members (always, regardless of recording settings)
         local arithmancer = BattleScrolls.arithmancer:Make(encounter, capturedState.abilityInfo)
@@ -774,7 +817,7 @@ function scribe:ImportEncounterFromStateAsync()
         if pendingEntry.sharedData then
             allShared = allShared or {}
             for _, shared in ipairs(pendingEntry.sharedData) do
-                table.insert(allShared, shared)
+                upsertSharedDataEntry(allShared, shared)
             end
         end
         if allShared then

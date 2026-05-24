@@ -253,6 +253,7 @@ local strings = {
     [BATTLESCROLLS_HEADER_BY_ABILITY] = "按技能",
     [BATTLESCROLLS_HEADER_BY_DAMAGE_TYPE] = "按伤害类型",
     [BATTLESCROLLS_HEADER_DIRECT_VS_DOT] = "直接 vs DoT",
+    [BATTLESCROLLS_HEADER_DAMAGE_DELIVERY] = "伤害方式",
     [BATTLESCROLLS_HEADER_AOE_VS_SINGLE] = "范围 vs 单体",
     [BATTLESCROLLS_HEADER_BY_TARGET] = "按目标",
     [BATTLESCROLLS_HEADER_BY_SOURCE] = "按来源",
@@ -283,6 +284,10 @@ local strings = {
     [BATTLESCROLLS_STAT_DIRECT_HEALING] = "直接治疗",
     [BATTLESCROLLS_STAT_HEALING_OVER_TIME] = "持续治疗",
     [BATTLESCROLLS_STAT_SHIELD_HEALING] = "伤害护盾",
+    [BATTLESCROLLS_STAT_REGEN_HEALING] = "生命恢复",
+    [BATTLESCROLLS_DAMAGE_UNKNOWN_SHIELDED] = "未知（护盾吸收）",
+    [BATTLESCROLLS_HEALING_UNKNOWN_ABSORBED] = "未知（吸收）",
+    [BATTLESCROLLS_HEALING_HEALTH_RECOVERY] = "生命恢复",
 
     -------------------------
     -- Effects Stats
@@ -362,6 +367,8 @@ local strings = {
     [BATTLESCROLLS_DELIVERY_DIRECT] = "直接",
     [BATTLESCROLLS_DELIVERY_HOT] = "HoT",
     [BATTLESCROLLS_DELIVERY_SHIELD] = "护盾",
+    [BATTLESCROLLS_DELIVERY_REGEN] = "恢复",
+    [BATTLESCROLLS_DELIVERY_HEAL_ABSORPTION] = "治疗吸收",
 
     -------------------------
     -- Filter Dialog
@@ -870,7 +877,7 @@ local strings = {
     [BATTLESCROLLS_PIVOT_COLUMNS_CAPPED] = "结果已限制为 <<1>> 列",
     [BATTLESCROLLS_PIVOT_TIP_DOMAIN_OVERVIEW] = "所有伤害、治疗和效果域的汇总概览。显示合计总数而非单独明细。",
     [BATTLESCROLLS_PIVOT_TIP_ENC_BOSS_NAMES] = "筛选包含所选Boss的战斗。在下一步中选择Boss名称。",
-    [BATTLESCROLLS_PIVOT_TIP_DIM_DELIVERY] = "按施加方式分割数据：直接、DoT（持续伤害）、HoT（持续治疗）或混合。",
+    [BATTLESCROLLS_PIVOT_TIP_DIM_DELIVERY] = "按施加方式分割数据：直接、DoT（持续伤害）、治疗吸收、HoT（持续治疗）、恢复、护盾或混合。",
     [BATTLESCROLLS_PIVOT_TIP_DIM_DAMAGE_TYPE] = "按伤害类型分割数据：物理、火焰、闪电、冰霜、魔法、毒素、疾病、流血、湮灭等。",
     [BATTLESCROLLS_PIVOT_TIP_DOMAIN_GROUP] = "每位成员的战斗数据（DPS、总伤害、暴击率等）。如需查看组队成员的增益/减益持续时间，请使用团队效果。",
     [BATTLESCROLLS_PIVOT_TIP_AGGREGATION] = "当多场战斗汇入同一单元格时如何合并数值。例如，平均DPS显示各战斗的均值，而最大值显示表现最好的单场战斗。",

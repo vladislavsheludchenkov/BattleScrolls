@@ -66,30 +66,36 @@ end
 ---@class OverviewHealingDeliveryPercents
 ---@field hot number|nil
 ---@field shield number|nil
+---@field regen number|nil
 
 ---@param hotRaw number
 ---@param directRaw number
 ---@param shieldRaw number
+---@param regenRaw number
 ---@return OverviewHealingDeliveryPercents
-local function computeOverviewHealingDeliveryPercents(hotRaw, directRaw, shieldRaw)
-    local totalRaw = hotRaw + directRaw + shieldRaw
-    if totalRaw <= 0 then return { hot = nil, shield = nil } end
+local function computeOverviewHealingDeliveryPercents(hotRaw, directRaw, shieldRaw, regenRaw)
+    regenRaw = regenRaw or 0
+    local totalRaw = hotRaw + directRaw + shieldRaw + regenRaw
+    if totalRaw <= 0 then return { hot = nil, shield = nil, regen = nil } end
 
     local hotPercent = hotRaw / totalRaw * 100
     local directPercent = directRaw / totalRaw * 100
     local shieldPercent = shieldRaw / totalRaw * 100
+    local regenPercent = regenRaw / totalRaw * 100
     local visibleCount = (hotPercent > 5 and 1 or 0)
         + (directPercent > 5 and 1 or 0)
         + (shieldPercent > 5 and 1 or 0)
-    if visibleCount <= 1 then return { hot = nil, shield = nil } end
+        + (regenPercent > 5 and 1 or 0)
+    if visibleCount <= 1 then return { hot = nil, shield = nil, regen = nil } end
 
     return {
         hot = hotPercent > 5 and hotPercent or nil,
         shield = shieldPercent > 5 and shieldPercent or nil,
+        regen = regenPercent > 5 and regenPercent or nil,
     }
 end
 
----@param totals { hot: number, direct: number, shield: number }
+---@param totals { hot: number, direct: number, shield: number, regen: number }
 ---@param healingData HealingDone|HealingDoneDiffSource
 ---@param abilityInfo table<number, AbilityInfo>
 local function addHealingDeliveryTotals(totals, healingData, abilityInfo)
@@ -97,6 +103,7 @@ local function addHealingDeliveryTotals(totals, healingData, abilityInfo)
     totals.hot = totals.hot + (hotVsDirect.hot and hotVsDirect.hot.raw or 0)
     totals.direct = totals.direct + (hotVsDirect.direct and hotVsDirect.direct.raw or 0)
     totals.shield = totals.shield + (hotVsDirect.shield and hotVsDirect.shield.raw or 0)
+    totals.regen = totals.regen + (hotVsDirect.regen and hotVsDirect.regen.raw or 0)
 end
 
 -------------------------
@@ -398,7 +405,7 @@ function OverviewRenderer.buildOverviewPanelSpec(ctx)
             local maxHit = qualityData.maxHit
 
             -- Compute delivery percentages for the prevalent healing type
-            local prevalentDelivery = { hot = nil, shield = nil }
+            local prevalentDelivery = { hot = nil, shield = nil, regen = nil }
             if prevalentHealingType and encounter.healingStats then
                 local healingRawData = nil
 
@@ -408,29 +415,29 @@ function OverviewRenderer.buildOverviewPanelSpec(ctx)
                     -- Aggregate across all targets for healing out
                     local healingOutToGroup = encounter.healingStats.healingOutToGroup
                     if healingOutToGroup then
-                        local totals = { hot = 0, direct = 0, shield = 0 }
+                        local totals = { hot = 0, direct = 0, shield = 0, regen = 0 }
                         for _, targetData in pairs(healingOutToGroup) do
                             addHealingDeliveryTotals(totals, targetData, abilityInfo)
                         end
-                        prevalentDelivery = computeOverviewHealingDeliveryPercents(totals.hot, totals.direct, totals.shield)
+                        prevalentDelivery = computeOverviewHealingDeliveryPercents(totals.hot, totals.direct, totals.shield, totals.regen)
                     end
                 elseif prevalentHealingType == "healingIn" then
                     -- Aggregate across all sources for healing in
                     local healingInFromGroup = encounter.healingStats.healingInFromGroup
                     if healingInFromGroup then
-                        local totals = { hot = 0, direct = 0, shield = 0 }
+                        local totals = { hot = 0, direct = 0, shield = 0, regen = 0 }
                         for _, sourceData in pairs(healingInFromGroup) do
                             addHealingDeliveryTotals(totals, sourceData, abilityInfo)
                         end
-                        prevalentDelivery = computeOverviewHealingDeliveryPercents(totals.hot, totals.direct, totals.shield)
+                        prevalentDelivery = computeOverviewHealingDeliveryPercents(totals.hot, totals.direct, totals.shield, totals.regen)
                     end
                 end
 
                 -- For selfHealing, compute directly
-                if healingRawData and not prevalentDelivery.hot and not prevalentDelivery.shield then
-                    local totals = { hot = 0, direct = 0, shield = 0 }
+                if healingRawData and not prevalentDelivery.hot and not prevalentDelivery.shield and not prevalentDelivery.regen then
+                    local totals = { hot = 0, direct = 0, shield = 0, regen = 0 }
                     addHealingDeliveryTotals(totals, healingRawData, abilityInfo)
-                    prevalentDelivery = computeOverviewHealingDeliveryPercents(totals.hot, totals.direct, totals.shield)
+                    prevalentDelivery = computeOverviewHealingDeliveryPercents(totals.hot, totals.direct, totals.shield, totals.regen)
                 end
             end
 
@@ -469,7 +476,8 @@ function OverviewRenderer.buildOverviewPanelSpec(ctx)
                     q2:StatRow(GetString(BATTLESCROLLS_HEALING_EFFECTIVE_HPS), utils.formatNumber(prevalentHealingData.effectiveHps)),
                     q2:StatRow(GetString(BATTLESCROLLS_HEALING_OVERHEAL), utils.formatPercent(prevalentHealingData.overhealPercent)),
                     prevalentDelivery.hot and q2:StatRow(GetString(BATTLESCROLLS_DELIVERY_HOT), utils.formatPercent(prevalentDelivery.hot)),
-                    prevalentDelivery.shield and q2:StatRow(GetString(BATTLESCROLLS_DELIVERY_SHIELD), utils.formatPercent(prevalentDelivery.shield)))
+                    prevalentDelivery.shield and q2:StatRow(GetString(BATTLESCROLLS_DELIVERY_SHIELD), utils.formatPercent(prevalentDelivery.shield)),
+                    prevalentDelivery.regen and q2:StatRow(GetString(BATTLESCROLLS_DELIVERY_REGEN), utils.formatPercent(prevalentDelivery.regen)))
                 or nil
 
             local dtSection = hasDamageTaken

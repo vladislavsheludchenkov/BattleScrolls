@@ -4,7 +4,8 @@
 --
 -- Defines the protocol format for sharing combat stats with
 -- group members after each fight. Uses LGB protocol 437
--- (with optional setupHash) and 436 (legacy, receive only).
+-- with a required setupHash. The one-bit reserved field before
+-- setupHash preserves the old optional-field wire layout.
 -----------------------------------------------------------
 
 if not SemisPlaygroundCheckAccess() then
@@ -14,8 +15,7 @@ end
 BattleScrolls = BattleScrolls or {}
 
 ---@class EncounterShare
----@field protocol Protocol|nil LibGroupBroadcast encounter share protocol instance (437, or 436 fallback)
----@field legacyProtocol Protocol|nil LibGroupBroadcast legacy protocol instance (436, receive only)
+---@field protocol Protocol|nil LibGroupBroadcast encounter share protocol instance (437)
 local encounterShare = {}
 BattleScrolls.encounterShare = encounterShare
 
@@ -161,7 +161,7 @@ local function onReceive(unitTag, data)
         aliveTimeMs = data.playerAliveTimeMs,
         topDamageTakenAbilities = data.topDamageTakenAbilities or {},
         deaths = deaths,
-        setupHash = data.setupHash, -- nil for protocol 436 senders
+        setupHash = data.setupHash,
     }
 
     notifyAllCallbacks(unitTag, sharedData)
@@ -174,7 +174,7 @@ end
 ---Send pre-built SharedEncounterData via LGB
 ---@param sharedData SharedEncounterData The encounter data to send
 ---@param timestampS number The encounter timestamp (for wire format)
----@param setupHash number|nil Optional 16-bit setup hash (protocol 437)
+---@param setupHash number 16-bit setup hash (protocol 437)
 function encounterShare:send(sharedData, timestampS, setupHash)
     if not encounterShare.protocol then
         return
@@ -251,7 +251,7 @@ end
 -- INITIALIZE
 -- =============================================================================
 
----Adds all shared encounter data fields to a protocol (reused by 436 and 437)
+---Adds all shared encounter data fields to a protocol
 ---@param protocol Protocol The protocol to add fields to
 ---@param LGB table LibGroupBroadcast reference
 local function addEncounterFields(protocol, LGB)
@@ -358,22 +358,13 @@ function encounterShare:Initialize()
         return
     end
 
-    -- Protocol 436 (legacy, receive only): backward compatibility for old clients
-    local legacyProtocol = handler:DeclareProtocol(436, "BattleScrolls_EncounterShare")
-    addEncounterFields(legacyProtocol, LGB)
-    legacyProtocol:OnData(onReceive)
-    legacyProtocol:Finalize({ isRelevantInCombat = false, replaceQueuedMessages = false })
-    encounterShare.legacyProtocol = legacyProtocol
-
-    -- Protocol 437 (new, send + receive): same fields + optional setupHash at the end
-    local newProtocol = handler:DeclareProtocol(437, "BattleScrolls_EncounterShareV2")
-    addEncounterFields(newProtocol, LGB)
-    newProtocol:AddField(LGB.CreateOptionalField(
-        LGB.CreateNumericField("setupHash", { minValue = 0, numBits = 16, trimValues = true })
-    ))
-    newProtocol:OnData(onReceive)
-    newProtocol:Finalize({ isRelevantInCombat = false, replaceQueuedMessages = false })
-    encounterShare.protocol = newProtocol
+    local protocol = handler:DeclareProtocol(437, "BattleScrolls_EncounterShareV2")
+    addEncounterFields(protocol, LGB)
+    protocol:AddField(LGB.CreateReservedField("reservedSetupHashIsNil", 1))
+    protocol:AddField(LGB.CreateNumericField("setupHash", { minValue = 0, numBits = 16, trimValues = true }))
+    protocol:OnData(onReceive)
+    protocol:Finalize({ isRelevantInCombat = false, replaceQueuedMessages = false })
+    encounterShare.protocol = protocol
 
     -- BattleScrolls.log.Info("EncounterShare: initialized")
 end

@@ -12,7 +12,7 @@ BattleScrolls = BattleScrolls or {}
 local binaryStorage = {}
 BattleScrolls.binaryStorage = binaryStorage
 
-local CURRENT_VERSION = 13
+local CURRENT_VERSION = 15
 
 -- Import BitEncoder/BitDecoder from bitcodec module
 local BitEncoder = BattleScrolls.bitcodec.BitEncoder
@@ -1316,6 +1316,8 @@ local function readAbilityInfo(decoder, version)
         local overTime = decoder:readBit()
         local direct = decoder:readBit()
         local shield = version >= 13 and decoder:readBit() or false
+        local regen = version >= 14 and decoder:readBit() or false
+        local healAbsorption = version >= 15 and decoder:readBit() or false
 
         local typeCount = decoder:readUInt(4)
         local damageTypes = {}
@@ -1324,7 +1326,13 @@ local function readAbilityInfo(decoder, version)
             damageTypes[damageType] = true
         end
 
-        local deliveryType = { overTime = overTime or nil, direct = direct or nil, shield = shield or nil }
+        local deliveryType = {
+            overTime = overTime or nil,
+            direct = direct or nil,
+            shield = shield or nil,
+            regen = regen or nil,
+            healAbsorption = healAbsorption or nil,
+        }
         result[abilityId] = {
             deliveryType = deliveryType,
             damageTypes = damageTypes,
@@ -1361,6 +1369,8 @@ function binaryStorage.encodeInstanceFieldsAsync(abilityInfo)
             encoder:writeBit(deliveryType.overTime)
             encoder:writeBit(deliveryType.direct)
             encoder:writeBit(deliveryType.shield)
+            encoder:writeBit(deliveryType.regen)
+            encoder:writeBit(deliveryType.healAbsorption)
 
             local typeCount = writeTableCount(encoder, info.damageTypes or {}, 4)
 

@@ -172,6 +172,8 @@ journal.StatIcons = {
     DOT = "EsoUI/Art/Icons/scribing_secondary_damageovertime.dds",
     HOT = "EsoUI/Art/Icons/scribing_secondary_healovertime.dds",
     SHIELD = "EsoUI/Art/Icons/scribing_primary_damageshield.dds",
+    REGEN = "EsoUI/Art/Icons/scribing_tertiary_intellectendurance.dds",
+    HEAL_ABSORPTION = "EsoUI/Art/Icons/scribing_primary_trauma.dds",
 
     -- AOE vs Single Target
     AOE = "EsoUI/Art/Icons/scribing_primary_multihit.dds",
@@ -337,7 +339,7 @@ journal.AbilityIconStyle = {
 
 ---@class SharedDamageTakenAbility
 ---@field abilityId number
----@field damagePercent number 0-1 fraction of total damage taken
+---@field damagePercent number 0-1 fraction of known incoming damage, excluding unknown shielded damage
 
 ---@class SharedEncounterData
 ---@field timestampS number Sender's fight start (Unix epoch)
@@ -355,7 +357,7 @@ journal.AbilityIconStyle = {
 ---@field aliveTimeMs number|nil Player alive time in ms
 ---@field topDamageTakenAbilities SharedDamageTakenAbility[] Top 5 damage-taken abilities
 ---@field deaths SharedDeaths|nil Death recap data (nil if player never died)
----@field setupHash number|nil 16-bit setup hash (protocol 437 only, nil for 436 senders)
+---@field setupHash number|nil 16-bit setup hash; nil only for historical shared data
 
 ---@class SharedDataEntry
 ---@field displayName string Sender's display name (undecorated)

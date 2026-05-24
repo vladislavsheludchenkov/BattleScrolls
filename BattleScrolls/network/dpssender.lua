@@ -26,7 +26,7 @@ end
 function dpsSender:OnCombatTick(calc, bossCalc)
     BattleScrolls.dpsShare:SendData(
         calc:personalDPS(),
-        bossCalc and bossCalc:personalDPS() or 0,
+        bossCalc and bossCalc:personalDPS() or nil,
         calc:personalRawHPSOut(),
         calc:personalEffectiveHPSOut()
     )

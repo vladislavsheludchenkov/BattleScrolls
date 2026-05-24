@@ -160,6 +160,7 @@ local function displayEffectEntriesAsync(list, sortedEffects, durationMs, header
             local isFavorite = favorites[entry.abilityId] or false
 
             local lines = tooltips.buildEffectTooltipLines(entry.stats, durationMs)
+            table.insert(lines, "")
             utils.appendAbilityIdLine(lines, entry.abilityId)
 
             EntryBuilder.addEntry(list, {
@@ -578,6 +579,7 @@ function EffectsRenderer.renderEffectsGroup(ctx)
             local isFavorite = favorites[entry.abilityId] or false
 
             local lines = tooltips.buildGroupEffectTooltipLines(entry.stats, entry.avgEffectiveAliveTimeMs, entry.memberBreakdown)
+            table.insert(lines, "")
             utils.appendAbilityIdLine(lines, entry.abilityId)
 
             EntryBuilder.addEntry(list, {

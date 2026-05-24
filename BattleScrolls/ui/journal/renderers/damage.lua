@@ -24,6 +24,15 @@ local DamageRenderer = {}
 
 -- Yield frequency for loops (yield every N iterations)
 local YIELD_INTERVAL = 20
+local DETAILED_ABILITY_LIMIT = 50
+local DETAILED_UNIT_LIMIT = 20
+local DAMAGE_SHIELDED_ABILITY_ID = BattleScrolls.constants.DAMAGE_SHIELDED_ABILITY_ID
+
+---@param abilityId number
+---@return boolean
+local function isDamagePercentExcludedAbility(abilityId)
+    return abilityId == DAMAGE_SHIELDED_ABILITY_ID
+end
 
 -------------------------
 -- Section Builders (for overview panel specs)
@@ -46,13 +55,15 @@ end
 ---@param col ColumnBuilder
 ---@param dotPercent number|nil
 ---@param directPercent number|nil
+---@param healAbsorptionPercent number|nil
 ---@param aoePercent number|nil
 ---@param stPercent number|nil
 ---@return Control|nil
-local function buildDamageComposition(col, dotPercent, directPercent, aoePercent, stPercent)
+local function buildDamageComposition(col, dotPercent, directPercent, healAbsorptionPercent, aoePercent, stPercent)
     return col:Section(GetString(BATTLESCROLLS_OVERVIEW_COMPOSITION),
         directPercent and col:StatRow(GetString(BATTLESCROLLS_DELIVERY_DIRECT), utils.formatPercent(directPercent)),
         dotPercent and col:StatRow(GetString(BATTLESCROLLS_DELIVERY_DOT), utils.formatPercent(dotPercent)),
+        healAbsorptionPercent and col:StatRow(GetString(BATTLESCROLLS_DELIVERY_HEAL_ABSORPTION), utils.formatPercent(healAbsorptionPercent)),
         aoePercent and col:StatRow(GetString(BATTLESCROLLS_AOE), utils.formatPercent(aoePercent)),
         stPercent and col:StatRow(GetString(BATTLESCROLLS_SINGLE_TARGET), utils.formatPercent(stPercent))
     )
@@ -83,6 +94,13 @@ end
 -------------------------
 -- Internal Helpers
 -------------------------
+
+---@param damage number
+---@param durationSec number
+---@return string
+local function formatDamageWithoutPercent(damage, durationSec)
+    return string.format("%s (%s)", ZO_CommaDelimitNumber(damage), utils.formatTargetDPS(damage, durationSec))
+end
 
 ---@class AbilityStats
 ---@field total number Total damage/value
@@ -117,12 +135,13 @@ local function buildAbilityTooltipText(merged)
             local pct = merged.totalDamage > 0 and (entry.damage / merged.totalDamage * 100) or 0
             table.insert(lines, string.format("  %s: %s (%.1f%%)", entry.displayName, ZO_CommaDelimitNumber(entry.damage), pct))
             tooltips.appendTickStats(lines, entry.critStats, "    ")
-            table.insert(lines, "    " .. utils.formatAbilityIdLine(entry.abilityId))
+            utils.appendAbilityIdLine(lines, entry.abilityId, "    ")
         end
     else
         -- Single variant
         table.insert(lines, "")
         tooltips.appendTickStats(lines, merged.critStats)
+        table.insert(lines, "")
         utils.appendAbilityIdLine(lines, merged.abilityId)
     end
 
@@ -165,13 +184,12 @@ end
 ---Displays ability breakdown with merging and tooltips (async)
 ---@param list any
 ---@param abilityEntries { abilityId: number, sourceUnitId: number, stats: DamageBreakdown }[]
----@param totalDamage number
 ---@param durationSec number
 ---@param abilityInfo table<number, AbilityInfo>
 ---@param unitNames table<number, string>
 ---@param headerText string
 ---@return Effect
-local function displayAbilityBreakdownAsync(list, abilityEntries, totalDamage, durationSec, abilityInfo, unitNames, headerText)
+local function displayAbilityBreakdownAsync(list, abilityEntries, durationSec, abilityInfo, unitNames, headerText)
     return LibEffect.Async(function()
         if #abilityEntries == 0 then
             return
@@ -207,13 +225,20 @@ local function displayAbilityBreakdownAsync(list, abilityEntries, totalDamage, d
 
         -- Get delivery description for an ability
         local function getDeliveryDesc(abilityId)
+            if abilityId == DAMAGE_SHIELDED_ABILITY_ID then
+                return GetString(BATTLESCROLLS_DAMAGE_UNKNOWN_SHIELDED)
+            end
             local info = getAbilityInfo(abilityId)
             local deliveryType = BattleScrolls.arithmancer.GetAbilityDeliveryType(info)
             if deliveryType then
                 local hasOverTime = deliveryType.overTime
                 local hasDirect = deliveryType.direct
-                if hasOverTime and hasDirect then
+                local hasHealAbsorption = deliveryType.healAbsorption
+                local count = (hasOverTime and 1 or 0) + (hasDirect and 1 or 0) + (hasHealAbsorption and 1 or 0)
+                if count > 1 then
                     return GetString(BATTLESCROLLS_DELIVERY_MIXED)
+                elseif hasHealAbsorption then
+                    return GetString(BATTLESCROLLS_DELIVERY_HEAL_ABSORPTION)
                 elseif hasOverTime then
                     return GetString(BATTLESCROLLS_DELIVERY_DOT)
                 elseif hasDirect then
@@ -233,7 +258,9 @@ local function displayAbilityBreakdownAsync(list, abilityEntries, totalDamage, d
             local rawSourceName = unitNames[entry.sourceUnitId]
             local isPlayer = rawSourceName and playerNames[rawSourceName]
 
-            if not isPlayer and rawSourceName then
+            if entry.abilityId == DAMAGE_SHIELDED_ABILITY_ID then
+                baseName = zo_strformat("<<C:1>>", abilityName)
+            elseif not isPlayer and rawSourceName then
                 local unitName = zo_strformat(SI_UNIT_NAME, rawSourceName)
                 baseName = zo_strformat("<<C:1>> (<<2>>)", abilityName, unitName)
             else
@@ -352,6 +379,7 @@ local function displayAbilityBreakdownAsync(list, abilityEntries, totalDamage, d
                 damageTypeDesc = topEntry.damageTypeDesc,
                 deliveryDesc = topEntry.deliveryDesc,
                 breakdown = nil,
+                isSupplemental = isDamagePercentExcludedAbility(topEntry.abilityId),
             }
 
             -- If multiple entries, build breakdown for tooltip
@@ -443,14 +471,24 @@ local function displayAbilityBreakdownAsync(list, abilityEntries, totalDamage, d
         end
         LibEffect.Yield():Await()
 
+        local eligibleTotalDamage = 0
+        for _, merged in ipairs(mergedAbilities) do
+            if not merged.isSupplemental then
+                eligibleTotalDamage = eligibleTotalDamage + merged.totalDamage
+            end
+        end
+
         -- Sort by total damage descending
         table.sort(mergedAbilities, function(a, b)
+            if a.isSupplemental ~= b.isSupplemental then
+                return not a.isSupplemental
+            end
             return a.totalDamage > b.totalDamage
         end)
 
         -- Display merged entries
         local isFirst = true
-        local maxAbilities = 25
+        local maxAbilities = DETAILED_ABILITY_LIMIT
 
         for i, merged in ipairs(mergedAbilities) do
             if i > maxAbilities then
@@ -458,7 +496,9 @@ local function displayAbilityBreakdownAsync(list, abilityEntries, totalDamage, d
             end
 
             local abilityIcon = utils.getAbilityIcon(merged.abilityId)
-            local valueStr = utils.formatDamageWithPercent(merged.totalDamage, totalDamage, durationSec)
+            local valueStr = merged.isSupplemental
+                and formatDamageWithoutPercent(merged.totalDamage, durationSec)
+                or utils.formatDamageWithPercent(merged.totalDamage, eligibleTotalDamage, durationSec)
             local tooltipText = buildAbilityTooltipText(merged)
 
             EntryBuilder.addEntry(list, {
@@ -481,27 +521,34 @@ end
 ---Displays damage type breakdown from pre-computed data
 ---@param list any
 ---@param byDamageType table<DamageType, number> Pre-computed damage by type (from calc:personalDamageByType() or calc:damageTakenByType())
----@param totalDamage number
 ---@param durationSec number
 ---@param sharedData table|nil
-local function displayDamageTypeBreakdown(list, byDamageType, totalDamage, durationSec, sharedData)
+---@param shieldedDamage number|nil Damage whose type is unknown because it was shielded
+local function displayDamageTypeBreakdown(list, byDamageType, durationSec, sharedData, shieldedDamage)
     local sortedTypes = utils.sortDamageBreakdown(byDamageType)
     local isFirst = true
+    local typedTotal = 0
+    for _, entry in ipairs(sortedTypes) do
+        typedTotal = typedTotal + entry.damage
+    end
 
     for _, entry in ipairs(sortedTypes) do
         local damageType = entry.key
         local typeName = utils.getDamageTypeName(damageType)
         local typeIcon = utils.getDamageTypeIcon(damageType)
-        local valueStr = utils.formatDamageWithPercent(entry.damage, totalDamage, durationSec)
+        local valueStr = utils.formatDamageWithPercent(entry.damage, typedTotal, durationSec)
 
         local _, ttText = tooltips.buildGroupAvgTooltip(sharedData, function(data)
-            if not data.damageByType or data.totalDamage <= 0 then return nil end
+            if not data.damageByType then return nil end
+            local sharedTypedTotal = 0
+            local sharedDamage = 0
             for _, dbt in ipairs(data.damageByType) do
+                sharedTypedTotal = sharedTypedTotal + dbt.damage
                 if dbt.type == damageType then
-                    return dbt.damage / data.totalDamage * 100
+                    sharedDamage = dbt.damage
                 end
             end
-            return 0
+            return sharedTypedTotal > 0 and (sharedDamage / sharedTypedTotal * 100) or nil
         end)
 
         EntryBuilder.addEntry(list, {
@@ -513,21 +560,34 @@ local function displayDamageTypeBreakdown(list, byDamageType, totalDamage, durat
         })
         isFirst = false
     end
+
+    if shieldedDamage and shieldedDamage > 0 then
+        EntryBuilder.addEntry(list, {
+            label = GetString(BATTLESCROLLS_DAMAGE_UNKNOWN_SHIELDED),
+            sublabel = formatDamageWithoutPercent(shieldedDamage, durationSec),
+            icon = STAT_ICONS.SHIELD,
+            header = isFirst and GetString(BATTLESCROLLS_HEADER_BY_DAMAGE_TYPE) or nil,
+        })
+    end
 end
 
 ---Displays direct vs DoT breakdown from pre-computed data
 ---@param list any
----@param dotVsDirect { dot: number, direct: number } Pre-computed breakdown (from calc:personalDotVsDirect() or calc:damageTakenDotVsDirect())
----@param totalDamage number
+---@param dotVsDirect { dot: number, direct: number, healAbsorption: number, shielded: number } Pre-computed breakdown (from calc:personalDotVsDirect() or calc:damageTakenDotVsDirect())
 ---@param durationSec number
 ---@param sharedData table|nil
-local function displayDirectVsDoTBreakdown(list, dotVsDirect, totalDamage, durationSec, sharedData)
+local function displayDirectVsDoTBreakdown(list, dotVsDirect, durationSec, sharedData)
     local directDmg = dotVsDirect.direct
     local dotDmg = dotVsDirect.dot
+    local healAbsorptionDmg = dotVsDirect.healAbsorption or 0
+    local shieldedDmg = dotVsDirect.shielded or 0
+    local deliveryTotal = directDmg + dotDmg + healAbsorptionDmg
 
-    if directDmg > 0 or dotDmg > 0 then
-        local directStr = utils.formatDamageWithPercent(directDmg, totalDamage, durationSec)
-        local dotStr = utils.formatDamageWithPercent(dotDmg, totalDamage, durationSec)
+    if directDmg > 0 or dotDmg > 0 or healAbsorptionDmg > 0 or shieldedDmg > 0 then
+        local directStr = utils.formatDamageWithPercent(directDmg, deliveryTotal, durationSec)
+        local dotStr = utils.formatDamageWithPercent(dotDmg, deliveryTotal, durationSec)
+        local healAbsorptionStr = utils.formatDamageWithPercent(healAbsorptionDmg, deliveryTotal, durationSec)
+        local shieldedStr = formatDamageWithoutPercent(shieldedDmg, durationSec)
 
         local _, dotTtText = tooltips.buildGroupAvgTooltip(sharedData, function(data)
             if not data.dotPercent then return nil end
@@ -538,30 +598,58 @@ local function displayDirectVsDoTBreakdown(list, dotVsDirect, totalDamage, durat
             return (1 - data.dotPercent) * 100
         end)
 
-        EntryBuilder.addEntry(list, {
-            label = GetString(BATTLESCROLLS_STAT_DIRECT_DAMAGE),
-            sublabel = directStr,
-            icon = STAT_ICONS.DIRECT,
-            header = GetString(BATTLESCROLLS_HEADER_DIRECT_VS_DOT),
-            tooltip = directTtText and { type = "text", title = GetString(BATTLESCROLLS_STAT_DIRECT_DAMAGE), text = directTtText } or nil,
-        })
-        EntryBuilder.addEntry(list, {
-            label = GetString(BATTLESCROLLS_STAT_DAMAGE_OVER_TIME),
-            sublabel = dotStr,
-            icon = STAT_ICONS.DOT,
-            tooltip = dotTtText and { type = "text", title = GetString(BATTLESCROLLS_STAT_DAMAGE_OVER_TIME), text = dotTtText } or nil,
-        })
+        local needsHeader = true
+        if directDmg > 0 then
+            EntryBuilder.addEntry(list, {
+                label = GetString(BATTLESCROLLS_STAT_DIRECT_DAMAGE),
+                sublabel = directStr,
+                icon = STAT_ICONS.DIRECT,
+                header = needsHeader and GetString(BATTLESCROLLS_HEADER_DAMAGE_DELIVERY) or nil,
+                tooltip = directTtText and { type = "text", title = GetString(BATTLESCROLLS_STAT_DIRECT_DAMAGE), text = directTtText } or nil,
+            })
+            needsHeader = false
+        end
+        if dotDmg > 0 then
+            EntryBuilder.addEntry(list, {
+                label = GetString(BATTLESCROLLS_STAT_DAMAGE_OVER_TIME),
+                sublabel = dotStr,
+                icon = STAT_ICONS.DOT,
+                header = needsHeader and GetString(BATTLESCROLLS_HEADER_DAMAGE_DELIVERY) or nil,
+                tooltip = dotTtText and { type = "text", title = GetString(BATTLESCROLLS_STAT_DAMAGE_OVER_TIME), text = dotTtText } or nil,
+            })
+            needsHeader = false
+        end
+        if healAbsorptionDmg > 0 then
+            EntryBuilder.addEntry(list, {
+                label = GetString(BATTLESCROLLS_DELIVERY_HEAL_ABSORPTION),
+                sublabel = healAbsorptionStr,
+                icon = STAT_ICONS.HEAL_ABSORPTION,
+                header = needsHeader and GetString(BATTLESCROLLS_HEADER_DAMAGE_DELIVERY) or nil,
+            })
+            needsHeader = false
+        end
+        if shieldedDmg > 0 then
+            EntryBuilder.addEntry(list, {
+                label = GetString(BATTLESCROLLS_DAMAGE_UNKNOWN_SHIELDED),
+                sublabel = shieldedStr,
+                icon = STAT_ICONS.SHIELD,
+                header = needsHeader and GetString(BATTLESCROLLS_HEADER_DAMAGE_DELIVERY) or nil,
+            })
+        end
     end
 end
 
 ---Displays AOE vs single target breakdown
-local function displayAoeVsSingleTargetBreakdown(list, aoeVsSingleTarget, totalDamage, durationSec, sharedData)
+local function displayAoeVsSingleTargetBreakdown(list, aoeVsSingleTarget, durationSec, sharedData)
     local aoeDmg = aoeVsSingleTarget.aoe
     local singleTargetDmg = aoeVsSingleTarget.singleTarget
+    local shieldedDmg = aoeVsSingleTarget.shielded or 0
+    local aoeTotal = aoeDmg + singleTargetDmg
 
-    if aoeDmg > 0 or singleTargetDmg > 0 then
-        local aoeStr = utils.formatDamageWithPercent(aoeDmg, totalDamage, durationSec)
-        local singleTargetStr = utils.formatDamageWithPercent(singleTargetDmg, totalDamage, durationSec)
+    if aoeDmg > 0 or singleTargetDmg > 0 or shieldedDmg > 0 then
+        local aoeStr = utils.formatDamageWithPercent(aoeDmg, aoeTotal, durationSec)
+        local singleTargetStr = utils.formatDamageWithPercent(singleTargetDmg, aoeTotal, durationSec)
+        local shieldedStr = formatDamageWithoutPercent(shieldedDmg, durationSec)
 
         local _, aoeTtText = tooltips.buildGroupAvgTooltip(sharedData, function(data)
             if not data.aoePercent then return nil end
@@ -572,19 +660,35 @@ local function displayAoeVsSingleTargetBreakdown(list, aoeVsSingleTarget, totalD
             return (1 - data.aoePercent) * 100
         end)
 
-        EntryBuilder.addEntry(list, {
-            label = GetString(BATTLESCROLLS_STAT_AOE_DAMAGE),
-            sublabel = aoeStr,
-            icon = STAT_ICONS.AOE,
-            header = GetString(BATTLESCROLLS_HEADER_AOE_VS_SINGLE),
-            tooltip = aoeTtText and { type = "text", title = GetString(BATTLESCROLLS_STAT_AOE_DAMAGE), text = aoeTtText } or nil,
-        })
-        EntryBuilder.addEntry(list, {
-            label = GetString(BATTLESCROLLS_STAT_SINGLE_TARGET_DAMAGE),
-            sublabel = singleTargetStr,
-            icon = STAT_ICONS.SINGLE_TARGET,
-            tooltip = stTtText and { type = "text", title = GetString(BATTLESCROLLS_STAT_SINGLE_TARGET_DAMAGE), text = stTtText } or nil,
-        })
+        local needsHeader = true
+        if aoeDmg > 0 then
+            EntryBuilder.addEntry(list, {
+                label = GetString(BATTLESCROLLS_STAT_AOE_DAMAGE),
+                sublabel = aoeStr,
+                icon = STAT_ICONS.AOE,
+                header = needsHeader and GetString(BATTLESCROLLS_HEADER_AOE_VS_SINGLE) or nil,
+                tooltip = aoeTtText and { type = "text", title = GetString(BATTLESCROLLS_STAT_AOE_DAMAGE), text = aoeTtText } or nil,
+            })
+            needsHeader = false
+        end
+        if singleTargetDmg > 0 then
+            EntryBuilder.addEntry(list, {
+                label = GetString(BATTLESCROLLS_STAT_SINGLE_TARGET_DAMAGE),
+                sublabel = singleTargetStr,
+                icon = STAT_ICONS.SINGLE_TARGET,
+                header = needsHeader and GetString(BATTLESCROLLS_HEADER_AOE_VS_SINGLE) or nil,
+                tooltip = stTtText and { type = "text", title = GetString(BATTLESCROLLS_STAT_SINGLE_TARGET_DAMAGE), text = stTtText } or nil,
+            })
+            needsHeader = false
+        end
+        if shieldedDmg > 0 then
+            EntryBuilder.addEntry(list, {
+                label = GetString(BATTLESCROLLS_DAMAGE_UNKNOWN_SHIELDED),
+                sublabel = shieldedStr,
+                icon = STAT_ICONS.SHIELD,
+                header = needsHeader and GetString(BATTLESCROLLS_HEADER_AOE_VS_SINGLE) or nil,
+            })
+        end
     end
 end
 
@@ -610,7 +714,7 @@ local function displayTargetBreakdownAsync(list, damageTable, totalDamage, durat
 
         local sortedTargets = utils.sortDamageBreakdown(byTarget)
         local isFirst = true
-        local maxTargets = 10
+        local maxTargets = DETAILED_UNIT_LIMIT
         unitNames = unitNames or {}
 
         for i, entry in ipairs(sortedTargets) do
@@ -707,16 +811,18 @@ function DamageRenderer.renderBossDamageDone(ctx)
 
         -- By Ability
         local abilityEntries = buildAbilityEntriesAsync(filteredDamageTable, nil, nil):Await()
-        displayAbilityBreakdownAsync(list, abilityEntries, totalBossDamage, durationSec, abilityInfo, unitNames, GetString(BATTLESCROLLS_HEADER_BY_ABILITY)):Await()
+        displayAbilityBreakdownAsync(list, abilityEntries, durationSec, abilityInfo, unitNames, GetString(BATTLESCROLLS_HEADER_BY_ABILITY)):Await()
+
+        local dotVsDirect = bossCalc:personalDotVsDirect()
 
         -- By Damage Type
-        displayDamageTypeBreakdown(list, bossCalc:personalDamageByType(), totalBossDamage, durationSec, encounter.sharedData)
+        displayDamageTypeBreakdown(list, bossCalc:personalDamageByType(), durationSec, encounter.sharedData, dotVsDirect.shielded)
 
         -- Direct vs DoT
-        displayDirectVsDoTBreakdown(list, bossCalc:personalDotVsDirect(), totalBossDamage, durationSec, encounter.sharedData)
+        displayDirectVsDoTBreakdown(list, dotVsDirect, durationSec, encounter.sharedData)
 
         -- AOE vs Single Target
-        displayAoeVsSingleTargetBreakdown(list, bossCalc:personalAoeVsSingleTarget(), totalBossDamage, durationSec, encounter.sharedData)
+        displayAoeVsSingleTargetBreakdown(list, bossCalc:personalAoeVsSingleTarget(), durationSec, encounter.sharedData)
         LibEffect.Yield():Await()
 
         -- By Target
@@ -783,16 +889,18 @@ function DamageRenderer.renderDamageDone(ctx)
 
         -- By Ability
         local abilityEntries = buildAbilityEntriesAsync(filteredDamageTable, nil, nil):Await()
-        displayAbilityBreakdownAsync(list, abilityEntries, totalDamage, durationSec, abilityInfo, unitNames, GetString(BATTLESCROLLS_HEADER_BY_ABILITY)):Await()
+        displayAbilityBreakdownAsync(list, abilityEntries, durationSec, abilityInfo, unitNames, GetString(BATTLESCROLLS_HEADER_BY_ABILITY)):Await()
+
+        local dotVsDirect = calc:personalDotVsDirect()
 
         -- By Damage Type
-        displayDamageTypeBreakdown(list, calc:personalDamageByType(), totalDamage, durationSec, encounter.sharedData)
+        displayDamageTypeBreakdown(list, calc:personalDamageByType(), durationSec, encounter.sharedData, dotVsDirect.shielded)
 
         -- Direct vs DoT
-        displayDirectVsDoTBreakdown(list, calc:personalDotVsDirect(), totalDamage, durationSec, encounter.sharedData)
+        displayDirectVsDoTBreakdown(list, dotVsDirect, durationSec, encounter.sharedData)
 
         -- AOE vs Single Target
-        displayAoeVsSingleTargetBreakdown(list, calc:personalAoeVsSingleTarget(), totalDamage, durationSec, encounter.sharedData)
+        displayAoeVsSingleTargetBreakdown(list, calc:personalAoeVsSingleTarget(), durationSec, encounter.sharedData)
         LibEffect.Yield():Await()
 
         -- By Target
@@ -887,13 +995,15 @@ function DamageRenderer.renderDamageTaken(ctx)
 
         -- By Ability
         local abilityEntries = buildAbilityEntriesAsync(filteredDamageTaken, nil, nil):Await()
-        displayAbilityBreakdownAsync(list, abilityEntries, totalDamageTaken, durationSec, abilityInfo, unitNames, GetString(BATTLESCROLLS_HEADER_BY_ABILITY)):Await()
+        displayAbilityBreakdownAsync(list, abilityEntries, durationSec, abilityInfo, unitNames, GetString(BATTLESCROLLS_HEADER_BY_ABILITY)):Await()
+
+        local dotVsDirect = calc:damageTakenDotVsDirect()
 
         -- By Damage Type (no group avg -- sharedData has outgoing damage stats, not incoming)
-        displayDamageTypeBreakdown(list, calc:damageTakenByType(), totalDamageTaken, durationSec, nil)
+        displayDamageTypeBreakdown(list, calc:damageTakenByType(), durationSec, nil, dotVsDirect.shielded)
 
         -- Direct vs DoT (no group avg -- same reason)
-        displayDirectVsDoTBreakdown(list, calc:damageTakenDotVsDirect(), totalDamageTaken, durationSec, nil)
+        displayDirectVsDoTBreakdown(list, dotVsDirect, durationSec, nil)
 
         -- By Source (who dealt the damage to us)
         local bySource = {}
@@ -911,7 +1021,7 @@ function DamageRenderer.renderDamageTaken(ctx)
 
         local sortedSources = utils.sortDamageBreakdown(bySource)
         local isFirst = true
-        local maxSources = 10
+        local maxSources = DETAILED_UNIT_LIMIT
         unitNames = unitNames or {}
 
         for i, entry in ipairs(sortedSources) do
@@ -958,6 +1068,7 @@ function DamageRenderer.extractTopAbilitiesAsync(damageTable, targetFilter, sour
 
         -- Aggregate stats per abilityId
         local abilityStats = {}
+        local eligibleTotal = 0
         local iterations = 0
 
         for sourceUnitId, byTarget in pairs(damageTable) do
@@ -965,6 +1076,7 @@ function DamageRenderer.extractTopAbilitiesAsync(damageTable, targetFilter, sour
                 for targetUnitId, damageData in pairs(byTarget) do
                     if not targetFilter or targetFilter[targetUnitId] then
                         for abilityId, breakdown in pairs(getAbilities(damageData)) do
+                            local damage = computeTotal(breakdown)
                             if not abilityStats[abilityId] then
                                 abilityStats[abilityId] = {
                                     total = 0,
@@ -974,11 +1086,14 @@ function DamageRenderer.extractTopAbilitiesAsync(damageTable, targetFilter, sour
                                 }
                             end
                             local stats = abilityStats[abilityId]
-                            stats.total = stats.total + computeTotal(breakdown)
+                            stats.total = stats.total + damage
                             stats.ticks = stats.ticks + (breakdown.ticks or 0)
                             stats.critTicks = stats.critTicks + (breakdown.critTicks or 0)
                             if breakdown.maxTick and breakdown.maxTick > stats.maxHit then
                                 stats.maxHit = breakdown.maxTick
+                            end
+                            if not isDamagePercentExcludedAbility(abilityId) then
+                                eligibleTotal = eligibleTotal + damage
                             end
                         end
                     end
@@ -993,7 +1108,11 @@ function DamageRenderer.extractTopAbilitiesAsync(damageTable, targetFilter, sour
         LibEffect.YieldWithGC():Await()
 
         -- Merge by ability name and return top N
-        return utils.mergeAbilitiesByName(abilityStats, maxCount)
+        local abilities = utils.mergeAbilitiesByName(abilityStats, maxCount, isDamagePercentExcludedAbility)
+        for _, ability in ipairs(abilities) do
+            ability.shareTotal = eligibleTotal
+        end
+        return abilities
     end)
 end
 
@@ -1058,11 +1177,13 @@ function DamageRenderer.extractDamageTakenAbilitiesAsync(damageTakenTable, maxCo
 
         -- Aggregate stats per ability
         local abilityStats = {}
+        local eligibleTotal = 0
         local iterations = 0
 
         for _, byTarget in pairs(damageTakenTable) do
             for _, damageData in pairs(byTarget) do
                 for abilityId, breakdown in pairs(getAbilities(damageData)) do
+                    local damage = computeTotal(breakdown)
                     if not abilityStats[abilityId] then
                         abilityStats[abilityId] = {
                             total = 0,
@@ -1072,11 +1193,14 @@ function DamageRenderer.extractDamageTakenAbilitiesAsync(damageTakenTable, maxCo
                         }
                     end
                     local stats = abilityStats[abilityId]
-                    stats.total = stats.total + computeTotal(breakdown)
+                    stats.total = stats.total + damage
                     stats.ticks = stats.ticks + (breakdown.ticks or 0)
                     stats.critTicks = stats.critTicks + (breakdown.critTicks or 0)
                     if breakdown.maxTick and breakdown.maxTick > stats.maxHit then
                         stats.maxHit = breakdown.maxTick
+                    end
+                    if not isDamagePercentExcludedAbility(abilityId) then
+                        eligibleTotal = eligibleTotal + damage
                     end
                 end
                 iterations = iterations + 1
@@ -1089,7 +1213,11 @@ function DamageRenderer.extractDamageTakenAbilitiesAsync(damageTakenTable, maxCo
         LibEffect.YieldWithGC():Await()
 
         -- Merge by ability name and return top N
-        return utils.mergeAbilitiesByName(abilityStats, maxCount)
+        local abilities = utils.mergeAbilitiesByName(abilityStats, maxCount, isDamagePercentExcludedAbility)
+        for _, ability in ipairs(abilities) do
+            ability.shareTotal = eligibleTotal
+        end
+        return abilities
     end)
 end
 
@@ -1192,7 +1320,7 @@ local function buildDamageDonePanelSpec(ctx, config)
 
             local compositionData = calc:getDamageComposition()
             local compSection = buildDamageComposition(q2,
-                compositionData.dotPercent, compositionData.directPercent, compositionData.aoePercent, compositionData.stPercent)
+                compositionData.dotPercent, compositionData.directPercent, compositionData.healAbsorptionPercent, compositionData.aoePercent, compositionData.stPercent)
             LibEffect.YieldWithGC():Await()
 
             local qualityData = calc:getDamageQuality()
@@ -1284,7 +1412,7 @@ function DamageRenderer.buildDamageTakenPanelSpec(ctx)
 
             local compositionData = calc:getDamageTakenComposition()
             local compSection = buildDamageComposition(q2,
-                compositionData.dotPercent, compositionData.directPercent, compositionData.aoePercent, compositionData.stPercent)
+                compositionData.dotPercent, compositionData.directPercent, compositionData.healAbsorptionPercent, compositionData.aoePercent, compositionData.stPercent)
             LibEffect.YieldWithGC():Await()
 
             local qualityData = calc:getDamageTakenQuality()

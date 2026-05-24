@@ -253,6 +253,7 @@ local strings = {
     [BATTLESCROLLS_HEADER_BY_ABILITY] = "Por habilidad",
     [BATTLESCROLLS_HEADER_BY_DAMAGE_TYPE] = "Por tipo de daño",
     [BATTLESCROLLS_HEADER_DIRECT_VS_DOT] = "Directo vs DoT",
+    [BATTLESCROLLS_HEADER_DAMAGE_DELIVERY] = "Aplicación de daño",
     [BATTLESCROLLS_HEADER_AOE_VS_SINGLE] = "Área vs Objetivo único",
     [BATTLESCROLLS_HEADER_BY_TARGET] = "Por objetivo",
     [BATTLESCROLLS_HEADER_BY_SOURCE] = "Por fuente",
@@ -283,6 +284,10 @@ local strings = {
     [BATTLESCROLLS_STAT_DIRECT_HEALING] = "Curación directa",
     [BATTLESCROLLS_STAT_HEALING_OVER_TIME] = "Curación prolongada",
     [BATTLESCROLLS_STAT_SHIELD_HEALING] = "Escudos de daño",
+    [BATTLESCROLLS_STAT_REGEN_HEALING] = "Recuperación de salud",
+    [BATTLESCROLLS_DAMAGE_UNKNOWN_SHIELDED] = "Desconocido (Escudado)",
+    [BATTLESCROLLS_HEALING_UNKNOWN_ABSORBED] = "Desconocido (Absorbido)",
+    [BATTLESCROLLS_HEALING_HEALTH_RECOVERY] = "Recuperación de salud",
 
     -------------------------
     -- Effects Stats
@@ -362,6 +367,8 @@ local strings = {
     [BATTLESCROLLS_DELIVERY_DIRECT] = "Directo",
     [BATTLESCROLLS_DELIVERY_HOT] = "HoT",
     [BATTLESCROLLS_DELIVERY_SHIELD] = "Escudo",
+    [BATTLESCROLLS_DELIVERY_REGEN] = "Regeneración",
+    [BATTLESCROLLS_DELIVERY_HEAL_ABSORPTION] = "Absorción de curación",
 
     -------------------------
     -- Filter Dialog
@@ -870,7 +877,7 @@ local strings = {
     [BATTLESCROLLS_PIVOT_COLUMNS_CAPPED] = "Resultados limitados a <<1>> columnas",
     [BATTLESCROLLS_PIVOT_TIP_DOMAIN_OVERVIEW] = "Resumen agregado de todos los dominios de daño, sanación y efectos. Muestra totales combinados en lugar de desgloses individuales.",
     [BATTLESCROLLS_PIVOT_TIP_ENC_BOSS_NAMES] = "Filtra a encuentros con los jefes seleccionados. Selecciona los nombres de jefe en el siguiente paso.",
-    [BATTLESCROLLS_PIVOT_TIP_DIM_DELIVERY] = "Divide los datos por método de aplicación: Directo, DoT (daño con el tiempo), HoT (sanación con el tiempo) o Mixto.",
+    [BATTLESCROLLS_PIVOT_TIP_DIM_DELIVERY] = "Divide los datos por método de aplicación: Directo, DoT (daño con el tiempo), Absorción de curación, HoT (sanación con el tiempo), Regeneración, Escudo o Mixto.",
     [BATTLESCROLLS_PIVOT_TIP_DIM_DAMAGE_TYPE] = "Divide los datos por tipo de daño: Físico, Fuego, Descarga, Escarcha, Magia, Veneno, Enfermedad, Sangrado, Oblivion y otros.",
     [BATTLESCROLLS_PIVOT_TIP_DOMAIN_GROUP] = "Estadísticas de combate por miembro: DPS, daño total y tasa de crítico. Para tiempos de buffs/debuffs en miembros del grupo, usa Efectos de grupo.",
     [BATTLESCROLLS_PIVOT_TIP_AGGREGATION] = "Cómo se combinan los valores cuando múltiples encuentros contribuyen a la misma celda. Por ejemplo, DPS promedio muestra la media entre encuentros, mientras que Máx muestra el mejor encuentro.",

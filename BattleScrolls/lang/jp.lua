@@ -253,6 +253,7 @@ local strings = {
     [BATTLESCROLLS_HEADER_BY_ABILITY] = "スキル別",
     [BATTLESCROLLS_HEADER_BY_DAMAGE_TYPE] = "ダメージタイプ別",
     [BATTLESCROLLS_HEADER_DIRECT_VS_DOT] = "直接攻撃 vs 継続",
+    [BATTLESCROLLS_HEADER_DAMAGE_DELIVERY] = "ダメージ方式",
     [BATTLESCROLLS_HEADER_AOE_VS_SINGLE] = "範囲攻撃 vs 単体攻撃",
     [BATTLESCROLLS_HEADER_BY_TARGET] = "ターゲット別",
     [BATTLESCROLLS_HEADER_BY_SOURCE] = "ソース別",
@@ -283,6 +284,10 @@ local strings = {
     [BATTLESCROLLS_STAT_DIRECT_HEALING] = "直接回復",
     [BATTLESCROLLS_STAT_HEALING_OVER_TIME] = "継続回復",
     [BATTLESCROLLS_STAT_SHIELD_HEALING] = "ダメージシールド",
+    [BATTLESCROLLS_STAT_REGEN_HEALING] = "体力回復",
+    [BATTLESCROLLS_DAMAGE_UNKNOWN_SHIELDED] = "不明 (シールド吸収)",
+    [BATTLESCROLLS_HEALING_UNKNOWN_ABSORBED] = "不明 (吸収)",
+    [BATTLESCROLLS_HEALING_HEALTH_RECOVERY] = "体力回復",
 
     -------------------------
     -- Effects Stats
@@ -362,6 +367,8 @@ local strings = {
     [BATTLESCROLLS_DELIVERY_DIRECT] = "直接",
     [BATTLESCROLLS_DELIVERY_HOT] = "継続回復",
     [BATTLESCROLLS_DELIVERY_SHIELD] = "シールド",
+    [BATTLESCROLLS_DELIVERY_REGEN] = "回復",
+    [BATTLESCROLLS_DELIVERY_HEAL_ABSORPTION] = "回復吸収",
 
     -------------------------
     -- Filter Dialog
@@ -870,7 +877,7 @@ local strings = {
     [BATTLESCROLLS_PIVOT_COLUMNS_CAPPED] = "結果は<<1>>列に制限されました",
     [BATTLESCROLLS_PIVOT_TIP_DOMAIN_OVERVIEW] = "ダメージ、回復、エフェクト全ドメインの集約サマリー。個別の内訳ではなく、合計値を表示します。",
     [BATTLESCROLLS_PIVOT_TIP_ENC_BOSS_NAMES] = "選択したボスが登場する戦闘のみ表示します。次のステップでボス名を選択してください。",
-    [BATTLESCROLLS_PIVOT_TIP_DIM_DELIVERY] = "適用方法でデータを分割：直接、DoT（継続ダメージ）、HoT（継続回復）、または混合。",
+    [BATTLESCROLLS_PIVOT_TIP_DIM_DELIVERY] = "適用方法でデータを分割：直接、DoT（継続ダメージ）、回復吸収、HoT（継続回復）、回復、シールド、または混合。",
     [BATTLESCROLLS_PIVOT_TIP_DIM_DAMAGE_TYPE] = "ダメージタイプでデータを分割：物理、炎、雷、氷、魔法、毒、疫病、出血、オブリビオンなど。",
     [BATTLESCROLLS_PIVOT_TIP_DOMAIN_GROUP] = "メンバーごとの戦闘データ（DPS、合計ダメージ、クリティカル率など）。グループメンバーのバフ/デバフ持続時間はグループエフェクトを使用してください。",
     [BATTLESCROLLS_PIVOT_TIP_AGGREGATION] = "複数の戦闘が同じセルに集約される際の計算方法。例えば、平均DPSは戦闘間の平均値を、最大は最も高い単一戦闘の値を表示します。",

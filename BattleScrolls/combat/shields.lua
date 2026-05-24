@@ -50,10 +50,8 @@ BattleScrolls.shields = shields
 
 local PENDING_EVENT_WINDOW_MS = 250
 local PATTERN_GROUP = "^group"
--- Synthetic IDs must fit the 24-bit unsigned unit-id storage field if a fight
--- ends before a real combat unit id is observed and retconned.
-local INFERRED_PLAYER_UNIT_ID = 16777215
-local INFERRED_COMPANION_UNIT_ID = 16777214
+local INFERRED_PLAYER_UNIT_ID = BattleScrolls.constants.INFERRED_PLAYER_UNIT_ID
+local INFERRED_COMPANION_UNIT_ID = BattleScrolls.constants.INFERRED_COMPANION_UNIT_ID
 
 local FALLBACK_SELF_SHIELD_ABILITY_IDS = {
     [201265] = true, -- Pragmatic Fatecarver
@@ -96,9 +94,6 @@ local combatEventNames = {}
 ---@type table<number, boolean>
 local personalTypesSet = BattleScrolls.constants.personalTypesSet
 
----@type table<number, number>
-local realSourceUnitIdByType = {}
-
 local function clearTracking()
     shieldTotalsByTag = {}
     pendingDeltaByName = {}
@@ -106,7 +101,6 @@ local function clearTracking()
     pendingCombatGains = {}
     pendingAttributeBlocks = {}
     activeShields = {}
-    realSourceUnitIdByType = {}
 end
 
 ---@param abilityId number
@@ -143,45 +137,6 @@ local function getInferredSourceName(sourceType)
         return GetRawUnitName("companion") or ""
     end
     return ""
-end
-
----@param into HealingBreakdown
----@param from HealingBreakdown
-local function mergeHealingBreakdown(into, from)
-    into.raw = into.raw + from.raw
-    into.real = into.real + from.real
-    into.overheal = into.overheal + from.overheal
-    into.ticks = into.ticks + from.ticks
-    into.critTicks = into.critTicks + from.critTicks
-    into.minTick = into.minTick and from.minTick and math.min(into.minTick, from.minTick) or into.minTick or from.minTick
-    into.maxTick = into.maxTick and from.maxTick and math.max(into.maxTick, from.maxTick) or into.maxTick or from.maxTick
-end
-
----@param healing HealingDoneDiffSource|nil
----@param fromUnitId number
----@param toUnitId number
-local function retconHealingSource(healing, fromUnitId, toUnitId)
-    if not healing or not healing.bySourceUnitIdByAbilityId then return end
-
-    local fromByAbility = healing.bySourceUnitIdByAbilityId[fromUnitId]
-    if not fromByAbility then return end
-
-    local toByAbility = healing.bySourceUnitIdByAbilityId[toUnitId]
-    if not toByAbility then
-        healing.bySourceUnitIdByAbilityId[toUnitId] = fromByAbility
-        healing.bySourceUnitIdByAbilityId[fromUnitId] = nil
-        return
-    end
-
-    for abilityId, fromBreakdown in pairs(fromByAbility) do
-        local toBreakdown = toByAbility[abilityId]
-        if toBreakdown then
-            mergeHealingBreakdown(toBreakdown, fromBreakdown)
-        else
-            toByAbility[abilityId] = fromBreakdown
-        end
-    end
-    healing.bySourceUnitIdByAbilityId[fromUnitId] = nil
 end
 
 ---@param toQueue ActiveShieldInstance[]
@@ -240,31 +195,23 @@ local function rememberRealSourceUnitId(state, sourceType, realUnitId, name)
     local inferredUnitId = INFERRED_SOURCE_UNIT_ID_BY_TYPE[sourceType]
     if not inferredUnitId or realUnitId <= 0 or not name or name == "" then return end
 
-    local previousRealUnitId = realSourceUnitIdByType[sourceType]
-    realSourceUnitIdByType[sourceType] = realUnitId
+    state:RememberPersonalUnitIdentity(sourceType, realUnitId, name)
+end
 
-    if name and name ~= "" then
-        state:UpdateUnitName(realUnitId, name)
-    end
-    state:UpdateUnitFriendliness(realUnitId, sourceType)
-
-    if inferredUnitId ~= realUnitId then
-        retconHealingSource(state.healingStats.selfHealing, inferredUnitId, realUnitId)
-        for _, healing in pairs(state.healingStats.healingOutToGroup) do
-            retconHealingSource(healing, inferredUnitId, realUnitId)
-        end
-        retconActiveShieldUnitId(inferredUnitId, realUnitId)
-        state.unitIdToName[inferredUnitId] = nil
-        state.unitIdToIsFriendly[inferredUnitId] = nil
+---@param unitType number
+---@param previousUnitId number|nil
+---@param unitId number
+function shields:OnPersonalUnitIdentityChanged(unitType, previousUnitId, unitId)
+    if not isInferableSourceType(unitType)
+        or not previousUnitId
+        or not unitId
+        or previousUnitId <= 0
+        or unitId <= 0
+        or previousUnitId == unitId then
+        return
     end
 
-    if previousRealUnitId and previousRealUnitId ~= inferredUnitId and previousRealUnitId ~= realUnitId then
-        retconHealingSource(state.healingStats.selfHealing, previousRealUnitId, realUnitId)
-        for _, healing in pairs(state.healingStats.healingOutToGroup) do
-            retconHealingSource(healing, previousRealUnitId, realUnitId)
-        end
-        retconActiveShieldUnitId(previousRealUnitId, realUnitId)
-    end
+    retconActiveShieldUnitId(previousUnitId, unitId)
 end
 
 ---@param state BattleScrollsState
@@ -278,7 +225,7 @@ local function getInferredSourceUnitId(state, sourceType, targetType, targetUnit
         return targetUnitId
     end
 
-    return realSourceUnitIdByType[sourceType] or INFERRED_SOURCE_UNIT_ID_BY_TYPE[sourceType] or 0
+    return state:GetPersonalUnitId(sourceType) or INFERRED_SOURCE_UNIT_ID_BY_TYPE[sourceType] or 0
 end
 
 ---@param unitType number

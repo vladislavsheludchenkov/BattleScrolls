@@ -8,8 +8,8 @@
 --
 -- Callbacks receive either DPSShareDamageData or DPSShareHealingData
 -- as a discriminated union based on the dominant metric.
--- Old wire format (protocol 438) is classified on receive.
--- New wire formats (430 damage, 431 healing) are natively typed.
+-- Old wire format (protocol 438) is read-only and classified on receive.
+-- New wire formats (430 damage, 431 healing) are sent and received natively typed.
 -----------------------------------------------------------
 
 if not SemisPlaygroundCheckAccess() then
@@ -31,7 +31,8 @@ BattleScrolls = BattleScrolls or {}
 ---@alias DPSShareTypedData DPSShareDamageData | DPSShareHealingData
 
 ---@class DPSShare
----@field legacyProtocol Protocol|nil LibGroupBroadcast legacy protocol instance (438)
+---@field damageProtocol Protocol|nil LibGroupBroadcast damage protocol instance (430)
+---@field healingProtocol Protocol|nil LibGroupBroadcast healing protocol instance (431)
 local dpsShare = {}
 BattleScrolls.dpsShare = dpsShare
 
@@ -46,7 +47,7 @@ local callbacks = {}
 ---@param rawHPS number
 ---@param effectiveHPS number
 ---@return DPSShareTypedData
-local function classifyLegacyData(allTargetsDPS, bossDPS, rawHPS, effectiveHPS)
+local function classifyData(allTargetsDPS, bossDPS, rawHPS, effectiveHPS)
     if rawHPS > allTargetsDPS then
         return { messageType = "healing", rawHPS = rawHPS, effectiveHPS = effectiveHPS }
     else
@@ -88,9 +89,7 @@ local function makeCodec(numBits, literalMax)
     return encode, decode
 end
 
----@diagnostic disable-next-line: unused-local -- encode used in phase 2 when sending new format
 local encode11, decode11 = makeCodec(11, 255)
----@diagnostic disable-next-line: unused-local -- encode used in phase 2 when sending new format
 local encode12, decode12 = makeCodec(12, 511)
 
 ---Initialize the DPS sharing protocols with LibGroupBroadcast
@@ -110,11 +109,10 @@ function dpsShare:Initialize()
     legacyProtocol:AddField(LGB.CreateNumericField("effectiveHPS", { minValue = 0, numBits = 20, trimValues = true }))
     legacyProtocol:OnData(function(unitTag, data)
         if AreUnitsEqual(unitTag, "player") then return end
-        local typed = classifyLegacyData(data.allTargetsDPS, data.bossDPS, data.rawHPS, data.effectiveHPS)
+        local typed = classifyData(data.allTargetsDPS, data.bossDPS, data.rawHPS, data.effectiveHPS)
         notifyAllCallbacks(unitTag, typed)
     end)
     legacyProtocol:Finalize({ isRelevantInCombat = true, replaceQueuedMessages = true })
-    dpsShare.legacyProtocol = legacyProtocol
 
     -- Damage protocol (430): encoded allTargetsDPS + optional bossDPS
     local damageProtocol = handler:DeclareProtocol(430, "BattleScrolls_DamageData")
@@ -129,6 +127,7 @@ function dpsShare:Initialize()
         notifyAllCallbacks(unitTag, typed)
     end)
     damageProtocol:Finalize({ isRelevantInCombat = true, replaceQueuedMessages = true })
+    dpsShare.damageProtocol = damageProtocol
 
     -- Healing protocol (431): encoded rawHPS + effectiveHPS
     local healingProtocol = handler:DeclareProtocol(431, "BattleScrolls_HealingData")
@@ -143,6 +142,7 @@ function dpsShare:Initialize()
         notifyAllCallbacks(unitTag, typed)
     end)
     healingProtocol:Finalize({ isRelevantInCombat = true, replaceQueuedMessages = true })
+    dpsShare.healingProtocol = healingProtocol
 end
 
 --- @param name string The name of the callback.
@@ -157,25 +157,32 @@ function dpsShare:UnregisterCallback(name)
 end
 
 ---Send DPS/HPS data to group members and notify local callbacks
----Sends old format over the wire (phase 1). Local callbacks receive typed data.
+---Sends the new typed format over the wire. Local callbacks receive typed data.
 ---@param allTargetsDPS number DPS against all targets
 ---@param bossDPS number|nil DPS against boss targets only
 ---@param rawHPS number Raw healing per second output
 ---@param effectiveHPS number Effective healing per second output
 function dpsShare:SendData(allTargetsDPS, bossDPS, rawHPS, effectiveHPS)
-    -- Network: still old format (phase 1)
-    -- LGB will log a warning and will not send anything when trying to send data while not grouped
-    if dpsShare.legacyProtocol and IsUnitGrouped("player") then
-        dpsShare.legacyProtocol:Send({
-            allTargetsDPS = allTargetsDPS,
-            bossDPS = bossDPS,
-            rawHPS = rawHPS,
-            effectiveHPS = effectiveHPS,
-        })
+    local typed = classifyData(allTargetsDPS, bossDPS, rawHPS, effectiveHPS)
+
+    -- Network: protocol 438 remains receive-only for older clients.
+    -- LGB logs and drops sends while not grouped, so avoid the call when solo.
+    if IsUnitGrouped("player") then
+        if typed.messageType == "healing" then
+            if dpsShare.healingProtocol then
+                dpsShare.healingProtocol:Send({
+                    encodedRawHPS = encode12(typed.rawHPS),
+                    encodedEffectiveHPS = encode12(typed.effectiveHPS),
+                })
+            end
+        elseif dpsShare.damageProtocol then
+            dpsShare.damageProtocol:Send({
+                encodedAllDPS = encode11(typed.allTargetsDPS),
+                encodedBossDPS = typed.bossDPS and encode12(typed.bossDPS) or nil,
+            })
+        end
     end
 
-    -- Local: classify and emit typed
-    local typed = classifyLegacyData(allTargetsDPS, bossDPS, rawHPS, effectiveHPS)
+    -- Local: emit exact typed values without encode/decode loss.
     notifyAllCallbacks("player", typed)
 end
-

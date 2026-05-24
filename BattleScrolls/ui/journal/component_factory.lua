@@ -439,14 +439,19 @@ function ColumnBuilder:AbilityBar(abilityData, topValue, totalDamage, durationS)
     nameLabel:SetText(abilityData.name or utils.GetScribeAwareAbilityDisplayName(abilityId))
 
     local statusBar = bar:GetNamedChild("Bar")
-    local barPercent = topValue > 0 and (abilityData.total / topValue * 100) or 0
+    local barPercent = topValue > 0 and zo_clamp(abilityData.total / topValue * 100, 0, 100) or 0
     statusBar:SetMinMax(0, 100)
     statusBar:SetValue(barPercent)
     ZO_StatusBar_SetGradientColor(statusBar, ZO_XP_BAR_GRADIENT_COLORS)
 
     local shareLabel = bar:GetNamedChild("Share")
-    local sharePercent = totalDamage > 0 and (abilityData.total / totalDamage * 100) or 0
-    shareLabel:SetText(string.format("%.1f%%", sharePercent))
+    if abilityData.isSupplemental then
+        shareLabel:SetText("")
+    else
+        local shareTotal = abilityData.shareTotal or totalDamage
+        local sharePercent = shareTotal > 0 and (abilityData.total / shareTotal * 100) or 0
+        shareLabel:SetText(string.format("%.1f%%", sharePercent))
+    end
     shareLabel:ClearAnchors()
     shareLabel:SetAnchor(TOPRIGHT, bar, TOPRIGHT, 0, 0)
 

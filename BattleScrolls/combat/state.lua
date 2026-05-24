@@ -15,6 +15,7 @@
 --
 -- Observer interface:
 --   observer:OnStateInitialized()  -- Combat started
+--   observer:OnStatePreTick(state) -- Before live combat snapshots/calculations
 --   observer:OnStatePreReset()     -- Combat ended, data available
 -----------------------------------------------------------
 
@@ -57,12 +58,12 @@ BattleScrolls = BattleScrolls or {}
 
 ---@class HealingDoneDiffSource
 ---@field total HealingTotals
----@field byHotVsDirect { hot: HealingTotals, direct: HealingTotals, shield: HealingTotals }
+---@field byHotVsDirect { hot: HealingTotals, direct: HealingTotals, shield: HealingTotals, regen: HealingTotals, absorbed: HealingTotals }
 ---@field bySourceUnitIdByAbilityId table<number, table<number, HealingBreakdown>> Nested: sourceUnitId -> abilityId -> healing
 
 ---@class HealingDone
 ---@field total HealingTotals
----@field byHotVsDirect { hot: HealingTotals, direct: HealingTotals, shield: HealingTotals }
+---@field byHotVsDirect { hot: HealingTotals, direct: HealingTotals, shield: HealingTotals, regen: HealingTotals, absorbed: HealingTotals }
 ---@field byAbilityId table<number, HealingBreakdown>
 
 ---@class HealingStats
@@ -110,6 +111,8 @@ BattleScrolls = BattleScrolls or {}
 ---@field overTime boolean|nil DOT/HOT delivery
 ---@field direct boolean|nil Direct delivery
 ---@field shield boolean|nil Damage shield delivery
+---@field regen boolean|nil Health recovery delivery
+---@field healAbsorption boolean|nil Heal absorption delivery
 
 ---@class AbilityInfo
 ---@field deliveryType AbilityDeliveryType
@@ -118,6 +121,7 @@ BattleScrolls = BattleScrolls or {}
 ---State observer interface for combat lifecycle notifications
 ---@class StateObserver
 ---@field OnStateInitialized fun(self: StateObserver)|nil Called when combat starts
+---@field OnStatePreTick fun(self: StateObserver, state: BattleScrollsState)|nil Called before live combat snapshots/calculations
 ---@field OnStatePreReset fun(self: StateObserver)|nil Called when combat ends, before state reset
 
 ---Per-boss tracking data
@@ -139,6 +143,7 @@ BattleScrolls = BattleScrolls or {}
 ---@field currentZoneId number
 ---@field unitIdToName table<number, string> Cached names
 ---@field unitIdToIsFriendly table<number, boolean> Cached friendliness
+---@field personalUnitIdByType table<number, number> Player/companion unit IDs by combat unit type, inferred until ESO reports real IDs
 ---@field abilityInfo table<number, AbilityInfo> Cached ability metadata
 ---@field procs table<number, ProcEvent[]> Proc events by ability ID
 ---@field damageByUnitId table<number, table<number, DamageDone>> Personal damage done, nested: sourceUnitId -> targetUnitId -> damage
@@ -186,7 +191,7 @@ local PRE_COMBAT_LOOKBACK_MS = 1000     -- Replay events from last 1 second
 
 ---@class PreCombatEvent
 ---@field timestampMs number Game time when event occurred
----@field type "personal"|"group" Event type for routing replay
+---@field type "personal"|"group"|"personalShielded"|"groupShielded" Event type for routing replay
 ---@field result number Combat result
 ---@field sourceUnitID number
 ---@field targetUnitID number
@@ -251,7 +256,7 @@ local function getBufferedEventsAfter(cutoffMs)
 end
 
 ---Register an observer to receive state lifecycle notifications
----@param observer StateObserver Object with OnStateInitialized and/or OnStatePreReset methods
+---@param observer StateObserver Object with state lifecycle methods
 function BattleScrolls.state:RegisterObserver(observer)
     table.insert(observers, observer)
 end
@@ -286,6 +291,15 @@ function BattleScrolls.state:NotifyPreReset()
     for _, observer in ipairs(observers) do
         if observer.OnStatePreReset then
             observer:OnStatePreReset()
+        end
+    end
+end
+
+---Notify all observers before live combat snapshots/calculations are created.
+function BattleScrolls.state:NotifyPreTick()
+    for _, observer in ipairs(observers) do
+        if observer.OnStatePreTick then
+            observer:OnStatePreTick(self)
         end
     end
 end
@@ -335,6 +349,10 @@ function BattleScrolls.state:Reset()
     self.currentZoneId = 0
     self.unitIdToName = {}
     self.unitIdToIsFriendly = {}
+    self.personalUnitIdByType = {
+        [COMBAT_UNIT_TYPE_PLAYER] = BattleScrolls.constants.INFERRED_PLAYER_UNIT_ID,
+        [COMBAT_UNIT_TYPE_PLAYER_COMPANION] = BattleScrolls.constants.INFERRED_COMPANION_UNIT_ID,
+    }
 
     -- Clear combat tracking state via accumulators module
     BattleScrolls.accumulators.clear(self)
@@ -371,6 +389,7 @@ function BattleScrolls.state:Snapshot()
     snapshot.currentZoneId = self.currentZoneId
     snapshot.unitIdToName = self.unitIdToName
     snapshot.unitIdToIsFriendly = self.unitIdToIsFriendly
+    snapshot.personalUnitIdByType = self.personalUnitIdByType
     snapshot.abilityInfo = self.abilityInfo
     snapshot.procs = self.procs
     snapshot.damageByUnitId = self.damageByUnitId
@@ -602,6 +621,8 @@ local healingResultsSet = BattleScrolls.constants.healingResultsSet
 local ignoredHealingAbilityIds = BattleScrolls.constants.ignoredHealingAbilityIds
 ---@type table<number, boolean>
 local portalEffectsSet = BattleScrolls.constants.portalEffectsSet
+local DAMAGE_SHIELDED_ABILITY_ID = BattleScrolls.constants.DAMAGE_SHIELDED_ABILITY_ID
+local HEAL_ABSORBED_ABILITY_ID = BattleScrolls.constants.HEAL_ABSORBED_ABILITY_ID
 
 -- Crux ability ID for Arcanist stack tracking (used in Initialize + weaving handler)
 local CRUX_ABILITY_ID = 184220
@@ -639,10 +660,40 @@ function BattleScrolls.state:OnCombatEvent(eventCode, result, isError, abilityNa
     local isDamageResult = damageResultsSet[result]
     local isHealingResult = healingResultsSet[result]
 
-    local shieldTracker = BattleScrolls.shields
-    if shieldTracker and shieldTracker.RememberUnitIdentity then
-        shieldTracker:RememberUnitIdentity(sourceType, sourceUnitID, sourceName)
-        shieldTracker:RememberUnitIdentity(targetType, targetUnitID, targetName)
+    self:RememberPersonalUnitIdentity(sourceType, sourceUnitID, sourceName)
+    self:RememberPersonalUnitIdentity(targetType, targetUnitID, targetName)
+
+    if result == ACTION_RESULT_DAMAGE_SHIELDED then
+        if isPersonalSource then
+            self:OnPersonalDamageShielded(eventCode, result, isError, abilityName, abilityGraphic, abilityActionSlotType, sourceName, sourceType, targetName, targetType, hitValue, powerType, damageType, log, sourceUnitID, targetUnitID, abilityID, overflow)
+        end
+
+        if isGroupSource or (not isPersonalSource and not isPersonalTarget and not isGroupTarget) then
+            self:OnGroupDamageShielded(eventCode, result, isError, abilityName, abilityGraphic, abilityActionSlotType, sourceName, sourceType, targetName, targetType, hitValue, powerType, damageType, log, sourceUnitID, targetUnitID, abilityID, overflow)
+        end
+
+        if isPersonalTarget then
+            self:OnDamageShieldedTaken(eventCode, result, isError, abilityName, abilityGraphic, abilityActionSlotType, sourceName, sourceType, targetName, targetType, hitValue, powerType, damageType, log, sourceUnitID, targetUnitID, abilityID, overflow)
+        end
+
+        self.lastDamageDoneMs = GetGameTimeMilliseconds()
+        return
+    end
+
+    if result == ACTION_RESULT_HEAL_ABSORBED then
+        if isPersonalSource and isPersonalTarget then
+            self:OnSelfHealingAbsorbed(eventCode, result, isError, abilityName, abilityGraphic, abilityActionSlotType, sourceName, sourceType, targetName, targetType, hitValue, powerType, damageType, log, sourceUnitID, targetUnitID, abilityID, overflow)
+        end
+
+        if isPersonalSource and isGroupTarget then
+            self:OnHealingOutAbsorbed(eventCode, result, isError, abilityName, abilityGraphic, abilityActionSlotType, sourceName, sourceType, targetName, targetType, hitValue, powerType, damageType, log, sourceUnitID, targetUnitID, abilityID, overflow)
+        end
+
+        if isGroupSource and isPersonalTarget then
+            self:OnHealingInAbsorbed(eventCode, result, isError, abilityName, abilityGraphic, abilityActionSlotType, sourceName, sourceType, targetName, targetType, hitValue, powerType, damageType, log, sourceUnitID, targetUnitID, abilityID, overflow)
+        end
+
+        return
     end
 
     -- Damage events
@@ -772,6 +823,19 @@ function BattleScrolls.state:Initialize()
                 REGISTER_FILTER_IS_ERROR, false)
     end
 
+    registerCombatEvent("BattleScrolls_DmgShielded",
+            function(eventCode, result, isError, ...)
+                if isError or result ~= ACTION_RESULT_DAMAGE_SHIELDED then
+                    bsLog.Warn(function()
+                        return "Combat filter leak (damage shielded): got result=" .. tostring(result)
+                    end)
+                    return
+                end
+                self:OnCombatEvent(eventCode, result, isError, ...)
+            end,
+            REGISTER_FILTER_COMBAT_RESULT, ACTION_RESULT_DAMAGE_SHIELDED,
+            REGISTER_FILTER_IS_ERROR, false)
+
     -- Healing out + self-healing: personal source × healing result
     for i, expectedResult in ipairs(healingResults) do
         for j, expectedSourceType in ipairs(personalSourceTypes) do
@@ -809,6 +873,19 @@ function BattleScrolls.state:Initialize()
                     REGISTER_FILTER_IS_ERROR, false)
         end
     end
+
+    registerCombatEvent("BattleScrolls_HealAbsorbed",
+            function(eventCode, result, isError, ...)
+                if isError or result ~= ACTION_RESULT_HEAL_ABSORBED then
+                    bsLog.Warn(function()
+                        return "Combat filter leak (heal absorbed): got result=" .. tostring(result)
+                    end)
+                    return
+                end
+                self:OnCombatEvent(eventCode, result, isError, ...)
+            end,
+            REGISTER_FILTER_COMBAT_RESULT, ACTION_RESULT_HEAL_ABSORBED,
+            REGISTER_FILTER_IS_ERROR, false)
 
     EVENT_MANAGER:RegisterForEvent("BattleScrolls_State", EVENT_PLAYER_COMBAT_STATE,
             function(_, inCombat)
@@ -906,6 +983,36 @@ function BattleScrolls.state:MarkShieldAbility(abilityId)
     self:UpdateAbilityInfo(abilityId, false, nil, true)
 end
 
+---Marks an ability as natural health recovery without adding damage type metadata.
+---@param abilityId number
+function BattleScrolls.state:MarkRegenAbility(abilityId)
+    if not self.abilityInfo[abilityId] then
+        self.abilityInfo[abilityId] = {
+            deliveryType = {},
+            damageTypes = {}
+        }
+    end
+
+    local info = self.abilityInfo[abilityId]
+    info.deliveryType = info.deliveryType or {}
+    info.deliveryType.regen = true
+end
+
+---Marks an ability as heal-absorption delivery without adding damage type metadata.
+---@param abilityId number
+function BattleScrolls.state:MarkHealAbsorptionAbility(abilityId)
+    if not self.abilityInfo[abilityId] then
+        self.abilityInfo[abilityId] = {
+            deliveryType = {},
+            damageTypes = {}
+        }
+    end
+
+    local info = self.abilityInfo[abilityId]
+    info.deliveryType = info.deliveryType or {}
+    info.deliveryType.healAbsorption = true
+end
+
 
 -- Use accumulators module for combat result helpers
 local isOverTimeResult = BattleScrolls.accumulators.isOverTimeResult
@@ -962,6 +1069,163 @@ function BattleScrolls.state:UpdateUnitFriendliness(unitId, unitType)
             end
         end
     end
+end
+
+---@param unitType number
+---@return number|nil
+local function getInferredPersonalUnitId(unitType)
+    if unitType == COMBAT_UNIT_TYPE_PLAYER then
+        return BattleScrolls.constants.INFERRED_PLAYER_UNIT_ID
+    elseif unitType == COMBAT_UNIT_TYPE_PLAYER_COMPANION then
+        return BattleScrolls.constants.INFERRED_COMPANION_UNIT_ID
+    end
+    return nil
+end
+
+---@param into HealingBreakdown
+---@param from HealingBreakdown
+local function mergeHealingBreakdown(into, from)
+    into.raw = into.raw + from.raw
+    into.real = into.real + from.real
+    into.overheal = into.overheal + from.overheal
+    into.ticks = into.ticks + from.ticks
+    into.critTicks = into.critTicks + from.critTicks
+    into.minTick = into.minTick and from.minTick and math.min(into.minTick, from.minTick) or into.minTick or from.minTick
+    into.maxTick = into.maxTick and from.maxTick and math.max(into.maxTick, from.maxTick) or into.maxTick or from.maxTick
+end
+
+---@param healing HealingDoneDiffSource|nil
+---@param fromUnitId number
+---@param toUnitId number
+local function retconHealingSourceUnitId(healing, fromUnitId, toUnitId)
+    if not healing or not healing.bySourceUnitIdByAbilityId or fromUnitId == toUnitId then return end
+
+    local fromByAbility = healing.bySourceUnitIdByAbilityId[fromUnitId]
+    if not fromByAbility then return end
+
+    local toByAbility = healing.bySourceUnitIdByAbilityId[toUnitId]
+    if not toByAbility then
+        healing.bySourceUnitIdByAbilityId[toUnitId] = fromByAbility
+        healing.bySourceUnitIdByAbilityId[fromUnitId] = nil
+        return
+    end
+
+    for abilityId, fromBreakdown in pairs(fromByAbility) do
+        local toBreakdown = toByAbility[abilityId]
+        if toBreakdown then
+            mergeHealingBreakdown(toBreakdown, fromBreakdown)
+        else
+            toByAbility[abilityId] = fromBreakdown
+        end
+    end
+
+    healing.bySourceUnitIdByAbilityId[fromUnitId] = nil
+end
+
+---@param previousUnitId number
+---@param unitId number
+function BattleScrolls.state:RetconPersonalUnitIdentity(previousUnitId, unitId)
+    if not previousUnitId or not unitId or previousUnitId <= 0 or unitId <= 0 or previousUnitId == unitId then
+        return
+    end
+
+    local healingStats = self.healingStats
+    if not healingStats then return end
+
+    retconHealingSourceUnitId(healingStats.selfHealing, previousUnitId, unitId)
+    for _, healing in pairs(healingStats.healingOutToGroup or {}) do
+        retconHealingSourceUnitId(healing, previousUnitId, unitId)
+    end
+end
+
+---@param unitType number
+---@param previousUnitId number
+---@param unitId number
+function BattleScrolls.state:NotifyPersonalUnitIdentityChanged(unitType, previousUnitId, unitId)
+    local shieldTracker = BattleScrolls.shields
+    if shieldTracker and shieldTracker.OnPersonalUnitIdentityChanged then
+        shieldTracker:OnPersonalUnitIdentityChanged(unitType, previousUnitId, unitId)
+    end
+end
+
+---@param unitType number
+---@return number|nil
+function BattleScrolls.state:GetPersonalUnitId(unitType)
+    local inferredUnitId = getInferredPersonalUnitId(unitType)
+    if not inferredUnitId then
+        return nil
+    end
+
+    local byType = self.personalUnitIdByType
+    return (byType and byType[unitType]) or inferredUnitId
+end
+
+---@param unitType number
+---@param unitId number
+---@param name string
+---@return number|nil previousUnitId Previous unit ID when it changed, otherwise nil
+function BattleScrolls.state:RememberPersonalUnitIdentity(unitType, unitId, name)
+    local inferredUnitId = getInferredPersonalUnitId(unitType)
+    if not inferredUnitId or not unitId or unitId <= 0 then
+        return nil
+    end
+
+    if not self.personalUnitIdByType then
+        self.personalUnitIdByType = {}
+    end
+
+    local previousUnitId = self.personalUnitIdByType[unitType] or inferredUnitId
+    self.personalUnitIdByType[unitType] = unitId
+
+    if name and name ~= "" then
+        self:UpdateUnitName(unitId, name)
+    end
+    self:UpdateUnitFriendliness(unitId, unitType)
+
+    if previousUnitId ~= unitId then
+        self:RetconPersonalUnitIdentity(previousUnitId, unitId)
+        self:NotifyPersonalUnitIdentityChanged(unitType, previousUnitId, unitId)
+        return previousUnitId
+    end
+    return nil
+end
+
+---@param targetUnitID number
+---@param targetName string
+---@param targetType number
+---@return number targetUnitID Redirected target unit ID
+function BattleScrolls.state:NormalizeAndTrackPersonalDamageTarget(targetUnitID, targetName, targetType)
+    -- Redirect boss unit IDs (merging if boss unit recreated on the client,
+    -- for example after going in and out of the portal)
+    targetUnitID = self.bossUnitIdRedirects[targetUnitID] or targetUnitID
+
+    -- Boss assignment: try to link this targetUnitID to a known boss
+    if self.bossesByUnitId[targetUnitID] then
+        self.isBossFight = true
+    elseif not self.failedToAssignBossUnitIds[targetUnitID] then
+        -- Name-match fallback: only assign to bosses that don't have a unitId yet
+        for _, bossData in pairs(self.bossesByTag) do
+            if bossData.name == targetName and bossData.unitId == nil then
+                bossData.unitId = targetUnitID
+                bossData.confirmed = false
+                self.bossesByUnitId[targetUnitID] = bossData
+                self.isBossFight = true
+                break
+            end
+        end
+        if not self.bossesByUnitId[targetUnitID] then
+            self.failedToAssignBossUnitIds[targetUnitID] = true
+        end
+    end
+
+    -- Track fight types based on target unit type
+    if targetType == COMBAT_UNIT_TYPE_OTHER then
+        self.isPlayerFight = true
+    elseif targetType == COMBAT_UNIT_TYPE_TARGET_DUMMY then
+        self.isDummyFight = true
+    end
+
+    return targetUnitID
 end
 
 ---Handles combat damage events and tracks damage, ability metadata, proc events
@@ -1029,9 +1293,7 @@ function BattleScrolls.state:ApplyPersonalDamage(result, sourceName, sourceType,
     self:UpdateUnitFriendliness(sourceUnitID, sourceType)
     self:UpdateUnitFriendliness(targetUnitID, targetType)
 
-    -- Redirect boss unit IDs (merging if boss unit recreated on the client,
-    -- for example after going in and out of the portal)
-    targetUnitID = self.bossUnitIdRedirects[targetUnitID] or targetUnitID
+    targetUnitID = self:NormalizeAndTrackPersonalDamageTarget(targetUnitID, targetName, targetType)
 
     local isDot = isOverTimeResult(result)
     local isCrit = isCriticalResult(result)
@@ -1039,32 +1301,6 @@ function BattleScrolls.state:ApplyPersonalDamage(result, sourceName, sourceType,
     self:UpdateAbilityInfo(abilityID, isDot, damageType)
 
     BattleScrolls.accumulators.damage(self.damageByUnitId, sourceUnitID, targetUnitID, abilityID, hitValue, overflow, isCrit)
-
-    -- Boss assignment: try to link this targetUnitID to a known boss
-    if self.bossesByUnitId[targetUnitID] then
-        self.isBossFight = true
-    elseif not self.failedToAssignBossUnitIds[targetUnitID] then
-        -- Name-match fallback: only assign to bosses that don't have a unitId yet
-        for _, bossData in pairs(self.bossesByTag) do
-            if bossData.name == targetName and bossData.unitId == nil then
-                bossData.unitId = targetUnitID
-                bossData.confirmed = false
-                self.bossesByUnitId[targetUnitID] = bossData
-                self.isBossFight = true
-                break
-            end
-        end
-        if not self.bossesByUnitId[targetUnitID] then
-            self.failedToAssignBossUnitIds[targetUnitID] = true
-        end
-    end
-
-    -- Track fight types based on target unit type
-    if targetType == COMBAT_UNIT_TYPE_OTHER then
-        self.isPlayerFight = true
-    elseif targetType == COMBAT_UNIT_TYPE_TARGET_DUMMY then
-        self.isDummyFight = true
-    end
 
     if BattleScrolls.constants.SingleTargetDamageProcAbilityIds[abilityID] then
         if not self.procs[abilityID] then
@@ -1076,6 +1312,72 @@ function BattleScrolls.state:ApplyPersonalDamage(result, sourceName, sourceType,
             timestampMs = GetGameTimeMilliseconds()
         })
     end
+end
+
+---Handles damage absorbed by shields from personal sources.
+---@param _ number eventCode
+---@param result number
+---@param _isError boolean
+---@param _abilityName string
+---@param _abilityGraphic string
+---@param _abilityActionSlotType number
+---@param sourceName string
+---@param sourceType number
+---@param targetName string
+---@param targetType number
+---@param hitValue number
+---@param _powerType number
+---@param damageType number
+---@param _log string
+---@param sourceUnitID number
+---@param targetUnitID number
+---@param _abilityID number
+---@param overflow number
+function BattleScrolls.state:OnPersonalDamageShielded(_, result, _isError, _abilityName, _abilityGraphic, _abilityActionSlotType, sourceName, sourceType, targetName, targetType, hitValue, _powerType, damageType, _log, sourceUnitID, targetUnitID, _abilityID, overflow)
+    if hitValue <= 0 then
+        return
+    end
+
+    -- Buffer event if not yet in combat (will replay on combat start)
+    if not self.initialized then
+        bufferPreCombatEvent({
+            timestampMs = GetGameTimeMilliseconds(),
+            type = "personalShielded",
+            result = result,
+            sourceUnitID = sourceUnitID,
+            targetUnitID = targetUnitID,
+            abilityID = DAMAGE_SHIELDED_ABILITY_ID,
+            hitValue = hitValue,
+            overflow = overflow,
+            damageType = damageType,
+            sourceName = sourceName,
+            targetName = targetName,
+            sourceType = sourceType,
+            targetType = targetType,
+        })
+        return
+    end
+
+    self:ApplyPersonalDamageShielded(sourceName, sourceType, targetName, targetType, hitValue, sourceUnitID, targetUnitID)
+end
+
+---Applies shielded personal damage with a synthetic ability ID.
+---@param sourceName string
+---@param sourceType number
+---@param targetName string
+---@param targetType number
+---@param hitValue number
+---@param sourceUnitID number
+---@param targetUnitID number
+function BattleScrolls.state:ApplyPersonalDamageShielded(sourceName, sourceType, targetName, targetType, hitValue, sourceUnitID, targetUnitID)
+    self:UpdateUnitName(sourceUnitID, sourceName)
+    self:UpdateUnitName(targetUnitID, targetName)
+    self:UpdateUnitFriendliness(sourceUnitID, sourceType)
+    self:UpdateUnitFriendliness(targetUnitID, targetType)
+
+    targetUnitID = self:NormalizeAndTrackPersonalDamageTarget(targetUnitID, targetName, targetType)
+
+    BattleScrolls.accumulators.damage(self.damageByUnitId, sourceUnitID, targetUnitID, DAMAGE_SHIELDED_ABILITY_ID, hitValue, 0, false)
 end
 
 ---Handles group member damage events (no boss tracking or procs)
@@ -1155,6 +1457,70 @@ function BattleScrolls.state:ApplyGroupDamage(result, sourceUnitID, targetUnitID
     -- If target is friendly, incoming damage is not tracked
 end
 
+---Handles damage absorbed by shields from group/catch-all sources.
+---@param _ number eventCode
+---@param result number
+---@param _isError boolean
+---@param _abilityName string
+---@param _abilityGraphic string
+---@param _abilityActionSlotType number
+---@param _sourceName string
+---@param _sourceType number
+---@param _targetName string
+---@param _targetType number
+---@param hitValue number
+---@param _powerType number
+---@param damageType number
+---@param _log string
+---@param sourceUnitID number
+---@param targetUnitID number
+---@param _abilityID number
+---@param overflow number
+function BattleScrolls.state:OnGroupDamageShielded(_, result, _isError, _abilityName, _abilityGraphic, _abilityActionSlotType, _sourceName, _sourceType, _targetName, _targetType, hitValue, _powerType, damageType, _log, sourceUnitID, targetUnitID, _abilityID, overflow)
+    if hitValue <= 0 then
+        return
+    end
+
+    -- Buffer event if not yet in combat (will replay on combat start)
+    if not self.initialized then
+        bufferPreCombatEvent({
+            timestampMs = GetGameTimeMilliseconds(),
+            type = "groupShielded",
+            result = result,
+            sourceUnitID = sourceUnitID,
+            targetUnitID = targetUnitID,
+            abilityID = DAMAGE_SHIELDED_ABILITY_ID,
+            hitValue = hitValue,
+            overflow = overflow,
+            damageType = damageType,
+            sourceName = _sourceName,
+            targetName = _targetName,
+            sourceType = _sourceType,
+            targetType = _targetType,
+        })
+        return
+    end
+
+    self:ApplyGroupDamageShielded(sourceUnitID, targetUnitID, hitValue)
+end
+
+---Applies shielded group damage with a synthetic ability ID.
+---@param sourceUnitID number
+---@param targetUnitID number
+---@param hitValue number
+function BattleScrolls.state:ApplyGroupDamageShielded(sourceUnitID, targetUnitID, hitValue)
+    -- Redirect boss unit IDs (merging if boss unit recreated on the client,
+    -- for example after going in and out of the portal)
+    targetUnitID = self.bossUnitIdRedirects[targetUnitID] or targetUnitID
+
+    if self.unitIdToIsFriendly[targetUnitID] == nil then
+        BattleScrolls.accumulators.damage(self.damageUnknownByUnitId, sourceUnitID, targetUnitID, DAMAGE_SHIELDED_ABILITY_ID, hitValue, 0, false)
+    elseif self.unitIdToIsFriendly[targetUnitID] == false then
+        BattleScrolls.accumulators.damage(self.damageByUnitIdGroup, sourceUnitID, targetUnitID, DAMAGE_SHIELDED_ABILITY_ID, hitValue, 0, false)
+    end
+    -- If target is friendly, incoming damage is not tracked
+end
+
 ---Handles self-healing events (source and target are both personal: player, pet, companion)
 ---@param _ number eventCode
 ---@param result number
@@ -1193,6 +1559,10 @@ function BattleScrolls.state:OnSelfHealing(_, result, _isError, _abilityName, _a
     self:UpdateAbilityInfo(abilityID, isHot, damageType)
 
     BattleScrolls.accumulators.healingDiffSource(self.healingStats.selfHealing, sourceUnitID, abilityID, hitValue, overflow, isCrit)
+
+    if targetType == COMBAT_UNIT_TYPE_PLAYER and BattleScrolls.healthRecovery then
+        BattleScrolls.healthRecovery:OnPlayerHealthHealing(hitValue)
+    end
 end
 
 ---Handles healing out to group members (source is personal, target is group)
@@ -1281,6 +1651,126 @@ function BattleScrolls.state:OnHealingIn(_, result, _isError, _abilityName, _abi
     end
 
     BattleScrolls.accumulators.healingDone(self.healingStats.healingInFromGroup[sourceUnitID], abilityID, hitValue, overflow, isCrit)
+
+    if targetType == COMBAT_UNIT_TYPE_PLAYER and BattleScrolls.healthRecovery then
+        BattleScrolls.healthRecovery:OnPlayerHealthHealing(hitValue)
+    end
+end
+
+---Handles absorbed self-healing. The real event ability ID is not reliable, so use a synthetic ability.
+---@param _ number eventCode
+---@param _result number
+---@param _isError boolean
+---@param _abilityName string
+---@param _abilityGraphic string
+---@param _abilityActionSlotType number
+---@param sourceName string
+---@param sourceType number
+---@param targetName string
+---@param targetType number
+---@param hitValue number
+---@param _powerType number
+---@param _damageType number
+---@param _log string
+---@param sourceUnitID number
+---@param targetUnitID number
+---@param _abilityID number
+---@param _overflow number
+function BattleScrolls.state:OnSelfHealingAbsorbed(_, _result, _isError, _abilityName, _abilityGraphic, _abilityActionSlotType, sourceName, sourceType, targetName, targetType, hitValue, _powerType, _damageType, _log, sourceUnitID, targetUnitID, _abilityID, _overflow)
+    if not self.initialized then
+        return
+    end
+    if hitValue <= 0 then
+        return
+    end
+
+    self:UpdateUnitName(sourceUnitID, sourceName)
+    self:UpdateUnitName(targetUnitID, targetName)
+    self:UpdateUnitFriendliness(sourceUnitID, sourceType)
+    self:UpdateUnitFriendliness(targetUnitID, targetType)
+    self:MarkHealAbsorptionAbility(HEAL_ABSORBED_ABILITY_ID)
+
+    BattleScrolls.accumulators.healingDiffSource(self.healingStats.selfHealing, sourceUnitID, HEAL_ABSORBED_ABILITY_ID, hitValue, 0, false)
+end
+
+---Handles absorbed outgoing healing. The real event ability ID is not reliable, so use a synthetic ability.
+---@param _ number eventCode
+---@param _result number
+---@param _isError boolean
+---@param _abilityName string
+---@param _abilityGraphic string
+---@param _abilityActionSlotType number
+---@param sourceName string
+---@param sourceType number
+---@param targetName string
+---@param targetType number
+---@param hitValue number
+---@param _powerType number
+---@param _damageType number
+---@param _log string
+---@param sourceUnitID number
+---@param targetUnitID number
+---@param _abilityID number
+---@param _overflow number
+function BattleScrolls.state:OnHealingOutAbsorbed(_, _result, _isError, _abilityName, _abilityGraphic, _abilityActionSlotType, sourceName, sourceType, targetName, targetType, hitValue, _powerType, _damageType, _log, sourceUnitID, targetUnitID, _abilityID, _overflow)
+    if not self.initialized then
+        return
+    end
+    if hitValue <= 0 then
+        return
+    end
+
+    self:UpdateUnitName(sourceUnitID, sourceName)
+    self:UpdateUnitName(targetUnitID, targetName)
+    self:UpdateUnitFriendliness(sourceUnitID, sourceType)
+    self:UpdateUnitFriendliness(targetUnitID, targetType)
+    self:MarkHealAbsorptionAbility(HEAL_ABSORBED_ABILITY_ID)
+
+    if not self.healingStats.healingOutToGroup[targetUnitID] then
+        self.healingStats.healingOutToGroup[targetUnitID] = BattleScrolls.structures.newHealingDoneDiffSource()
+    end
+
+    BattleScrolls.accumulators.healingDiffSource(self.healingStats.healingOutToGroup[targetUnitID], sourceUnitID, HEAL_ABSORBED_ABILITY_ID, hitValue, 0, false)
+end
+
+---Handles absorbed incoming healing. The real event ability ID is not reliable, so use a synthetic ability.
+---@param _ number eventCode
+---@param _result number
+---@param _isError boolean
+---@param _abilityName string
+---@param _abilityGraphic string
+---@param _abilityActionSlotType number
+---@param sourceName string
+---@param sourceType number
+---@param targetName string
+---@param targetType number
+---@param hitValue number
+---@param _powerType number
+---@param _damageType number
+---@param _log string
+---@param sourceUnitID number
+---@param targetUnitID number
+---@param _abilityID number
+---@param _overflow number
+function BattleScrolls.state:OnHealingInAbsorbed(_, _result, _isError, _abilityName, _abilityGraphic, _abilityActionSlotType, sourceName, sourceType, targetName, targetType, hitValue, _powerType, _damageType, _log, sourceUnitID, targetUnitID, _abilityID, _overflow)
+    if not self.initialized then
+        return
+    end
+    if hitValue <= 0 then
+        return
+    end
+
+    self:UpdateUnitName(sourceUnitID, sourceName)
+    self:UpdateUnitName(targetUnitID, targetName)
+    self:UpdateUnitFriendliness(sourceUnitID, sourceType)
+    self:UpdateUnitFriendliness(targetUnitID, targetType)
+    self:MarkHealAbsorptionAbility(HEAL_ABSORBED_ABILITY_ID)
+
+    if not self.healingStats.healingInFromGroup[sourceUnitID] then
+        self.healingStats.healingInFromGroup[sourceUnitID] = BattleScrolls.structures.newHealingDone()
+    end
+
+    BattleScrolls.accumulators.healingDone(self.healingStats.healingInFromGroup[sourceUnitID], HEAL_ABSORBED_ABILITY_ID, hitValue, 0, false)
 end
 
 ---Handles damage taken events (target is personal: player, pet, companion)
@@ -1322,9 +1812,57 @@ function BattleScrolls.state:OnDamageTaken(_, result, _isError, _abilityName, _a
     local isDot = isOverTimeResult(result)
     local isCrit = isCriticalResult(result)
 
-    self:UpdateAbilityInfo(abilityID, isDot, damageType)
+    if result == ACTION_RESULT_HEAL_ABSORBED then
+        self:MarkHealAbsorptionAbility(abilityID)
+    else
+        self:UpdateAbilityInfo(abilityID, isDot, damageType)
+    end
 
     BattleScrolls.accumulators.damage(self.damageTakenByUnitId, sourceUnitID, targetUnitID, abilityID, hitValue, overflow, isCrit)
+
+    -- Track player fights when taking damage from enemy players
+    if sourceType == COMBAT_UNIT_TYPE_OTHER then
+        self.isPlayerFight = true
+    end
+end
+
+---Handles incoming damage absorbed by shields. The real event ability ID is not reliable.
+---@param _ number eventCode
+---@param _result number
+---@param _isError boolean
+---@param _abilityName string
+---@param _abilityGraphic string
+---@param _abilityActionSlotType number
+---@param sourceName string
+---@param sourceType number
+---@param targetName string
+---@param targetType number
+---@param hitValue number
+---@param _powerType number
+---@param _damageType number
+---@param _log string
+---@param sourceUnitID number
+---@param targetUnitID number
+---@param _abilityID number
+---@param _overflow number
+function BattleScrolls.state:OnDamageShieldedTaken(_, _result, _isError, _abilityName, _abilityGraphic, _abilityActionSlotType, sourceName, sourceType, targetName, targetType, hitValue, _powerType, _damageType, _log, sourceUnitID, targetUnitID, _abilityID, _overflow)
+    if not self.initialized then
+        return
+    end
+    if hitValue <= 0 then
+        return
+    end
+
+    self:UpdateUnitName(sourceUnitID, sourceName)
+    self:UpdateUnitName(targetUnitID, targetName)
+    self:UpdateUnitFriendliness(sourceUnitID, sourceType)
+    self:UpdateUnitFriendliness(targetUnitID, targetType)
+
+    -- Redirect boss unit IDs as source (merging if boss unit recreated on the client,
+    -- for example after going in and out of the portal)
+    sourceUnitID = self.bossUnitIdRedirects[sourceUnitID] or sourceUnitID
+
+    BattleScrolls.accumulators.damage(self.damageTakenByUnitId, sourceUnitID, targetUnitID, DAMAGE_SHIELDED_ABILITY_ID, hitValue, 0, false)
 
     -- Track player fights when taking damage from enemy players
     if sourceType == COMBAT_UNIT_TYPE_OTHER then
@@ -1363,11 +1901,19 @@ function BattleScrolls.state:ChangePlayerCombatState(inCombat)
                     event.damageType, event.sourceUnitID, event.targetUnitID,
                     event.abilityID, event.overflow
                 )
+            elseif event.type == "personalShielded" then
+                self:ApplyPersonalDamageShielded(
+                    event.sourceName, event.sourceType,
+                    event.targetName, event.targetType, event.hitValue,
+                    event.sourceUnitID, event.targetUnitID
+                )
             elseif event.type == "group" then
                 self:ApplyGroupDamage(
                     event.result, event.sourceUnitID, event.targetUnitID,
                     event.abilityID, event.hitValue, event.overflow, event.damageType
                 )
+            elseif event.type == "groupShielded" then
+                self:ApplyGroupDamageShielded(event.sourceUnitID, event.targetUnitID, event.hitValue)
             end
         end
 

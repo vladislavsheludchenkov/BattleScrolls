@@ -1,7 +1,7 @@
 ## Title: Battle Scrolls
 ## Author: Semigroup1329
 ## Description: Combat metrics tracking on consoles with native gamepad UI.
-## APIVersion: 101048
+## APIVersion: 101049
 ## AddOnVersion: {{addon_version}}
 ## Version: {{version}}
 ## IsLibrary: False
@@ -38,7 +38,9 @@ combat/effects_events.lua
 combat/effects_reconcile.lua
 combat/deathrecap.lua
 combat/state.lua
+combat/health_recovery.lua
 combat/shields.lua
+combat/trauma.lua
 combat/scribe.lua
 combat/ticker.lua
 combat/setup.lua

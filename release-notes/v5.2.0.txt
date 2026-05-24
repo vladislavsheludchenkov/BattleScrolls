@@ -1,0 +1,14 @@
+New features:
+- Health Recovery is now tracked as healing. It contributes raw healing based on your in-combat Health Recovery stat, and the effective vs overheal split is estimated from actual health movement during the fight. It is considered a separate delivery type
+- Heal Absorption applied to the player is now tracked as damage taken as a separate delivery type
+- Outgoing and incoming shielded damage is now included in total damage / damage taken and derivatives such as DPS/DTPS, but not in ability/type breakdowns
+- Outgoing and incoming absorbed healing is now included in healing out / self-healing / healing in and derivatives such as HPS
+
+Minor changes:
+- Detailed lists always show up to 50 abilities and 20 targets/sources instead of 25/15/10 depending on the context
+
+Bugfixes:
+- Healing Out delivery aggregations now include self-healing consistently with other Healing Out aggregation views
+
+Known issues:
+- Health Recovery raw healing is estimated from elapsed alive time without knowing ESO's hidden tick phase. Effective vs overheal split is best effort and may undercount effective recovery when health recovery is hidden inside a net-negative health change

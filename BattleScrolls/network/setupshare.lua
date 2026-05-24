@@ -7,7 +7,6 @@
 -- with group members using a hash-based caching protocol.
 --
 -- Protocol 432: Setup Request (hash only)
--- Protocol 433: Setup Response (legacy, 4-bit classId/raceId, read-only)
 -- Protocol 434: Setup Response (8-bit classId/raceId, send + read)
 -----------------------------------------------------------
 
@@ -436,7 +435,7 @@ end
 -- ENCOUNTER HASH HANDLER
 -- =============================================================================
 
----Called when an encounter share (protocol 437) includes a setupHash.
+---Called when an encounter share (protocol 437) provides a setupHash.
 ---Requests the full setup if not already cached.
 ---@param displayName string Sender's display name
 ---@param hash number 16-bit setup hash
@@ -569,7 +568,7 @@ local function onSetupRequest(unitTag, data)
     end
 end
 
----Handles incoming setup response (protocol 433)
+---Handles incoming setup response (protocol 434)
 ---@param unitTag string
 ---@param data table
 local function onSetupResponse(unitTag, data)
@@ -835,18 +834,6 @@ function setupShare:Initialize()
                 LGB.CreateNumericField("backPoisonItemId", { minValue = 0, numBits = 18, trimValues = true }),
             })
         ))
-    end
-
-    -- Protocol 433: Legacy Setup Response (read-only, 4-bit classId/raceId)
-    local legacyResponseProtocol = handler:DeclareProtocol(433, "BattleScrolls_SetupResponse")
-    legacyResponseProtocol:AddField(LGB.CreateNumericField("setupHash", { minValue = 0, numBits = 16, trimValues = true }))
-    legacyResponseProtocol:AddField(LGB.CreateNumericField("classId", { minValue = 0, numBits = 4, trimValues = true }))
-    legacyResponseProtocol:AddField(LGB.CreateNumericField("raceId", { minValue = 0, numBits = 4, trimValues = true }))
-    addResponseFields(legacyResponseProtocol)
-    legacyResponseProtocol:OnData(onSetupResponse)
-    if not legacyResponseProtocol:Finalize({ isRelevantInCombat = false, replaceQueuedMessages = false }) then
-        log.Warn("SetupShare: legacy response protocol 433 failed to finalize")
-        return
     end
 
     -- Protocol 434: Setup Response (send + read, 8-bit classId/raceId)

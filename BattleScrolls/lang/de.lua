@@ -253,6 +253,7 @@ local strings = {
     [BATTLESCROLLS_HEADER_BY_ABILITY] = "Nach Fähigkeit",
     [BATTLESCROLLS_HEADER_BY_DAMAGE_TYPE] = "Nach Schadenstyp",
     [BATTLESCROLLS_HEADER_DIRECT_VS_DOT] = "Direkt vs. DoT",
+    [BATTLESCROLLS_HEADER_DAMAGE_DELIVERY] = "Schadensart",
     [BATTLESCROLLS_HEADER_AOE_VS_SINGLE] = "Fläche vs. Einzelziel",
     [BATTLESCROLLS_HEADER_BY_TARGET] = "Nach Ziel",
     [BATTLESCROLLS_HEADER_BY_SOURCE] = "Nach Quelle",
@@ -283,6 +284,10 @@ local strings = {
     [BATTLESCROLLS_STAT_DIRECT_HEALING] = "Direkte Heilung",
     [BATTLESCROLLS_STAT_HEALING_OVER_TIME] = "Heilung über Zeit",
     [BATTLESCROLLS_STAT_SHIELD_HEALING] = "Schadensschilde",
+    [BATTLESCROLLS_STAT_REGEN_HEALING] = "Gesundheitsregeneration",
+    [BATTLESCROLLS_DAMAGE_UNKNOWN_SHIELDED] = "Unbekannt (Abgeschirmt)",
+    [BATTLESCROLLS_HEALING_UNKNOWN_ABSORBED] = "Unbekannt (Absorbiert)",
+    [BATTLESCROLLS_HEALING_HEALTH_RECOVERY] = "Gesundheitsregeneration",
 
     -------------------------
     -- Effects Stats
@@ -362,6 +367,8 @@ local strings = {
     [BATTLESCROLLS_DELIVERY_DIRECT] = "Direkt",
     [BATTLESCROLLS_DELIVERY_HOT] = "HoT",
     [BATTLESCROLLS_DELIVERY_SHIELD] = "Schild",
+    [BATTLESCROLLS_DELIVERY_REGEN] = "Regeneration",
+    [BATTLESCROLLS_DELIVERY_HEAL_ABSORPTION] = "Heilungsabsorption",
 
     -------------------------
     -- Filter Dialog
@@ -870,7 +877,7 @@ local strings = {
     [BATTLESCROLLS_PIVOT_COLUMNS_CAPPED] = "Ergebnisse auf <<1>> Spalten begrenzt",
     [BATTLESCROLLS_PIVOT_TIP_DOMAIN_OVERVIEW] = "Zusammenfassung über alle Schadens-, Heilungs- und Effektdomänen. Zeigt kombinierte Gesamtwerte statt einzelner Aufschlüsselungen.",
     [BATTLESCROLLS_PIVOT_TIP_ENC_BOSS_NAMES] = "Filtert auf Begegnungen mit den ausgewählten Bossen. Bossnamen werden im nächsten Schritt ausgewählt.",
-    [BATTLESCROLLS_PIVOT_TIP_DIM_DELIVERY] = "Teilt Daten nach Wirkungsart auf: Direkt, DoT (Schaden über Zeit), HoT (Heilung über Zeit) oder Gemischt.",
+    [BATTLESCROLLS_PIVOT_TIP_DIM_DELIVERY] = "Teilt Daten nach Wirkungsart auf: Direkt, DoT (Schaden über Zeit), Heilungsabsorption, HoT (Heilung über Zeit), Regeneration, Schild oder Gemischt.",
     [BATTLESCROLLS_PIVOT_TIP_DIM_DAMAGE_TYPE] = "Teilt Daten nach Schadensart auf: Physisch, Feuer, Schock, Frost, Magie, Gift, Seuche, Blutung, Oblivion und andere.",
     [BATTLESCROLLS_PIVOT_TIP_DOMAIN_GROUP] = "Kampfwerte pro Gruppenmitglied wie DPS, Gesamtschaden und Krit-Rate. Für Buff-/Debuff-Wirkzeiten bei Gruppenmitgliedern verwende Gruppeneffekte.",
     [BATTLESCROLLS_PIVOT_TIP_AGGREGATION] = "Wie Werte kombiniert werden, wenn mehrere Begegnungen in dieselbe Zelle einfließen. Zum Beispiel zeigt Durchschnitt-DPS den Mittelwert über Begegnungen, während Max den besten Einzelkampf zeigt.",

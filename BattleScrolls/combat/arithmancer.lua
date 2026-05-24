@@ -29,6 +29,9 @@ local Arithmancer = {}
 
 BattleScrolls.arithmancer = Arithmancer
 
+local DAMAGE_SHIELDED_ABILITY_ID = BattleScrolls.constants.DAMAGE_SHIELDED_ABILITY_ID
+local HEAL_ABSORBED_ABILITY_ID = BattleScrolls.constants.HEAL_ABSORBED_ABILITY_ID
+
 -- =============================================================================
 -- AGGREGATE COMPUTATION HELPERS
 -- =============================================================================
@@ -55,9 +58,18 @@ function Arithmancer.GetAbilityDeliveryType(info)
 end
 
 ---@param info AbilityInfo|nil
----@return "hot"|"direct"|"shield"
-local function getHealingDeliveryKey(info)
+---@return "hot"|"direct"|"shield"|"regen"|"absorbed"
+local function getHealingDeliveryKey(abilityId, info)
+    if abilityId == HEAL_ABSORBED_ABILITY_ID then
+        return "absorbed"
+    end
     local deliveryType = Arithmancer.GetAbilityDeliveryType(info)
+    if deliveryType and deliveryType.healAbsorption then
+        return "absorbed"
+    end
+    if deliveryType and deliveryType.regen then
+        return "regen"
+    end
     if deliveryType and deliveryType.shield then
         return "shield"
     end
@@ -96,22 +108,34 @@ end
 ---Works with both verbose (has .byDotOrDirect) and decoded compact (abilities directly)
 ---@param damageDone DamageDoneStorage
 ---@param abilityInfo table<number, AbilityInfo> Ability metadata for determining DOT/Direct
----@return { dot: number, direct: number } byDotOrDirect
+---@return { dot: number, direct: number, healAbsorption: number, shielded: number, unknown: number } byDotOrDirect
 function Arithmancer.ComputeByDotOrDirect(damageDone, abilityInfo)
     -- Verbose format has .byDotOrDirect pre-computed
     if damageDone.byDotOrDirect then
-        return damageDone.byDotOrDirect
+        local byDotOrDirect = damageDone.byDotOrDirect
+        return {
+            dot = byDotOrDirect.dot or 0,
+            direct = byDotOrDirect.direct or 0,
+            healAbsorption = byDotOrDirect.healAbsorption or 0,
+            shielded = byDotOrDirect.shielded or 0,
+            unknown = byDotOrDirect.unknown or 0,
+        }
     end
     -- Compact format: compute from abilities + abilityInfo
-    local result = { dot = 0, direct = 0 }
+    local result = { dot = 0, direct = 0, healAbsorption = 0, shielded = 0, unknown = 0 }
     for abilityId, breakdown in pairs(getAbilities(damageDone)) do
         local info = abilityInfo[abilityId]
         local deliveryType = Arithmancer.GetAbilityDeliveryType(info)
-        local isDot = deliveryType and deliveryType.overTime
-        if isDot then
+        if abilityId == DAMAGE_SHIELDED_ABILITY_ID then
+            result.shielded = result.shielded + breakdown.total
+        elseif deliveryType and deliveryType.healAbsorption then
+            result.healAbsorption = result.healAbsorption + breakdown.total
+        elseif deliveryType and deliveryType.overTime then
             result.dot = result.dot + breakdown.total
-        else
+        elseif deliveryType and deliveryType.direct then
             result.direct = result.direct + breakdown.total
+        else
+            result.unknown = result.unknown + breakdown.total
         end
     end
     return result
@@ -143,18 +167,20 @@ end
 ---Computes HOT vs Direct breakdown from a HealingDone structure
 ---@param healingDone HealingDone|HealingDoneDiffSource
 ---@param abilityInfo table<number, AbilityInfo> Ability metadata for determining healing delivery
----@return { hot: { raw: number, real: number }, direct: { raw: number, real: number }, shield: { raw: number, real: number } }
+---@return { hot: { raw: number, real: number }, direct: { raw: number, real: number }, shield: { raw: number, real: number }, regen: { raw: number, real: number }, absorbed: { raw: number, real: number } }
 function Arithmancer.ComputeByHotVsDirect(healingDone, abilityInfo)
     local result = {
         hot = { raw = 0, real = 0 },
         direct = { raw = 0, real = 0 },
         shield = { raw = 0, real = 0 },
+        regen = { raw = 0, real = 0 },
+        absorbed = { raw = 0, real = 0 },
     }
     -- Handle HealingDone (has byAbilityId directly)
     if healingDone.byAbilityId then
         for abilityId, breakdown in pairs(healingDone.byAbilityId) do
             local info = abilityInfo[abilityId]
-            local key = getHealingDeliveryKey(info)
+            local key = getHealingDeliveryKey(abilityId, info)
             result[key].raw = result[key].raw + (breakdown.raw or 0)
             result[key].real = result[key].real + (breakdown.real or 0)
         end
@@ -164,7 +190,7 @@ function Arithmancer.ComputeByHotVsDirect(healingDone, abilityInfo)
         for _, byAbility in pairs(healingDone.bySourceUnitIdByAbilityId) do
             for abilityId, breakdown in pairs(byAbility) do
                 local info = abilityInfo[abilityId]
-                local key = getHealingDeliveryKey(info)
+                local key = getHealingDeliveryKey(abilityId, info)
                 result[key].raw = result[key].raw + (breakdown.raw or 0)
                 result[key].real = result[key].real + (breakdown.real or 0)
             end
@@ -284,19 +310,22 @@ end
 ---Computes AOE vs single target breakdown from a damage table
 ---Works with pre-filtered data (use FilterDamageTable first if filtering needed)
 ---@param damageTable table<number, table<number, DamageDoneStorage>>|nil
----@return { aoe: number, singleTarget: number }
+---@return { aoe: number, singleTarget: number, shielded: number }
 function Arithmancer.ComputeAoeVsSingleTarget(damageTable)
     if not damageTable then
-        return { aoe = 0, singleTarget = 0 }
+        return { aoe = 0, singleTarget = 0, shielded = 0 }
     end
     local aoeAbilityIds = BattleScrolls.constants.aoeAbilityIds
     local aoeDamage = 0
     local singleTargetDamage = 0
+    local shieldedDamage = 0
 
     for _, byTarget in pairs(damageTable) do
         for _, damage in pairs(byTarget) do
             for abilityId, abilityStats in pairs(getAbilities(damage)) do
-                if aoeAbilityIds[abilityId] then
+                if abilityId == DAMAGE_SHIELDED_ABILITY_ID then
+                    shieldedDamage = shieldedDamage + abilityStats.total
+                elseif aoeAbilityIds[abilityId] then
                     aoeDamage = aoeDamage + abilityStats.total
                 else
                     singleTargetDamage = singleTargetDamage + abilityStats.total
@@ -305,7 +334,7 @@ function Arithmancer.ComputeAoeVsSingleTarget(damageTable)
         end
     end
 
-    return { aoe = aoeDamage, singleTarget = singleTargetDamage }
+    return { aoe = aoeDamage, singleTarget = singleTargetDamage, shielded = shieldedDamage }
 end
 
 -- =============================================================================
@@ -349,10 +378,10 @@ end
 ---@field personalTotalEffectiveHealingOut number|nil
 ---@field personalRawHPSOut number|nil
 ---@field personalEffectiveHPSOut number|nil
----@field personalAoeVsSingleTarget { aoe: number, singleTarget: number }|nil
----@field personalDotVsDirect { dot: number, direct: number }|nil
+---@field personalAoeVsSingleTarget { aoe: number, singleTarget: number, shielded: number }|nil
+---@field personalDotVsDirect { dot: number, direct: number, healAbsorption: number, shielded: number, unknown: number }|nil
 ---@field personalDamageByType table<DamageType, number>|nil
----@field damageTakenDotVsDirect { dot: number, direct: number }|nil
+---@field damageTakenDotVsDirect { dot: number, direct: number, healAbsorption: number, shielded: number, unknown: number }|nil
 ---@field damageTakenByType table<DamageType, number>|nil
 ---@field damageSummary DamageSummary|nil
 ---@field damageComposition DamageComposition|nil
@@ -748,7 +777,7 @@ end
 -- =============================================================================
 
 ---Returns AOE vs single target breakdown for personal damage (filtered)
----@return { aoe: number, singleTarget: number }
+---@return { aoe: number, singleTarget: number, shielded: number }
 function ArithmancerInstance:personalAoeVsSingleTarget()
     if self._cache.personalAoeVsSingleTarget ~= nil then
         return self._cache.personalAoeVsSingleTarget
@@ -760,7 +789,7 @@ function ArithmancerInstance:personalAoeVsSingleTarget()
 end
 
 ---Returns DOT vs Direct breakdown for personal damage (filtered)
----@return { dot: number, direct: number }
+---@return { dot: number, direct: number, healAbsorption: number, shielded: number, unknown: number }
 function ArithmancerInstance:personalDotVsDirect()
     if self._cache.personalDotVsDirect ~= nil then
         return self._cache.personalDotVsDirect
@@ -768,7 +797,7 @@ function ArithmancerInstance:personalDotVsDirect()
 
     local damageTable = self:filteredDamageTable()
     local abilityInfo = self._abilityInfo
-    local dot, direct = 0, 0
+    local dot, direct, healAbsorption, shielded, unknown = 0, 0, 0, 0, 0
 
     if damageTable then
         for _, byTarget in pairs(damageTable) do
@@ -776,11 +805,14 @@ function ArithmancerInstance:personalDotVsDirect()
                 local breakdown = Arithmancer.ComputeByDotOrDirect(damage, abilityInfo)
                 dot = dot + (breakdown.dot or 0)
                 direct = direct + (breakdown.direct or 0)
+                healAbsorption = healAbsorption + (breakdown.healAbsorption or 0)
+                shielded = shielded + (breakdown.shielded or 0)
+                unknown = unknown + (breakdown.unknown or 0)
             end
         end
     end
 
-    local result = { dot = dot, direct = direct }
+    local result = { dot = dot, direct = direct, healAbsorption = healAbsorption, shielded = shielded, unknown = unknown }
     self._cache.personalDotVsDirect = result
     return result
 end
@@ -812,7 +844,7 @@ function ArithmancerInstance:personalDamageByType()
 end
 
 ---Returns DOT vs Direct breakdown for damage taken (filtered)
----@return { dot: number, direct: number }
+---@return { dot: number, direct: number, healAbsorption: number, shielded: number, unknown: number }
 function ArithmancerInstance:damageTakenDotVsDirect()
     if self._cache.damageTakenDotVsDirect ~= nil then
         return self._cache.damageTakenDotVsDirect
@@ -820,7 +852,7 @@ function ArithmancerInstance:damageTakenDotVsDirect()
 
     local damageTakenTable = self:filteredDamageTakenTable()
     local abilityInfo = self._abilityInfo
-    local dot, direct = 0, 0
+    local dot, direct, healAbsorption, shielded, unknown = 0, 0, 0, 0, 0
 
     if damageTakenTable then
         for _, byTarget in pairs(damageTakenTable) do
@@ -828,11 +860,14 @@ function ArithmancerInstance:damageTakenDotVsDirect()
                 local breakdown = Arithmancer.ComputeByDotOrDirect(damage, abilityInfo)
                 dot = dot + (breakdown.dot or 0)
                 direct = direct + (breakdown.direct or 0)
+                healAbsorption = healAbsorption + (breakdown.healAbsorption or 0)
+                shielded = shielded + (breakdown.shielded or 0)
+                unknown = unknown + (breakdown.unknown or 0)
             end
         end
     end
 
-    local result = { dot = dot, direct = direct }
+    local result = { dot = dot, direct = direct, healAbsorption = healAbsorption, shielded = shielded, unknown = unknown }
     self._cache.damageTakenDotVsDirect = result
     return result
 end
@@ -907,10 +942,11 @@ end
 ---@class DamageComposition
 ---@field dotPercent number|nil DOT damage percentage (nil if no data)
 ---@field directPercent number|nil Direct damage percentage (nil if no data)
+---@field healAbsorptionPercent number|nil Heal absorption percentage (nil if no data)
 ---@field aoePercent number|nil AOE damage percentage (nil if no data)
 ---@field stPercent number|nil Single-target damage percentage (nil if no data)
 
----Returns damage composition data: {dotPercent, directPercent, aoePercent, stPercent}
+---Returns damage composition data: {dotPercent, directPercent, healAbsorptionPercent, aoePercent, stPercent}
 ---@return DamageComposition
 function ArithmancerInstance:getDamageComposition()
     if self._cache.damageComposition then
@@ -921,25 +957,27 @@ function ArithmancerInstance:getDamageComposition()
     local damageTable = self:filteredDamageTable()
 
     if not damageTable then
-        local result = { dotPercent = nil, directPercent = nil, aoePercent = nil, stPercent = nil }
+        local result = { dotPercent = nil, directPercent = nil, healAbsorptionPercent = nil, aoePercent = nil, stPercent = nil }
         self._cache.damageComposition = result
         return result
     end
 
-    -- DOT vs Direct
-    local dot, direct = 0, 0
+    -- Damage delivery
+    local dot, direct, healAbsorption = 0, 0, 0
     for _, byTarget in pairs(damageTable) do
         for _, damage in pairs(byTarget) do
             local breakdown = Arithmancer.ComputeByDotOrDirect(damage, abilityInfo)
             dot = dot + (breakdown.dot or 0)
             direct = direct + (breakdown.direct or 0)
+            healAbsorption = healAbsorption + (breakdown.healAbsorption or 0)
         end
     end
-    local dotTotal = dot + direct
-    local dotPercent, directPercent
-    if dotTotal > 0 then
-        dotPercent = (dot / dotTotal) * 100
-        directPercent = (direct / dotTotal) * 100
+    local deliveryTotal = dot + direct + healAbsorption
+    local dotPercent, directPercent, healAbsorptionPercent
+    if deliveryTotal > 0 then
+        dotPercent = dot > 0 and (dot / deliveryTotal) * 100 or nil
+        directPercent = direct > 0 and (direct / deliveryTotal) * 100 or nil
+        healAbsorptionPercent = healAbsorption > 0 and (healAbsorption / deliveryTotal) * 100 or nil
     end
 
     -- AOE vs Single Target
@@ -951,7 +989,7 @@ function ArithmancerInstance:getDamageComposition()
         stPercent = (aoeVsST.singleTarget / aoeTotal) * 100
     end
 
-    local result = { dotPercent = dotPercent, directPercent = directPercent, aoePercent = aoePercent, stPercent = stPercent }
+    local result = { dotPercent = dotPercent, directPercent = directPercent, healAbsorptionPercent = healAbsorptionPercent, aoePercent = aoePercent, stPercent = stPercent }
     self._cache.damageComposition = result
     return result
 end
@@ -976,11 +1014,13 @@ function ArithmancerInstance:getDamageQuality()
     if damageTable then
         for _, byTarget in pairs(damageTable) do
             for _, damage in pairs(byTarget) do
-                for _, breakdown in pairs(Arithmancer.GetAbilities(damage)) do
-                    totalHits = totalHits + (breakdown.ticks or 0)
-                    critHits = critHits + (breakdown.critTicks or 0)
-                    if breakdown.maxTick and breakdown.maxTick > maxHit then
-                        maxHit = breakdown.maxTick
+                for abilityId, breakdown in pairs(Arithmancer.GetAbilities(damage)) do
+                    if abilityId ~= DAMAGE_SHIELDED_ABILITY_ID then
+                        totalHits = totalHits + (breakdown.ticks or 0)
+                        critHits = critHits + (breakdown.critTicks or 0)
+                        if breakdown.maxTick and breakdown.maxTick > maxHit then
+                            maxHit = breakdown.maxTick
+                        end
                     end
                 end
             end
@@ -1012,7 +1052,7 @@ function ArithmancerInstance:getDamageTakenSummary()
     return result
 end
 
----Returns damage taken composition data: {dotPercent, directPercent, aoePercent, stPercent}
+---Returns damage taken composition data: {dotPercent, directPercent, healAbsorptionPercent, aoePercent, stPercent}
 ---@return DamageComposition
 function ArithmancerInstance:getDamageTakenComposition()
     if self._cache.damageTakenComposition then
@@ -1023,25 +1063,27 @@ function ArithmancerInstance:getDamageTakenComposition()
     local damageTakenTable = self:filteredDamageTakenTable()
 
     if not damageTakenTable then
-        local result = { dotPercent = nil, directPercent = nil, aoePercent = nil, stPercent = nil }
+        local result = { dotPercent = nil, directPercent = nil, healAbsorptionPercent = nil, aoePercent = nil, stPercent = nil }
         self._cache.damageTakenComposition = result
         return result
     end
 
-    -- DOT vs Direct
-    local dot, direct = 0, 0
+    -- Damage delivery
+    local dot, direct, healAbsorption = 0, 0, 0
     for _, byTarget in pairs(damageTakenTable) do
         for _, damage in pairs(byTarget) do
             local breakdown = Arithmancer.ComputeByDotOrDirect(damage, abilityInfo)
             dot = dot + (breakdown.dot or 0)
             direct = direct + (breakdown.direct or 0)
+            healAbsorption = healAbsorption + (breakdown.healAbsorption or 0)
         end
     end
-    local dotTotal = dot + direct
-    local dotPercent, directPercent
-    if dotTotal > 0 then
-        dotPercent = (dot / dotTotal) * 100
-        directPercent = (direct / dotTotal) * 100
+    local deliveryTotal = dot + direct + healAbsorption
+    local dotPercent, directPercent, healAbsorptionPercent
+    if deliveryTotal > 0 then
+        dotPercent = dot > 0 and (dot / deliveryTotal) * 100 or nil
+        directPercent = direct > 0 and (direct / deliveryTotal) * 100 or nil
+        healAbsorptionPercent = healAbsorption > 0 and (healAbsorption / deliveryTotal) * 100 or nil
     end
 
     -- AOE vs Single Target
@@ -1053,7 +1095,7 @@ function ArithmancerInstance:getDamageTakenComposition()
         stPercent = (aoeVsST.singleTarget / aoeTotal) * 100
     end
 
-    local result = { dotPercent = dotPercent, directPercent = directPercent, aoePercent = aoePercent, stPercent = stPercent }
+    local result = { dotPercent = dotPercent, directPercent = directPercent, healAbsorptionPercent = healAbsorptionPercent, aoePercent = aoePercent, stPercent = stPercent }
     self._cache.damageTakenComposition = result
     return result
 end
@@ -1074,11 +1116,13 @@ function ArithmancerInstance:getDamageTakenQuality()
     if damageTakenTable then
         for _, byTarget in pairs(damageTakenTable) do
             for _, damage in pairs(byTarget) do
-                for _, breakdown in pairs(Arithmancer.GetAbilities(damage)) do
-                    totalHits = totalHits + (breakdown.ticks or 0)
-                    critHits = critHits + (breakdown.critTicks or 0)
-                    if breakdown.maxTick and breakdown.maxTick > maxHit then
-                        maxHit = breakdown.maxTick
+                for abilityId, breakdown in pairs(Arithmancer.GetAbilities(damage)) do
+                    if abilityId ~= DAMAGE_SHIELDED_ABILITY_ID then
+                        totalHits = totalHits + (breakdown.ticks or 0)
+                        critHits = critHits + (breakdown.critTicks or 0)
+                        if breakdown.maxTick and breakdown.maxTick > maxHit then
+                            maxHit = breakdown.maxTick
+                        end
                     end
                 end
             end
@@ -1133,7 +1177,8 @@ function ArithmancerInstance:getHealingOutSummary()
 
     local rawHps = durationS > 0 and (rawTotal / durationS) or 0
     local effectiveHps = durationS > 0 and (effectiveTotal / durationS) or 0
-    local overhealPercent = rawTotal > 0 and ((rawTotal - effectiveTotal) / rawTotal * 100) or 0
+    local overhealRaw = math.max(0, rawTotal - effectiveTotal)
+    local overhealPercent = rawTotal > 0 and (overhealRaw / rawTotal * 100) or 0
 
     local result = { rawHps = rawHps, effectiveHps = effectiveHps, total = effectiveTotal, rawTotal = rawTotal, overhealPercent = overhealPercent }
     self._cache.healingOutSummary = result
@@ -1161,7 +1206,8 @@ function ArithmancerInstance:getSelfHealingSummary()
 
     local rawHps = durationS > 0 and (rawTotal / durationS) or 0
     local effectiveHps = durationS > 0 and (effectiveTotal / durationS) or 0
-    local overhealPercent = rawTotal > 0 and ((rawTotal - effectiveTotal) / rawTotal * 100) or 0
+    local overhealRaw = math.max(0, rawTotal - effectiveTotal)
+    local overhealPercent = rawTotal > 0 and (overhealRaw / rawTotal * 100) or 0
 
     local result = { rawHps = rawHps, effectiveHps = effectiveHps, total = effectiveTotal, rawTotal = rawTotal, overhealPercent = overhealPercent }
     self._cache.selfHealingSummary = result
@@ -1195,7 +1241,8 @@ function ArithmancerInstance:getHealingInSummary()
 
     local rawHps = durationS > 0 and (rawTotal / durationS) or 0
     local effectiveHps = durationS > 0 and (effectiveTotal / durationS) or 0
-    local overhealPercent = rawTotal > 0 and ((rawTotal - effectiveTotal) / rawTotal * 100) or 0
+    local overhealRaw = math.max(0, rawTotal - effectiveTotal)
+    local overhealPercent = rawTotal > 0 and (overhealRaw / rawTotal * 100) or 0
 
     local result = { rawHps = rawHps, effectiveHps = effectiveHps, total = effectiveTotal, rawTotal = rawTotal, overhealPercent = overhealPercent }
     self._cache.healingInSummary = result
@@ -1242,7 +1289,7 @@ function ArithmancerInstance:buildSharedEncounterData()
         local abilityInfo = self._abilityInfo
 
         -- Per-boss damage output
-        ---@type table<string, { damage: number, dotDamage: number, aoeDamage: number, magicalDamage: number, ticks: number, critTicks: number }>
+        ---@type table<string, { damage: number, dotDamage: number, deliveryDamage: number, aoeDamage: number, aoeEligibleDamage: number, magicalDamage: number, typedDamage: number, ticks: number, critTicks: number }>
         local bossDamageMap = {}
         local aoeAbilityIds = BattleScrolls.constants.aoeAbilityIds
         local magicalDamageTypes = {
@@ -1258,27 +1305,37 @@ function ArithmancerInstance:buildSharedEncounterData()
                     if key then
                         local entry = bossDamageMap[key]
                         if not entry then
-                            entry = { damage = 0, dotDamage = 0, aoeDamage = 0, magicalDamage = 0, ticks = 0, critTicks = 0 }
+                            entry = { damage = 0, dotDamage = 0, deliveryDamage = 0, aoeDamage = 0, aoeEligibleDamage = 0, magicalDamage = 0, typedDamage = 0, ticks = 0, critTicks = 0 }
                             bossDamageMap[key] = entry
                         end
                         entry.damage = entry.damage + computeTotal(dmg)
                         local dotDirect = computeByDotOrDirect(dmg, abilityInfo)
                         entry.dotDamage = entry.dotDamage + dotDirect.dot
+                        entry.deliveryDamage = entry.deliveryDamage + dotDirect.dot + dotDirect.direct + dotDirect.healAbsorption
                         for abilityId, breakdown in pairs(getAbilities(dmg)) do
-                            entry.ticks = entry.ticks + (breakdown.ticks or 0)
-                            entry.critTicks = entry.critTicks + (breakdown.critTicks or 0)
+                            if abilityId ~= DAMAGE_SHIELDED_ABILITY_ID then
+                                entry.ticks = entry.ticks + (breakdown.ticks or 0)
+                                entry.critTicks = entry.critTicks + (breakdown.critTicks or 0)
+                                entry.aoeEligibleDamage = entry.aoeEligibleDamage + breakdown.total
+                            end
                             -- AoE classification
-                            if aoeAbilityIds[abilityId] then
+                            if abilityId ~= DAMAGE_SHIELDED_ABILITY_ID and aoeAbilityIds[abilityId] then
                                 entry.aoeDamage = entry.aoeDamage + breakdown.total
                             end
                             -- Magical classification (magic/fire/frost/shock)
                             local info = abilityInfo[abilityId]
                             if info and info.damageTypes then
+                                local hasDamageType = false
+                                entry.typedDamage = entry.typedDamage + breakdown.total
                                 for dmgType in pairs(info.damageTypes) do
+                                    hasDamageType = true
                                     if magicalDamageTypes[dmgType] then
                                         entry.magicalDamage = entry.magicalDamage + breakdown.total
                                         break
                                     end
+                                end
+                                if not hasDamageType then
+                                    entry.typedDamage = entry.typedDamage - breakdown.total
                                 end
                             end
                         end
@@ -1297,9 +1354,9 @@ function ArithmancerInstance:buildSharedEncounterData()
                     tagSeq = tonumber(seq) or 0,
                     damage = d,
                     critPercent = bossCritPercent,
-                    dotPercent = d > 0 and (entry.dotDamage / d) or 0,
-                    aoePercent = d > 0 and (entry.aoeDamage / d) or 0,
-                    magicalPercent = d > 0 and (entry.magicalDamage / d) or 0,
+                    dotPercent = entry.deliveryDamage > 0 and (entry.dotDamage / entry.deliveryDamage) or 0,
+                    aoePercent = entry.aoeEligibleDamage > 0 and (entry.aoeDamage / entry.aoeEligibleDamage) or 0,
+                    magicalPercent = entry.typedDamage > 0 and (entry.magicalDamage / entry.typedDamage) or 0,
                 })
             end
         end
@@ -1337,10 +1394,14 @@ function ArithmancerInstance:buildSharedEncounterData()
         -- Aggregate damage by ability ID across all sources and targets
         ---@type table<number, number>
         local abilityDamageMap = {}
+        local eligibleDamageTaken = 0
         for _, byTarget in pairs(source.damageTakenByUnitId) do
             for _, dmg in pairs(byTarget) do
                 for abilityId, breakdown in pairs(getAbilities(dmg)) do
-                    abilityDamageMap[abilityId] = (abilityDamageMap[abilityId] or 0) + breakdown.total
+                    if abilityId ~= DAMAGE_SHIELDED_ABILITY_ID then
+                        abilityDamageMap[abilityId] = (abilityDamageMap[abilityId] or 0) + breakdown.total
+                        eligibleDamageTaken = eligibleDamageTaken + breakdown.total
+                    end
                 end
             end
         end
@@ -1353,11 +1414,13 @@ function ArithmancerInstance:buildSharedEncounterData()
         end
         table.sort(sorted, function(a, b) return a.damage > b.damage end)
 
-        for i = 1, math.min(#sorted, 5) do
-            table.insert(topDamageTakenAbilities, {
-                abilityId = sorted[i].abilityId,
-                damagePercent = sorted[i].damage / totalDamageTaken,
-            })
+        if eligibleDamageTaken > 0 then
+            for i = 1, math.min(#sorted, 5) do
+                table.insert(topDamageTakenAbilities, {
+                    abilityId = sorted[i].abilityId,
+                    damagePercent = sorted[i].damage / eligibleDamageTaken,
+                })
+            end
         end
     end
 
@@ -1398,8 +1461,8 @@ function ArithmancerInstance:buildSharedEncounterData()
         durationMs = source.durationMs or 0,
         totalDamage = totalDamage,
         critPercent = critPercent,
-        dotPercent = totalDamage > 0 and (dotVsDirect.dot / totalDamage) or 0,
-        aoePercent = totalDamage > 0 and (aoeVsSt.aoe / totalDamage) or 0,
+        dotPercent = (dotVsDirect.dot + dotVsDirect.direct + dotVsDirect.healAbsorption) > 0 and (dotVsDirect.dot / (dotVsDirect.dot + dotVsDirect.direct + dotVsDirect.healAbsorption)) or 0,
+        aoePercent = (aoeVsSt.aoe + aoeVsSt.singleTarget) > 0 and (aoeVsSt.aoe / (aoeVsSt.aoe + aoeVsSt.singleTarget)) or 0,
         maxHit = qualityData.maxHit,
         damageByType = damageByType,
         bossDamage = bossDamage,
@@ -1438,11 +1501,13 @@ function ArithmancerInstance:getHealingOutQuality()
             for _, targetData in pairs(filteredHealingOut) do
                 if targetData.bySourceUnitIdByAbilityId then
                     for _, byAbility in pairs(targetData.bySourceUnitIdByAbilityId) do
-                        for _, breakdown in pairs(byAbility) do
-                            totalTicks = totalTicks + (breakdown.ticks or 0)
-                            totalCritTicks = totalCritTicks + (breakdown.critTicks or 0)
-                            if breakdown.maxTick and breakdown.maxTick > maxHeal then
-                                maxHeal = breakdown.maxTick
+                        for abilityId, breakdown in pairs(byAbility) do
+                            if abilityId ~= HEAL_ABSORBED_ABILITY_ID then
+                                totalTicks = totalTicks + (breakdown.ticks or 0)
+                                totalCritTicks = totalCritTicks + (breakdown.critTicks or 0)
+                                if breakdown.maxTick and breakdown.maxTick > maxHeal then
+                                    maxHeal = breakdown.maxTick
+                                end
                             end
                         end
                     end
@@ -1454,11 +1519,13 @@ function ArithmancerInstance:getHealingOutQuality()
         local includeSelf = not self._targetFilter or self._targetFilter[-1]
         if includeSelf and healingStats.selfHealing and healingStats.selfHealing.bySourceUnitIdByAbilityId then
             for _, byAbility in pairs(healingStats.selfHealing.bySourceUnitIdByAbilityId) do
-                for _, breakdown in pairs(byAbility) do
-                    totalTicks = totalTicks + (breakdown.ticks or 0)
-                    totalCritTicks = totalCritTicks + (breakdown.critTicks or 0)
-                    if breakdown.maxTick and breakdown.maxTick > maxHeal then
-                        maxHeal = breakdown.maxTick
+                for abilityId, breakdown in pairs(byAbility) do
+                    if abilityId ~= HEAL_ABSORBED_ABILITY_ID then
+                        totalTicks = totalTicks + (breakdown.ticks or 0)
+                        totalCritTicks = totalCritTicks + (breakdown.critTicks or 0)
+                        if breakdown.maxTick and breakdown.maxTick > maxHeal then
+                            maxHeal = breakdown.maxTick
+                        end
                     end
                 end
             end
@@ -1489,11 +1556,13 @@ function ArithmancerInstance:getSelfHealingQuality()
 
     local totalTicks, totalCritTicks, maxHeal = 0, 0, 0
     for _, byAbility in pairs(healingStats.selfHealing.bySourceUnitIdByAbilityId) do
-        for _, breakdown in pairs(byAbility) do
-            totalTicks = totalTicks + (breakdown.ticks or 0)
-            totalCritTicks = totalCritTicks + (breakdown.critTicks or 0)
-            if breakdown.maxTick and breakdown.maxTick > maxHeal then
-                maxHeal = breakdown.maxTick
+        for abilityId, breakdown in pairs(byAbility) do
+            if abilityId ~= HEAL_ABSORBED_ABILITY_ID then
+                totalTicks = totalTicks + (breakdown.ticks or 0)
+                totalCritTicks = totalCritTicks + (breakdown.critTicks or 0)
+                if breakdown.maxTick and breakdown.maxTick > maxHeal then
+                    maxHeal = breakdown.maxTick
+                end
             end
         end
     end
@@ -1521,11 +1590,13 @@ function ArithmancerInstance:getHealingInQuality()
         if filteredHealingIn then
             for _, sourceData in pairs(filteredHealingIn) do
                 if sourceData.byAbilityId then
-                    for _, breakdown in pairs(sourceData.byAbilityId) do
-                        totalTicks = totalTicks + (breakdown.ticks or 0)
-                        totalCritTicks = totalCritTicks + (breakdown.critTicks or 0)
-                        if breakdown.maxTick and breakdown.maxTick > maxHeal then
-                            maxHeal = breakdown.maxTick
+                    for abilityId, breakdown in pairs(sourceData.byAbilityId) do
+                        if abilityId ~= HEAL_ABSORBED_ABILITY_ID then
+                            totalTicks = totalTicks + (breakdown.ticks or 0)
+                            totalCritTicks = totalCritTicks + (breakdown.critTicks or 0)
+                            if breakdown.maxTick and breakdown.maxTick > maxHeal then
+                                maxHeal = breakdown.maxTick
+                            end
                         end
                     end
                 end
@@ -1535,11 +1606,13 @@ function ArithmancerInstance:getHealingInQuality()
         -- Include self-healing if no sourceFilter is active
         if not self._sourceFilter and healingStats.selfHealing and healingStats.selfHealing.bySourceUnitIdByAbilityId then
             for _, byAbility in pairs(healingStats.selfHealing.bySourceUnitIdByAbilityId) do
-                for _, breakdown in pairs(byAbility) do
-                    totalTicks = totalTicks + (breakdown.ticks or 0)
-                    totalCritTicks = totalCritTicks + (breakdown.critTicks or 0)
-                    if breakdown.maxTick and breakdown.maxTick > maxHeal then
-                        maxHeal = breakdown.maxTick
+                for abilityId, breakdown in pairs(byAbility) do
+                    if abilityId ~= HEAL_ABSORBED_ABILITY_ID then
+                        totalTicks = totalTicks + (breakdown.ticks or 0)
+                        totalCritTicks = totalCritTicks + (breakdown.critTicks or 0)
+                        if breakdown.maxTick and breakdown.maxTick > maxHeal then
+                            maxHeal = breakdown.maxTick
+                        end
                     end
                 end
             end

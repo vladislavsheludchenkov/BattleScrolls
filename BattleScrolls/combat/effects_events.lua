@@ -69,6 +69,13 @@ local function onPlayerEffect(eventCode, changeType, effectSlot, effectName, uni
             statusEffectType, unitName, unitId, abilityId, sourceType)
     end
 
+    local traumaTracker = BattleScrolls.trauma
+    if traumaTracker and traumaTracker.OnEffectChanged then
+        traumaTracker:OnEffectChanged(eventCode, changeType, effectSlot, effectName, unitTag, beginTime, endTime,
+            stackCount, iconName, deprecatedBuffType, effectType, abilityType,
+            statusEffectType, unitName, unitId, abilityId, sourceType)
+    end
+
     if trackPlayerEffectsThisCombat then
         effects.handlePlayerEffect(s, changeType, effectSlot, effectType, stackCount, abilityId, sourceType, beginTime)
     end

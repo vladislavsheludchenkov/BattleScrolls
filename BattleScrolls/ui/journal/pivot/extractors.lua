@@ -85,8 +85,7 @@ end
 ---@param abilityId number
 ---@return string
 local function keyByAbilityName(_sourceId, _targetId, abilityId)
-    local name = GetAbilityName(abilityId, "")
-    return name ~= "" and name or tostring(abilityId)
+    return utils.getAbilityDisplayName(abilityId)
 end
 
 ---@param healingByUnit table|nil Nested unit->HealingDone or HealingDoneDiffSource
@@ -99,8 +98,7 @@ local function extractAbilitiesFromHealing(healingByUnit)
             -- HealingDoneDiffSource: iterate source->ability
             for _, byAbility in pairs(healData.bySourceUnitIdByAbilityId) do
                 for abilityId, breakdown in pairs(byAbility) do
-                    local name = GetAbilityName(abilityId, "")
-                    if name == "" then name = tostring(abilityId) end
+                    local name = utils.getAbilityDisplayName(abilityId)
                     if not byName[name] then byName[name] = {} end
                     table.insert(byName[name], breakdown)
                 end
@@ -108,8 +106,7 @@ local function extractAbilitiesFromHealing(healingByUnit)
         elseif healData.byAbilityId then
             -- HealingDone
             for abilityId, breakdown in pairs(healData.byAbilityId) do
-                local name = GetAbilityName(abilityId, "")
-                if name == "" then name = tostring(abilityId) end
+                local name = utils.getAbilityDisplayName(abilityId)
                 if not byName[name] then byName[name] = {} end
                 table.insert(byName[name], breakdown)
             end
@@ -337,12 +334,18 @@ extractors.dimensions[pivot.Dimension.DAMAGE_TYPE] = {
             for _, damageData in pairs(byTarget) do
                 local abilities = Arithmancer.GetAbilities(damageData)
                 for abilityId, bd in pairs(abilities) do
-                    local info = abilityInfo[abilityId]
-                    if info and info.damageTypes then
-                        for damageType in pairs(info.damageTypes) do
-                            local typeName = (journal.DamageTypeNames and journal.DamageTypeNames[damageType]) or tostring(damageType)
-                            if not byType[typeName] then byType[typeName] = {} end
-                            table.insert(byType[typeName], bd)
+                    if abilityId == constants.DAMAGE_SHIELDED_ABILITY_ID then
+                        local typeName = GetString(BATTLESCROLLS_DAMAGE_UNKNOWN_SHIELDED)
+                        if not byType[typeName] then byType[typeName] = {} end
+                        table.insert(byType[typeName], bd)
+                    else
+                        local info = abilityInfo[abilityId]
+                        if info and info.damageTypes then
+                            for damageType in pairs(info.damageTypes) do
+                                local typeName = (journal.DamageTypeNames and journal.DamageTypeNames[damageType]) or tostring(damageType)
+                                if not byType[typeName] then byType[typeName] = {} end
+                                table.insert(byType[typeName], bd)
+                            end
                         end
                     end
                 end
@@ -355,18 +358,42 @@ extractors.dimensions[pivot.Dimension.DAMAGE_TYPE] = {
 extractors.dimensions[pivot.Dimension.DELIVERY] = {
     id = pivot.Dimension.DELIVERY,
     displayName = "BATTLESCROLLS_PIVOT_DIM_DELIVERY",
-    domains = { [pivot.Domain.DAMAGE] = true, [pivot.Domain.HEALING_OUT] = true },
+    domains = {
+        [pivot.Domain.DAMAGE] = true,
+        [pivot.Domain.DAMAGE_IN] = true,
+        [pivot.Domain.HEALING_OUT] = true,
+        [pivot.Domain.HEALING_IN] = true,
+    },
     extract = function(decoded, abilityInfo, domain, _unitNames)
-        if domain == pivot.Domain.HEALING_OUT then
+        if domain == pivot.Domain.HEALING_OUT or domain == pivot.Domain.HEALING_IN then
             -- HoT vs Direct healing using Arithmancer
-            local healingOut = decoded.healingStats and decoded.healingStats.healingOutToGroup
-            if not healingOut then return {} end
-            local hotRaw, directRaw, shieldRaw = 0, 0, 0
-            for _, healData in pairs(healingOut) do
+            local healingStats = decoded.healingStats
+            local healingMain = nil
+            if healingStats then
+                if domain == pivot.Domain.HEALING_OUT then
+                    healingMain = healingStats.healingOutToGroup
+                else
+                    healingMain = healingStats.healingInFromGroup
+                end
+            end
+            local selfHealing = healingStats and healingStats.selfHealing
+            if not healingMain and not selfHealing then return {} end
+            local hotRaw, directRaw, shieldRaw, regenRaw, absorbedRaw = 0, 0, 0, 0, 0
+            for _, healData in pairs(healingMain or {}) do
                 local result = Arithmancer.ComputeByHotVsDirect(healData, abilityInfo)
                 hotRaw = hotRaw + (result.hot and result.hot.raw or 0)
                 directRaw = directRaw + (result.direct and result.direct.raw or 0)
                 shieldRaw = shieldRaw + (result.shield and result.shield.raw or 0)
+                regenRaw = regenRaw + (result.regen and result.regen.raw or 0)
+                absorbedRaw = absorbedRaw + (result.absorbed and result.absorbed.raw or 0)
+            end
+            if selfHealing then
+                local result = Arithmancer.ComputeByHotVsDirect(selfHealing, abilityInfo)
+                hotRaw = hotRaw + (result.hot and result.hot.raw or 0)
+                directRaw = directRaw + (result.direct and result.direct.raw or 0)
+                shieldRaw = shieldRaw + (result.shield and result.shield.raw or 0)
+                regenRaw = regenRaw + (result.regen and result.regen.raw or 0)
+                absorbedRaw = absorbedRaw + (result.absorbed and result.absorbed.raw or 0)
             end
             local byDelivery = {}
             if hotRaw > 0 then
@@ -378,14 +405,32 @@ extractors.dimensions[pivot.Dimension.DELIVERY] = {
             if shieldRaw > 0 then
                 byDelivery[GetString(BATTLESCROLLS_DELIVERY_SHIELD)] = {{ raw = shieldRaw, real = shieldRaw, overheal = 0, ticks = 0, critTicks = 0, minTick = 0, maxTick = 0 }}
             end
+            if regenRaw > 0 then
+                byDelivery[GetString(BATTLESCROLLS_DELIVERY_REGEN)] = {{ raw = regenRaw, real = regenRaw, overheal = 0, ticks = 0, critTicks = 0, minTick = 0, maxTick = 0 }}
+            end
+            if absorbedRaw > 0 then
+                byDelivery[GetString(BATTLESCROLLS_HEALING_UNKNOWN_ABSORBED)] = {{ raw = absorbedRaw, real = absorbedRaw, overheal = 0, ticks = 0, critTicks = 0, minTick = 0, maxTick = 0 }}
+            end
             return byDelivery
         end
         -- Damage
-        return groupDamageBreakdowns(decoded.damageByUnitId, function(_, _, abilityId)
+        local damageTable = domain == pivot.Domain.DAMAGE_IN and decoded.damageTakenByUnitId or decoded.damageByUnitId
+        return groupDamageBreakdowns(damageTable, function(_, _, abilityId)
+            if abilityId == constants.DAMAGE_SHIELDED_ABILITY_ID then
+                return GetString(BATTLESCROLLS_DAMAGE_UNKNOWN_SHIELDED)
+            end
             local info = abilityInfo[abilityId]
             local deliveryType = Arithmancer.GetAbilityDeliveryType(info)
-            local isDot = deliveryType and deliveryType.overTime
-            return isDot and GetString(BATTLESCROLLS_DELIVERY_DOT) or GetString(BATTLESCROLLS_DELIVERY_DIRECT)
+            if deliveryType and deliveryType.healAbsorption then
+                return GetString(BATTLESCROLLS_DELIVERY_HEAL_ABSORPTION)
+            end
+            if deliveryType and deliveryType.overTime then
+                return GetString(BATTLESCROLLS_DELIVERY_DOT)
+            end
+            if deliveryType and deliveryType.direct then
+                return GetString(BATTLESCROLLS_DELIVERY_DIRECT)
+            end
+            return nil
         end)
     end,
 }
@@ -393,10 +438,14 @@ extractors.dimensions[pivot.Dimension.DELIVERY] = {
 extractors.dimensions[pivot.Dimension.AOE_ST] = {
     id = pivot.Dimension.AOE_ST,
     displayName = "BATTLESCROLLS_PIVOT_DIM_AOE_ST",
-    domains = { [pivot.Domain.DAMAGE] = true },
-    extract = function(decoded, _abilityInfo, _domain, _unitNames)
+    domains = { [pivot.Domain.DAMAGE] = true, [pivot.Domain.DAMAGE_IN] = true },
+    extract = function(decoded, _abilityInfo, domain, _unitNames)
         local aoeAbilityIds = constants.aoeAbilityIds
-        return groupDamageBreakdowns(decoded.damageByUnitId, function(_, _, abilityId)
+        local damageTable = domain == pivot.Domain.DAMAGE_IN and decoded.damageTakenByUnitId or decoded.damageByUnitId
+        return groupDamageBreakdowns(damageTable, function(_, _, abilityId)
+            if abilityId == constants.DAMAGE_SHIELDED_ABILITY_ID then
+                return GetString(BATTLESCROLLS_DAMAGE_UNKNOWN_SHIELDED)
+            end
             return aoeAbilityIds[abilityId] and GetString(BATTLESCROLLS_AOE) or GetString(BATTLESCROLLS_SINGLE_TARGET)
         end)
     end,

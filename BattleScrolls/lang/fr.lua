@@ -253,6 +253,7 @@ local strings = {
     [BATTLESCROLLS_HEADER_BY_ABILITY] = "Par compétence",
     [BATTLESCROLLS_HEADER_BY_DAMAGE_TYPE] = "Par type de dégâts",
     [BATTLESCROLLS_HEADER_DIRECT_VS_DOT] = "Direct vs DoT",
+    [BATTLESCROLLS_HEADER_DAMAGE_DELIVERY] = "Mode de dégâts",
     [BATTLESCROLLS_HEADER_AOE_VS_SINGLE] = "Zone vs Cible unique",
     [BATTLESCROLLS_HEADER_BY_TARGET] = "Par cible",
     [BATTLESCROLLS_HEADER_BY_SOURCE] = "Par source",
@@ -283,6 +284,10 @@ local strings = {
     [BATTLESCROLLS_STAT_DIRECT_HEALING] = "Soins directs",
     [BATTLESCROLLS_STAT_HEALING_OVER_TIME] = "Soins persistants",
     [BATTLESCROLLS_STAT_SHIELD_HEALING] = "Boucliers",
+    [BATTLESCROLLS_STAT_REGEN_HEALING] = "Récupération de santé",
+    [BATTLESCROLLS_DAMAGE_UNKNOWN_SHIELDED] = "Inconnu (Protégé)",
+    [BATTLESCROLLS_HEALING_UNKNOWN_ABSORBED] = "Inconnu (Absorbé)",
+    [BATTLESCROLLS_HEALING_HEALTH_RECOVERY] = "Récupération de santé",
 
     -------------------------
     -- Effects Stats
@@ -362,6 +367,8 @@ local strings = {
     [BATTLESCROLLS_DELIVERY_DIRECT] = "Direct",
     [BATTLESCROLLS_DELIVERY_HOT] = "HoT",
     [BATTLESCROLLS_DELIVERY_SHIELD] = "Bouclier",
+    [BATTLESCROLLS_DELIVERY_REGEN] = "Régénération",
+    [BATTLESCROLLS_DELIVERY_HEAL_ABSORPTION] = "Absorption de soins",
 
     -------------------------
     -- Filter Dialog
@@ -870,7 +877,7 @@ local strings = {
     [BATTLESCROLLS_PIVOT_COLUMNS_CAPPED] = "Résultats limités à <<1>> colonnes",
     [BATTLESCROLLS_PIVOT_TIP_DOMAIN_OVERVIEW] = "Résumé agrégé de tous les domaines de dégâts, soins et effets. Affiche les totaux combinés plutôt que les détails individuels.",
     [BATTLESCROLLS_PIVOT_TIP_ENC_BOSS_NAMES] = "Filtre les combats avec les boss sélectionnés. Choisissez les noms de boss à l'étape suivante.",
-    [BATTLESCROLLS_PIVOT_TIP_DIM_DELIVERY] = "Sépare les données par méthode : Direct, DoT (dégâts sur la durée), HoT (soins sur la durée) ou Mixte.",
+    [BATTLESCROLLS_PIVOT_TIP_DIM_DELIVERY] = "Sépare les données par méthode : Direct, DoT (dégâts sur la durée), Absorption de soins, HoT (soins sur la durée), Régénération, Bouclier ou Mixte.",
     [BATTLESCROLLS_PIVOT_TIP_DIM_DAMAGE_TYPE] = "Sépare les données par type de dégâts : Physique, Feu, Choc, Givre, Magie, Poison, Maladie, Saignement, Oblivion et autres.",
     [BATTLESCROLLS_PIVOT_TIP_DOMAIN_GROUP] = "Statistiques de combat par membre : DPS, dégâts totaux et taux de critique. Pour les durées de buffs/debuffs sur les membres, utilisez Effets de groupe.",
     [BATTLESCROLLS_PIVOT_TIP_AGGREGATION] = "Comment les valeurs sont combinées quand plusieurs combats contribuent à la même cellule. Par exemple, DPS moyen affiche la moyenne entre les combats, tandis que Max affiche le meilleur combat.",

@@ -32,7 +32,8 @@ end
 ---@param lines string[] Lines array to append to
 ---@param stats CritStats|nil Tick statistics
 ---@param indent string|nil Indentation prefix
-function tooltips.appendTickStats(lines, stats, indent)
+---@param abilityId number|nil Ability ID for ability-specific display rules
+function tooltips.appendTickStats(lines, stats, indent, abilityId)
     if not stats or stats.ticks == 0 then
         return
     end
@@ -45,6 +46,9 @@ function tooltips.appendTickStats(lines, stats, indent)
         tickTotal = stats.raw
     end
     local avgTick = math.floor(tickTotal / stats.ticks)
+    if abilityId == BattleScrolls.constants.HEALTH_RECOVERY_ABILITY_ID and stats.minTick and stats.maxTick then
+        avgTick = zo_clamp(avgTick, stats.minTick, stats.maxTick)
+    end
     table.insert(lines, string.format("%s%s: %.1f%% (%d/%d)", indent, GetString(BATTLESCROLLS_TOOLTIP_CRIT), critPercent, stats.critTicks, stats.ticks))
     table.insert(lines, string.format("%s%s: %s", indent, GetString(BATTLESCROLLS_TOOLTIP_AVG_TICK), ZO_CommaDelimitNumber(avgTick)))
     table.insert(lines, string.format("%s%s: %s", indent, GetString(BATTLESCROLLS_TOOLTIP_MIN_TICK), ZO_CommaDelimitNumber(stats.minTick)))

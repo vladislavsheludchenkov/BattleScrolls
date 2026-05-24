@@ -153,6 +153,8 @@ local function buildWeavingAbilityTooltipText(entry, totalActivations)
         lines[#lines + 1] = string.format("%s: %d", GetString(BATTLESCROLLS_STAT_MISSED_LA), entry.weavingErrors)
     end
 
+    table.insert(lines, "")
+
     utils.appendAbilityIdLine(lines, entry.abilityId)
 
     return table.concat(lines, "\n")
@@ -200,6 +202,8 @@ local function buildProcTooltipText(procData, unitNames)
             lines[#lines + 1] = string.format("  %s: %d (%.1f%%)", enemyName, enemyData.procCount, percent)
         end
     end
+
+    table.insert(lines, "")
 
     utils.appendAbilityIdLine(lines, procData.abilityId)
 

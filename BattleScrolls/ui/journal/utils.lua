@@ -182,12 +182,25 @@ local abilityIconAbilityIdOverrides = {
     [22225] = 22223, -- Rite of Passage heal -> Rite of Passage ultimate skill
     [22228] = 22226, -- Practiced Incantation heal -> Practiced Incantation ultimate skill
     [22231] = 22229, -- Remembrance heal -> Remembrance ultimate skill
+    [39267] = 39266, -- Soul Shatter Rank 1 damage -> Soul Shatter Rank 1 passive
+    [45584] = 45583, -- Soul Shatter Rank 2 damage -> Soul Shatter Rank 2 passive
+    [107055] = 61919, -- Merciless Resolve heal -> Merciless Resolve active ability
+    -- TODO: Grim Focus and Relentless Focus icons
 }
 
 ---Gets a UI icon for an ability, applying display-only ability-id remaps.
 ---@param abilityId number
 ---@return string
 function utils.getAbilityIcon(abilityId)
+    if abilityId == BattleScrolls.constants.DAMAGE_SHIELDED_ABILITY_ID then
+        return BattleScrolls.constants.DAMAGE_SHIELDED_ICON
+    end
+    if abilityId == BattleScrolls.constants.HEAL_ABSORBED_ABILITY_ID then
+        return BattleScrolls.constants.HEAL_ABSORBED_ICON
+    end
+    if abilityId == BattleScrolls.constants.HEALTH_RECOVERY_ABILITY_ID then
+        return BattleScrolls.constants.HEALTH_RECOVERY_ICON
+    end
     return GetAbilityIcon(abilityIconAbilityIdOverrides[abilityId] or abilityId)
 end
 
@@ -242,11 +255,26 @@ end
 ---@param abilityId number
 ---@return string
 function utils.getAbilityDisplayName(abilityId)
+    if abilityId == BattleScrolls.constants.DAMAGE_SHIELDED_ABILITY_ID then
+        return GetString(BATTLESCROLLS_DAMAGE_UNKNOWN_SHIELDED)
+    end
+    if abilityId == BattleScrolls.constants.HEAL_ABSORBED_ABILITY_ID then
+        return GetString(BATTLESCROLLS_HEALING_UNKNOWN_ABSORBED)
+    end
+    if abilityId == BattleScrolls.constants.HEALTH_RECOVERY_ABILITY_ID then
+        return GetString(BATTLESCROLLS_HEALING_HEALTH_RECOVERY)
+    end
     local abilityName = BattleScrolls.utils.GetScribeAwareAbilityDisplayName(abilityId)
     if abilityName == "" then
         return string.format("%s %d", GetString(BATTLESCROLLS_TOOLTIP_ABILITY), abilityId)
     end
     return abilityName
+end
+
+function utils.isSyntheticAbilityId(abilityId)
+    return abilityId == BattleScrolls.constants.DAMAGE_SHIELDED_ABILITY_ID
+        or abilityId == BattleScrolls.constants.HEAL_ABSORBED_ABILITY_ID
+        or abilityId == BattleScrolls.constants.HEALTH_RECOVERY_ABILITY_ID
 end
 
 ---Formats an ability ID line for ability-specific tooltip bodies.
@@ -259,14 +287,15 @@ end
 ---Appends a separated ability ID line to an ability-specific tooltip lines table.
 ---@param lines string[]
 ---@param abilityId number|nil
-function utils.appendAbilityIdLine(lines, abilityId)
-    if not abilityId or abilityId <= 0 then
+function utils.appendAbilityIdLine(lines, abilityId, prefix)
+    if not abilityId or abilityId <= 0 or utils.isSyntheticAbilityId(abilityId) then
         return
     end
-    if #lines > 0 then
-        lines[#lines + 1] = ""
+    if prefix then
+        lines[#lines + 1] = prefix .. utils.formatAbilityIdLine(abilityId)
+    else
+        lines[#lines + 1] = utils.formatAbilityIdLine(abilityId)
     end
-    lines[#lines + 1] = utils.formatAbilityIdLine(abilityId)
 end
 
 ---Returns body text with an appended ability ID line.
@@ -278,6 +307,9 @@ function utils.textWithAbilityId(text, abilityId)
     if text and text ~= "" then
         lines[#lines + 1] = text
     end
+
+    table.insert(lines, "")
+
     utils.appendAbilityIdLine(lines, abilityId)
     return table.concat(lines, "\n")
 end
@@ -292,13 +324,15 @@ end
 ---highest-total variant within each name group.
 ---@param abilityStats table<number, CritStats|number> Ability ID -> stats (table) or total (number)
 ---@param maxCount number|nil Maximum entries to return (nil = all)
----@return { abilityId: number, name: string, total: number, ticks: number, critTicks: number, maxHit: number }[]
-function utils.mergeAbilitiesByName(abilityStats, maxCount)
+---@param isSupplementalAbilityId fun(abilityId: number): boolean|nil Optional predicate for rows that should sort last and hide share percentages
+---@return { abilityId: number, name: string, total: number, ticks: number, critTicks: number, maxHit: number, isSupplemental: boolean|nil }[]
+function utils.mergeAbilitiesByName(abilityStats, maxCount, isSupplementalAbilityId)
     local nameGroups = {}
     local nameOrder = {}
 
     for abilityId, stats in pairs(abilityStats) do
         local abilityName = utils.getAbilityDisplayName(abilityId)
+        local isSupplemental = isSupplementalAbilityId and isSupplementalAbilityId(abilityId) or false
 
         if not nameGroups[abilityName] then
             nameGroups[abilityName] = {
@@ -308,11 +342,13 @@ function utils.mergeAbilitiesByName(abilityStats, maxCount)
                 ticks = 0,
                 critTicks = 0,
                 maxHit = 0,
+                isSupplemental = isSupplemental,
             }
             table.insert(nameOrder, abilityName)
         end
 
         local group = nameGroups[abilityName]
+        group.isSupplemental = group.isSupplemental and isSupplemental
         local isTable = type(stats) == "table"
         local total = isTable and stats.total or stats
         group.total = group.total + total
@@ -336,7 +372,12 @@ function utils.mergeAbilitiesByName(abilityStats, maxCount)
     for _, name in ipairs(nameOrder) do
         table.insert(abilities, nameGroups[name])
     end
-    table.sort(abilities, function(a, b) return a.total > b.total end)
+    table.sort(abilities, function(a, b)
+        if a.isSupplemental ~= b.isSupplemental then
+            return not a.isSupplemental
+        end
+        return a.total > b.total
+    end)
 
     -- Return top N if maxCount specified
     if maxCount and maxCount < #abilities then

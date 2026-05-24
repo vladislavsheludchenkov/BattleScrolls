@@ -296,6 +296,7 @@ ZO_CreateStringId("BATTLESCROLLS_STAT_DPS", "DPS")
 ZO_CreateStringId("BATTLESCROLLS_HEADER_BY_ABILITY", "By Ability")
 ZO_CreateStringId("BATTLESCROLLS_HEADER_BY_DAMAGE_TYPE", "By Damage Type")
 ZO_CreateStringId("BATTLESCROLLS_HEADER_DIRECT_VS_DOT", "Direct vs DoT")
+ZO_CreateStringId("BATTLESCROLLS_HEADER_DAMAGE_DELIVERY", "Damage Delivery")
 ZO_CreateStringId("BATTLESCROLLS_HEADER_AOE_VS_SINGLE", "AoE vs Single Target")
 ZO_CreateStringId("BATTLESCROLLS_HEADER_BY_TARGET", "By Target")
 ZO_CreateStringId("BATTLESCROLLS_HEADER_BY_SOURCE", "By Source")
@@ -326,6 +327,10 @@ ZO_CreateStringId("BATTLESCROLLS_HEADER_EFFECTIVE_HEALING_BY_SOURCE", "Effective
 ZO_CreateStringId("BATTLESCROLLS_STAT_DIRECT_HEALING", "Direct Healing")
 ZO_CreateStringId("BATTLESCROLLS_STAT_HEALING_OVER_TIME", "Healing over Time")
 ZO_CreateStringId("BATTLESCROLLS_STAT_SHIELD_HEALING", "Damage Shields")
+ZO_CreateStringId("BATTLESCROLLS_STAT_REGEN_HEALING", "Health Recovery")
+ZO_CreateStringId("BATTLESCROLLS_DAMAGE_UNKNOWN_SHIELDED", "Unknown (Shielded)")
+ZO_CreateStringId("BATTLESCROLLS_HEALING_UNKNOWN_ABSORBED", "Unknown (Absorbed)")
+ZO_CreateStringId("BATTLESCROLLS_HEALING_HEALTH_RECOVERY", "Health Recovery")
 
 -------------------------
 -- Effects Stats
@@ -405,6 +410,8 @@ ZO_CreateStringId("BATTLESCROLLS_DELIVERY_DOT", "DoT")
 ZO_CreateStringId("BATTLESCROLLS_DELIVERY_DIRECT", "Direct")
 ZO_CreateStringId("BATTLESCROLLS_DELIVERY_HOT", "HoT")
 ZO_CreateStringId("BATTLESCROLLS_DELIVERY_SHIELD", "Shield")
+ZO_CreateStringId("BATTLESCROLLS_DELIVERY_REGEN", "Regen")
+ZO_CreateStringId("BATTLESCROLLS_DELIVERY_HEAL_ABSORPTION", "Heal Absorption")
 
 -------------------------
 -- Filter Dialog
@@ -908,7 +915,7 @@ ZO_CreateStringId("BATTLESCROLLS_PIVOT_CUSTOM_DAYS_PROMPT", "Number of days back
 -- Tooltips for selector options
 ZO_CreateStringId("BATTLESCROLLS_PIVOT_TIP_DOMAIN_OVERVIEW", "Aggregated summary across all damage, healing, and effects domains. Shows combined totals rather than individual breakdowns.")
 ZO_CreateStringId("BATTLESCROLLS_PIVOT_TIP_ENC_BOSS_NAMES", "Filters to encounters that feature the selected bosses. Select boss names in the next step.")
-ZO_CreateStringId("BATTLESCROLLS_PIVOT_TIP_DIM_DELIVERY", "Splits data by delivery method: Direct, DoT (Damage over Time), HoT (Heal over Time), or Mixed.")
+ZO_CreateStringId("BATTLESCROLLS_PIVOT_TIP_DIM_DELIVERY", "Splits data by delivery method: Direct, DoT (Damage over Time), Heal Absorption, HoT (Heal over Time), Regen, Shield, or Mixed.")
 ZO_CreateStringId("BATTLESCROLLS_PIVOT_TIP_DIM_DAMAGE_TYPE", "Splits data by damage type: Physical, Fire, Shock, Frost, Magic, Poison, Disease, Bleed, Oblivion, and others.")
 ZO_CreateStringId("BATTLESCROLLS_PIVOT_TIP_DOMAIN_GROUP", "Per-member combat metrics like DPS, total damage, and crit rate. For buff/debuff uptimes on group members, use Group Effects.")
 ZO_CreateStringId("BATTLESCROLLS_PIVOT_TIP_AGGREGATION", "How values are combined when multiple encounters contribute to the same cell. For example, Average DPS shows the mean across encounters, while Max shows the best single encounter.")
