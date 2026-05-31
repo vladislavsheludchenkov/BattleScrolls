@@ -216,13 +216,56 @@ local CHAMPION_ROW_STYLE = {
     height = journal.ChampionRowStyle.ROW_HEIGHT,
     widthPercent = 100,
 }
+local VENGEANCE_PERK_ROW_STYLE = {
+    controlTemplate = "BattleScrolls_VengeancePerkTooltipRow",
+    height = 80,
+    widthPercent = 100,
+}
+
+---@param row Control
+---@return Control
+local function getVengeancePerkTooltipFramedIcon(row)
+    if row.vengeanceFramedIcon then
+        return row.vengeanceFramedIcon
+    end
+
+    local framedIcon = journal.utils.createVengeancePerkFramedIcon(row)
+    framedIcon:SetAnchor(CENTER, row, LEFT, 40, 0)
+    row.vengeanceFramedIcon = framedIcon
+    return framedIcon
+end
 
 ---Acquires and populates an icon+label row in the given tooltip section.
-local function addIconRow(tooltip, section, label, icon)
+---@param tooltip table
+---@param section table
+---@param rowData IconRow
+---@param fallbackIcon string|nil
+local function addIconRow(tooltip, section, rowData, fallbackIcon)
+    if rowData.vengeanceSlotFlag ~= nil then
+        local row = tooltip:AcquireCustomControl(VENGEANCE_PERK_ROW_STYLE)
+        row:SetHidden(false)
+        journal.utils.setupVengeancePerkFramedIcon(
+            getVengeancePerkTooltipFramedIcon(row),
+            rowData.vengeanceSlotFlag,
+            rowData.icon or fallbackIcon or "",
+            ZO_GAMEPAD_DEFAULT_LIST_ENTRY_ICON_DIMENSION)
+        row:GetNamedChild("Label"):SetText(rowData.label)
+        section:AddCustomControl(row)
+        return
+    end
+
+    if rowData.abilityId and rowData.abilityId > 0 then
+        local row = tooltip:AcquireCustomControl(ABILITY_ROW_STYLE)
+        row:SetHidden(false)
+        journal.utils.populateAbilityRow(row, rowData.abilityId, rowData.isUltimate == true)
+        section:AddCustomControl(row)
+        return
+    end
+
     local row = tooltip:AcquireCustomControl(CHAMPION_ROW_STYLE)
     row:SetHidden(false)
-    row:GetNamedChild("Icon"):SetTexture(icon)
-    row:GetNamedChild("Label"):SetText(label)
+    row:GetNamedChild("Icon"):SetTexture(rowData.icon or fallbackIcon or "")
+    row:GetNamedChild("Label"):SetText(rowData.label)
     section:AddCustomControl(row)
 end
 
@@ -258,17 +301,88 @@ local function showIconListTooltip(data)
             contentSection:SetNextSpacing(2)
             local groupIcon = group.headerIcon or ""
             for _, row in ipairs(group.rows) do
-                addIconRow(tooltip, contentSection, row.label, groupIcon)
+                addIconRow(tooltip, contentSection, row, groupIcon)
             end
         end
     elseif data.rows then
         for _, row in ipairs(data.rows) do
-            addIconRow(tooltip, contentSection, row.label, row.icon or "")
+            addIconRow(tooltip, contentSection, row)
         end
     end
     tooltip:AddSection(contentSection)
 
     -- Show tooltip + background fragments
+    SCENE_MANAGER:AddFragment(GAMEPAD_TOOLTIPS:GetTooltipFragment(GAMEPAD_LEFT_TOOLTIP))
+    if GAMEPAD_TOOLTIPS:DoesAutoShowTooltipBg(GAMEPAD_LEFT_TOOLTIP) then
+        SCENE_MANAGER:AddFragment(GAMEPAD_TOOLTIPS:GetTooltipBgFragment(GAMEPAD_LEFT_TOOLTIP))
+    end
+end
+
+---@param data TooltipDescriptor
+local function createVengeancePerkTooltipData(data)
+    local perkDefId = data.perkDefId
+    local slotFlag = data.slotFlag or 0
+    local getPerkName = _G["GetVengeancePerkName"]
+    local getPerkIcon = _G["GetVengeancePerkIcon"]
+    local name = type(getPerkName) == "function" and getPerkName(perkDefId) or ""
+    local formattedName = zo_strformat(SI_TOOLTIP_ITEM_NAME, name)
+
+    local rankPerkRewardData = { slotFlags = slotFlag }
+    function rankPerkRewardData:GetSlotFlags()
+        return self.slotFlags
+    end
+
+    if ZO_VeterancyPerkData then
+        local rewardData = ZO_VeterancyPerkData:New(perkDefId)
+        rewardData:SetRawName(name)
+        rewardData:SetFormattedName(formattedName)
+        if type(getPerkIcon) == "function" then
+            rewardData:SetIcon(getPerkIcon(perkDefId))
+        end
+        rewardData:SetVeterancyRankPerkRewardData(rankPerkRewardData)
+        return rewardData
+    end
+
+    local perkData = {
+        perkDefId = perkDefId,
+        formattedName = formattedName,
+        rankPerkRewardData = rankPerkRewardData,
+    }
+    function perkData:GetRewardId()
+        return self.perkDefId
+    end
+    function perkData:GetFormattedName()
+        return self.formattedName
+    end
+    function perkData:GetVeterancyRankPerkRewardData()
+        return self.rankPerkRewardData
+    end
+    return perkData
+end
+
+---@param data TooltipDescriptor
+local function showVengeancePerkTooltip(data)
+    GAMEPAD_TOOLTIPS:ClearTooltip(GAMEPAD_LEFT_TOOLTIP)
+
+    local didLayoutTooltip = false
+    if data.perkDefId and data.perkDefId > 0 and GAMEPAD_TOOLTIPS.LayoutVeterancyPerkTooltip then
+        didLayoutTooltip = pcall(function()
+            GAMEPAD_TOOLTIPS:LayoutVeterancyPerkTooltip(
+                GAMEPAD_LEFT_TOOLTIP,
+                createVengeancePerkTooltipData(data))
+        end)
+    end
+
+    if not didLayoutTooltip then
+        GAMEPAD_TOOLTIPS:ClearTooltip(GAMEPAD_LEFT_TOOLTIP)
+        local getPerkName = _G["GetVengeancePerkName"]
+        local getTooltipText = _G["GetVengeancePerkTooltipText"]
+        GAMEPAD_TOOLTIPS:LayoutTitleAndDescriptionTooltip(
+            GAMEPAD_LEFT_TOOLTIP,
+            type(getPerkName) == "function" and getPerkName(data.perkDefId) or "",
+            type(getTooltipText) == "function" and getTooltipText(data.perkDefId) or "")
+    end
+
     SCENE_MANAGER:AddFragment(GAMEPAD_TOOLTIPS:GetTooltipFragment(GAMEPAD_LEFT_TOOLTIP))
     if GAMEPAD_TOOLTIPS:DoesAutoShowTooltipBg(GAMEPAD_LEFT_TOOLTIP) then
         SCENE_MANAGER:AddFragment(GAMEPAD_TOOLTIPS:GetTooltipBgFragment(GAMEPAD_LEFT_TOOLTIP))
@@ -299,6 +413,9 @@ local tooltipDispatch = {
     end,
     iconList = function(data)
         showIconListTooltip(data)
+    end,
+    vengeancePerk = function(data)
+        showVengeancePerkTooltip(data)
     end,
 }
 

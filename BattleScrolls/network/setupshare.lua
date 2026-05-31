@@ -3,11 +3,13 @@
 -- Demand-driven setup sharing via LibGroupBroadcast
 --
 -- Shares player build snapshots (class, race, abilities,
--- gear sets, traits, enchants, champion, food, mundus)
+-- gear sets, traits, enchants, champion, food, mundus,
+-- and Vengeance loadouts/perks)
 -- with group members using a hash-based caching protocol.
 --
 -- Protocol 432: Setup Request (hash only)
--- Protocol 434: Setup Response (8-bit classId/raceId, send + read)
+-- Protocol 434: Setup Response V2 (legacy)
+-- Protocol 436: Setup Response V3 (Class Mastery or Vengeance payload)
 -----------------------------------------------------------
 
 if not SemisPlaygroundCheckAccess() then
@@ -24,7 +26,8 @@ local JEWELRY_SLOT_INDICES = setupAnalysis.JEWELRY_SLOT_INDICES
 
 ---@class SetupShare
 ---@field requestProtocol Protocol|nil Protocol 432
----@field responseProtocol Protocol|nil Protocol 434 (8-bit classId/raceId)
+---@field responseProtocol Protocol|nil Protocol 434 legacy response
+---@field responseProtocolV3 Protocol|nil Protocol 436 response with normal/Vengeance variants
 local setupShare = {}
 BattleScrolls.setupShare = setupShare
 
@@ -35,6 +38,10 @@ BattleScrolls.setupShare = setupShare
 ---@type table<number, CompactSetup>
 local localSetupCache = {}
 local LOCAL_CACHE_MAX = 4
+
+-- Selects the outbound setup response protocol. Protocol 436 stays registered
+-- regardless so we can read data from newer clients.
+local SEND_SETUP_RESPONSE_V3 = type(IsClassMasterySkillLine) == "function"
 
 ---@type number[]
 local localCacheOrder = {} -- oldest first
@@ -116,88 +123,103 @@ function setupShare.convertToCompact(setup)
         end
     end
 
-    -- Sets: from computeSetData, extract {setId, frontCount, backCount}
-    local setData = setupAnalysis.computeSetData(equipSlots)
     ---@type CompactSetupSet[]
     local sets = {}
-    for groupId, data in pairs(setData) do
-        if data.frontStep > 0 or data.backStep > 0 then
-            local isPerfected = data.perfectedActiveFront or data.perfectedActiveBack
-            local wireSetId = (isPerfected and data.perfectedSetId) and data.perfectedSetId or groupId
-            sets[#sets + 1] = {
-                setId = wireSetId,
-                frontCount = data.frontCount,
-                backCount = data.backCount,
-            }
+    local armorWeights = { 0, 0, 0 }
+    local weaponTypes = setup.weaponTypes
+    local armorTraits = {}
+    local armorEnchants = {}
+    local jewelryTraits = {}
+    local jewelryEnchants = {}
+    local weaponTraits = { 0, 0, 0, 0 }
+    local weaponEnchants = { 0, 0, 0, 0 }
+
+    if not setup.isVengeance then
+        -- Sets: from computeSetData, extract {setId, frontCount, backCount}
+        local setData = setupAnalysis.computeSetData(equipSlots)
+        for groupId, data in pairs(setData) do
+            if data.frontStep > 0 or data.backStep > 0 then
+                local isPerfected = data.perfectedActiveFront or data.perfectedActiveBack
+                local wireSetId = (isPerfected and data.perfectedSetId) and data.perfectedSetId or groupId
+                sets[#sets + 1] = {
+                    setId = wireSetId,
+                    frontCount = data.frontCount,
+                    backCount = data.backCount,
+                }
+            end
         end
+        -- Sort by max count descending for deterministic ordering
+        table.sort(sets, function(a, b)
+            local aMax = math.max(a.frontCount, a.backCount)
+            local bMax = math.max(b.frontCount, b.backCount)
+            if aMax ~= bMax then return aMax > bMax end
+            return a.setId < b.setId
+        end)
+        -- Limit to 6 sets
+        while #sets > 6 do
+            sets[#sets] = nil
+        end
+
+        -- Armor weights
+        local light, medium, heavy = setupAnalysis.countArmorWeights(equipSlots)
+        armorWeights = { light, medium, heavy }
+
+        -- Weapon types: positional for slots 5, 6, 13, 14
+        weaponTypes = {
+            getWeaponType(equipSlots[5]),
+            getWeaponType(equipSlots[6]),
+            getWeaponType(equipSlots[13]),
+            getWeaponType(equipSlots[14]),
+        }
+
+        -- Armor traits/enchants (grouped)
+        armorTraits = setupAnalysis.groupTraitIds(equipSlots, ARMOR_SLOT_INDICES)
+        armorEnchants = setupAnalysis.groupEnchantIds(equipSlots, ARMOR_SLOT_INDICES)
+
+        -- Jewelry traits/enchants (grouped)
+        jewelryTraits = setupAnalysis.groupTraitIds(equipSlots, JEWELRY_SLOT_INDICES)
+        jewelryEnchants = setupAnalysis.groupEnchantIds(equipSlots, JEWELRY_SLOT_INDICES)
+
+        -- Weapon traits/enchants: positional for slots 5, 6, 13, 14
+        weaponTraits = {
+            getTraitType(equipSlots[5]),
+            getTraitType(equipSlots[6]),
+            getTraitType(equipSlots[13]),
+            getTraitType(equipSlots[14]),
+        }
+        weaponEnchants = {
+            getEnchantId(equipSlots[5]),
+            getEnchantId(equipSlots[6]),
+            getEnchantId(equipSlots[13]),
+            getEnchantId(equipSlots[14]),
+        }
     end
-    -- Sort by max count descending for deterministic ordering
-    table.sort(sets, function(a, b)
-        local aMax = math.max(a.frontCount, a.backCount)
-        local bMax = math.max(b.frontCount, b.backCount)
-        if aMax ~= bMax then return aMax > bMax end
-        return a.setId < b.setId
-    end)
-    -- Limit to 6 sets
-    while #sets > 6 do
-        sets[#sets] = nil
-    end
-
-    -- Armor weights
-    local light, medium, heavy = setupAnalysis.countArmorWeights(equipSlots)
-
-    -- Weapon types: positional for slots 5, 6, 13, 14
-    local weaponTypes = {
-        getWeaponType(equipSlots[5]),
-        getWeaponType(equipSlots[6]),
-        getWeaponType(equipSlots[13]),
-        getWeaponType(equipSlots[14]),
-    }
-
-    -- Armor traits/enchants (grouped)
-    local armorTraits = setupAnalysis.groupTraitIds(equipSlots, ARMOR_SLOT_INDICES)
-    local armorEnchants = setupAnalysis.groupEnchantIds(equipSlots, ARMOR_SLOT_INDICES)
-
-    -- Jewelry traits/enchants (grouped)
-    local jewelryTraits = setupAnalysis.groupTraitIds(equipSlots, JEWELRY_SLOT_INDICES)
-    local jewelryEnchants = setupAnalysis.groupEnchantIds(equipSlots, JEWELRY_SLOT_INDICES)
-
-    -- Weapon traits/enchants: positional for slots 5, 6, 13, 14
-    local weaponTraits = {
-        getTraitType(equipSlots[5]),
-        getTraitType(equipSlots[6]),
-        getTraitType(equipSlots[13]),
-        getTraitType(equipSlots[14]),
-    }
-    local weaponEnchants = {
-        getEnchantId(equipSlots[5]),
-        getEnchantId(equipSlots[6]),
-        getEnchantId(equipSlots[13]),
-        getEnchantId(equipSlots[14]),
-    }
+    weaponTypes = weaponTypes or { 0, 0, 0, 0 }
 
     -- Champion: place skills at positional slots (4 per discipline)
     -- Decoder uses math.ceil(i / 4) to recover disciplineIndex, so positions must match.
     local champion = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
-    local disciplineOffset = {}
-    for disciplineIndex = 1, GetNumChampionDisciplines() do
-        disciplineOffset[GetChampionDisciplineId(disciplineIndex)] = (disciplineIndex - 1) * 4
-    end
-    local disciplineCount = {}
-    for _, skill in ipairs(setup.champion) do
-        local offset = disciplineOffset[skill.disciplineId]
-        if offset then
-            local count = (disciplineCount[skill.disciplineId] or 0) + 1
-            if count <= 4 then
-                disciplineCount[skill.disciplineId] = count
-                champion[offset + count] = skill.skillId
+    if not setup.isVengeance then
+        local disciplineOffset = {}
+        for disciplineIndex = 1, GetNumChampionDisciplines() do
+            disciplineOffset[GetChampionDisciplineId(disciplineIndex)] = (disciplineIndex - 1) * 4
+        end
+        local disciplineCount = {}
+        for _, skill in ipairs(setup.champion) do
+            local offset = disciplineOffset[skill.disciplineId]
+            if offset then
+                local count = (disciplineCount[skill.disciplineId] or 0) + 1
+                if count <= 4 then
+                    disciplineCount[skill.disciplineId] = count
+                    champion[offset + count] = skill.skillId
+                end
             end
         end
     end
 
     -- Food: up to 3 abilityIds
     local foodAbilityIds = {}
-    if setup.foods then
+    if not setup.isVengeance and setup.foods then
         for _, food in ipairs(setup.foods) do
             if #foodAbilityIds < 3 then
                 foodAbilityIds[#foodAbilityIds + 1] = food.abilityId
@@ -206,13 +228,17 @@ function setupShare.convertToCompact(setup)
     end
 
     -- Mundus: direct copy
-    local mundusAbilityIds = setup.mundusAbilityIds or {}
+    local mundusAbilityIds = setup.isVengeance and {} or (setup.mundusAbilityIds or {})
 
-    -- Class skill lines: direct copy
-    local classSkillLineIds = setup.classSkillLineIds or { 0, 0, 0 }
-    -- Pad to 3 entries
-    while #classSkillLineIds < 3 do
-        classSkillLineIds[#classSkillLineIds + 1] = 0
+    -- Class skill lines and Class Mastery passives: direct copy
+    local sourceClassSkillLineIds = setup.classSkillLineIds or {}
+    local classSkillLineIds = {}
+    for i = 1, 3 do
+        classSkillLineIds[i] = sourceClassSkillLineIds[i] or 0
+    end
+    local classMasteryAbilityIds = setup.classMasteryAbilityIds
+    if setup.isVengeance then
+        classMasteryAbilityIds = nil
     end
 
     -- Scribed abilities: collect from all bars (deduplicated by abilityId)
@@ -248,7 +274,7 @@ function setupShare.convertToCompact(setup)
     -- Poisons: extract PotionEffect (crafted) or item ID (unique) from item link
     local frontPoisonEffect, frontPoisonItemId = nil, nil
     local backPoisonEffect, backPoisonItemId = nil, nil
-    if setup.frontPoison then
+    if not setup.isVengeance and setup.frontPoison then
         local pe = tonumber(setup.frontPoison.itemLink:match(":(%d+)|h"))
         if pe and pe > 0 then
             frontPoisonEffect = pe
@@ -256,7 +282,7 @@ function setupShare.convertToCompact(setup)
             frontPoisonItemId = tonumber(setup.frontPoison.itemLink:match("|H%d:item:(%d+)"))
         end
     end
-    if setup.backPoison then
+    if not setup.isVengeance and setup.backPoison then
         local pe = tonumber(setup.backPoison.itemLink:match(":(%d+)|h"))
         if pe and pe > 0 then
             backPoisonEffect = pe
@@ -269,11 +295,12 @@ function setupShare.convertToCompact(setup)
     return {
         classId = setup.classId,
         raceId = setup.raceId,
+        isVengeance = setup.isVengeance or nil,
         frontAbilities = frontAbilities,
         backAbilities = backAbilities,
         werewolfAbilities = werewolfAbilities,
         sets = sets,
-        armorWeights = { light, medium, heavy },
+        armorWeights = armorWeights,
         weaponTypes = weaponTypes,
         armorTraits = armorTraits,
         armorEnchants = armorEnchants,
@@ -285,6 +312,9 @@ function setupShare.convertToCompact(setup)
         foodAbilityIds = foodAbilityIds,
         mundusAbilityIds = mundusAbilityIds,
         classSkillLineIds = classSkillLineIds,
+        classMasteryAbilityIds = classMasteryAbilityIds,
+        loadoutSkillLineId = setup.loadoutSkillLineId,
+        vengeancePerkDefIds = setup.vengeancePerkDefIds,
         scribedAbilities = scribedAbilities,
         frontPoisonEffect = frontPoisonEffect,
         frontPoisonItemId = frontPoisonItemId,
@@ -312,6 +342,7 @@ function setupShare.computeHash(compact)
 
     mix(compact.classId)
     mix(compact.raceId)
+    mix(compact.isVengeance and 1 or 0)
 
     if compact.frontAbilities then
         for _, id in ipairs(compact.frontAbilities) do mix(id) end
@@ -329,41 +360,53 @@ function setupShare.computeHash(compact)
         mix(set.backCount)
     end
 
-    for _, w in ipairs(compact.armorWeights) do mix(w) end
     for _, w in ipairs(compact.weaponTypes) do mix(w) end
 
-    for _, entry in ipairs(compact.armorTraits) do
-        mix(entry.traitType)
-        mix(entry.count)
-    end
-    for _, entry in ipairs(compact.armorEnchants) do
-        mix(entry.enchantId)
-        mix(entry.count)
-    end
-    for _, entry in ipairs(compact.jewelryTraits) do
-        mix(entry.traitType)
-        mix(entry.count)
-    end
-    for _, entry in ipairs(compact.jewelryEnchants) do
-        mix(entry.enchantId)
-        mix(entry.count)
-    end
+    if compact.isVengeance then
+        mix(compact.loadoutSkillLineId or 0)
+        for _, perkDefId in ipairs(compact.vengeancePerkDefIds or {}) do mix(perkDefId) end
+    else
+        for _, w in ipairs(compact.armorWeights) do mix(w) end
 
-    for _, t in ipairs(compact.weaponTraits) do mix(t) end
-    for _, e in ipairs(compact.weaponEnchants) do mix(e) end
-    for _, c in ipairs(compact.champion) do mix(c) end
-    for _, f in ipairs(compact.foodAbilityIds) do mix(f) end
-    for _, m in ipairs(compact.mundusAbilityIds) do mix(m) end
+        for _, entry in ipairs(compact.armorTraits) do
+            mix(entry.traitType)
+            mix(entry.count)
+        end
+        for _, entry in ipairs(compact.armorEnchants) do
+            mix(entry.enchantId)
+            mix(entry.count)
+        end
+        for _, entry in ipairs(compact.jewelryTraits) do
+            mix(entry.traitType)
+            mix(entry.count)
+        end
+        for _, entry in ipairs(compact.jewelryEnchants) do
+            mix(entry.enchantId)
+            mix(entry.count)
+        end
 
-    for _, sl in ipairs(compact.classSkillLineIds) do mix(sl) end
+        for _, t in ipairs(compact.weaponTraits) do mix(t) end
+        for _, e in ipairs(compact.weaponEnchants) do mix(e) end
+        for _, c in ipairs(compact.champion) do mix(c) end
+        for _, f in ipairs(compact.foodAbilityIds) do mix(f) end
+        for _, m in ipairs(compact.mundusAbilityIds) do mix(m) end
+
+        if SEND_SETUP_RESPONSE_V3 and compact.classMasteryAbilityIds ~= nil and #compact.classMasteryAbilityIds > 0 then
+            for _, abilityId in ipairs(compact.classMasteryAbilityIds) do mix(abilityId) end
+        else
+            for _, sl in ipairs(compact.classSkillLineIds) do mix(sl) end
+        end
+    end
     for _, sa in ipairs(compact.scribedAbilities) do
         mix(sa.abilityId)
         for _, sid in ipairs(sa.scriptIds) do mix(sid) end
     end
-    if compact.frontPoisonEffect then mix(compact.frontPoisonEffect) end
-    if compact.frontPoisonItemId then mix(compact.frontPoisonItemId) end
-    if compact.backPoisonEffect then mix(compact.backPoisonEffect) end
-    if compact.backPoisonItemId then mix(compact.backPoisonItemId) end
+    if not compact.isVengeance then
+        if compact.frontPoisonEffect then mix(compact.frontPoisonEffect) end
+        if compact.frontPoisonItemId then mix(compact.frontPoisonItemId) end
+        if compact.backPoisonEffect then mix(compact.backPoisonEffect) end
+        if compact.backPoisonItemId then mix(compact.backPoisonItemId) end
+    end
 
     return h
 end
@@ -457,80 +500,69 @@ end
 -- PROTOCOL HANDLERS
 -- =============================================================================
 
----Handles incoming setup request (protocol 432)
----@param unitTag string
----@param data table
-local function onSetupRequest(unitTag, data)
-    if AreUnitsEqual(unitTag, "player") then return end
-
-    local hash = data.setupHash
-    if not hash then return end
-
-    local compact = localSetupCache[hash]
-    if not compact then
-        -- log.Debug(function() return string.format("SetupShare: request for hash %d — not in local cache", hash) end)
-        return
-    end
-
-    -- Throttle: don't respond if we sent this hash recently
-    local now = GetGameTimeMilliseconds()
-    if lastResponseTime[hash] and now - lastResponseTime[hash] < RESPONSE_THROTTLE_MS then
-        -- log.Debug(function() return string.format("SetupShare: request for hash %d — throttled", hash) end)
-        return
-    end
-
-    if not setupShare.responseProtocol then return end
-
-    -- Build wire payload from CompactSetup
+---Copies compact set entries into the LGB wire shape.
+---@param compact CompactSetup
+---@return table[]
+local function buildWireSets(compact)
     local wireSets = {}
-    for _, set in ipairs(compact.sets) do
+    for _, set in ipairs(compact.sets or {}) do
         wireSets[#wireSets + 1] = {
             setId = set.setId,
             frontCount = set.frontCount,
             backCount = set.backCount,
         }
     end
+    return wireSets
+end
 
-    local wireArmorTraits = {}
-    for _, entry in ipairs(compact.armorTraits) do
-        wireArmorTraits[#wireArmorTraits + 1] = { traitType = entry.traitType, count = entry.count }
+---Copies compact grouped trait entries into the LGB wire shape.
+---@param entries CompactTraitEntry[]|nil
+---@return table[]
+local function buildWireTraits(entries)
+    local wire = {}
+    for _, entry in ipairs(entries or {}) do
+        wire[#wire + 1] = { traitType = entry.traitType, count = entry.count }
     end
+    return wire
+end
 
-    local wireArmorEnchants = {}
-    for _, entry in ipairs(compact.armorEnchants) do
-        wireArmorEnchants[#wireArmorEnchants + 1] = { enchantId = entry.enchantId, count = entry.count }
+---Copies compact grouped enchant entries into the LGB wire shape.
+---@param entries CompactEnchantEntry[]|nil
+---@return table[]
+local function buildWireEnchants(entries)
+    local wire = {}
+    for _, entry in ipairs(entries or {}) do
+        wire[#wire + 1] = { enchantId = entry.enchantId, count = entry.count }
     end
+    return wire
+end
 
-    local wireJewelryTraits = {}
-    for _, entry in ipairs(compact.jewelryTraits) do
-        wireJewelryTraits[#wireJewelryTraits + 1] = { traitType = entry.traitType, count = entry.count }
-    end
-
-    local wireJewelryEnchants = {}
-    for _, entry in ipairs(compact.jewelryEnchants) do
-        wireJewelryEnchants[#wireJewelryEnchants + 1] = { enchantId = entry.enchantId, count = entry.count }
-    end
-
-    -- Scribed abilities for wire format
-    local wireScribedAbilities = {}
-    for _, sa in ipairs(compact.scribedAbilities) do
-        wireScribedAbilities[#wireScribedAbilities + 1] = {
+---Copies compact scribed ability entries into the LGB wire shape.
+---@param entries CompactScribedAbility[]|nil
+---@return table[]
+local function buildWireScribedAbilities(entries)
+    local wire = {}
+    for _, sa in ipairs(entries or {}) do
+        wire[#wire + 1] = {
             abilityId = sa.abilityId,
             scriptId1 = sa.scriptIds[1],
             scriptId2 = sa.scriptIds[2],
             scriptId3 = sa.scriptIds[3],
         }
     end
+    return wire
+end
 
-    ---@type table
+---Builds the normal build payload body for protocol 434 or protocol 436's normal variant.
+---@param compact CompactSetup
+---@param includeClassMastery boolean
+---@return table
+local function buildNormalWirePayload(compact, includeClassMastery)
     local payload = {
-        setupHash = hash,
-        classId = compact.classId,
-        raceId = compact.raceId,
         frontAbilities = compact.frontAbilities,
         backAbilities = compact.backAbilities,
         werewolfAbilities = compact.werewolfAbilities,
-        set = wireSets,
+        set = buildWireSets(compact),
         lightCount = compact.armorWeights[1],
         mediumCount = compact.armorWeights[2],
         heavyCount = compact.armorWeights[3],
@@ -538,10 +570,10 @@ local function onSetupRequest(unitTag, data)
         frontOHWeaponType = compact.weaponTypes[2],
         backMHWeaponType = compact.weaponTypes[3],
         backOHWeaponType = compact.weaponTypes[4],
-        armorTrait = wireArmorTraits,
-        armorEnchant = wireArmorEnchants,
-        jewelryTrait = wireJewelryTraits,
-        jewelryEnchant = wireJewelryEnchants,
+        armorTrait = buildWireTraits(compact.armorTraits),
+        armorEnchant = buildWireEnchants(compact.armorEnchants),
+        jewelryTrait = buildWireTraits(compact.jewelryTraits),
+        jewelryEnchant = buildWireEnchants(compact.jewelryEnchants),
         frontMHTrait = compact.weaponTraits[1],
         frontOHTrait = compact.weaponTraits[2],
         backMHTrait = compact.weaponTraits[3],
@@ -553,35 +585,102 @@ local function onSetupRequest(unitTag, data)
         champion = compact.champion,
         foodAbilityIds = compact.foodAbilityIds,
         mundusAbilityIds = compact.mundusAbilityIds,
-        classSkillLineIds = compact.classSkillLineIds,
-        scribedAbility = wireScribedAbilities,
+        scribedAbility = buildWireScribedAbilities(compact.scribedAbilities),
         frontPoisonEffect = compact.frontPoisonEffect,
         frontPoisonItemId = compact.frontPoisonItemId,
         backPoisonEffect = compact.backPoisonEffect,
         backPoisonItemId = compact.backPoisonItemId,
     }
 
-    if IsUnitGrouped("player") then
+    if includeClassMastery and compact.classMasteryAbilityIds ~= nil and #compact.classMasteryAbilityIds > 0 then
+        payload.classMasteryAbilityIds = compact.classMasteryAbilityIds
+    else
+        payload.classSkillLineIds = compact.classSkillLineIds
+    end
+
+    return payload
+end
+
+---Builds the Vengeance payload body for protocol 436's Vengeance variant.
+---@param compact CompactSetup
+---@return table
+local function buildVengeanceWirePayload(compact)
+    local perkDefIds = compact.vengeancePerkDefIds or {}
+    return {
+        frontAbilities = compact.frontAbilities,
+        backAbilities = compact.backAbilities,
+        werewolfAbilities = compact.werewolfAbilities,
+        frontMHWeaponType = compact.weaponTypes[1],
+        frontOHWeaponType = compact.weaponTypes[2],
+        backMHWeaponType = compact.weaponTypes[3],
+        backOHWeaponType = compact.weaponTypes[4],
+        loadoutSkillLineId = compact.loadoutSkillLineId or 0,
+        vengeancePerkDefIds = { perkDefIds[1] or 0, perkDefIds[2] or 0, perkDefIds[3] or 0 },
+        scribedAbility = buildWireScribedAbilities(compact.scribedAbilities),
+    }
+end
+
+---Handles incoming setup request (protocol 432)
+---@param unitTag string
+---@param data table
+local function onSetupRequest(unitTag, data)
+    if AreUnitsEqual(unitTag, "player") then return end
+
+    local hash = data.setupHash
+    if not hash then return end
+
+    local compact = localSetupCache[hash]
+    if not compact then
+        -- log.Debug(function() return string.format("SetupShare: request for hash %d - not in local cache", hash) end)
+        return
+    end
+
+    -- Throttle: don't respond if we sent this hash recently
+    local now = GetGameTimeMilliseconds()
+    if lastResponseTime[hash] and now - lastResponseTime[hash] < RESPONSE_THROTTLE_MS then
+        -- log.Debug(function() return string.format("SetupShare: request for hash %d - throttled", hash) end)
+        return
+    end
+
+    local sent = false
+    if SEND_SETUP_RESPONSE_V3 then
+        if not setupShare.responseProtocolV3 then return end
+        local payload = {
+            setupHash = hash,
+            classId = compact.classId,
+            raceId = compact.raceId,
+        }
+        if compact.isVengeance then
+            payload.vengeanceSetup = buildVengeanceWirePayload(compact)
+        else
+            payload.normalSetup = buildNormalWirePayload(compact, true)
+        end
+        setupShare.responseProtocolV3:Send(payload)
+        sent = true
+    else
+        if compact.isVengeance then
+            -- Protocol 434 is already live and has no Vengeance variant.
+            return
+        end
+        if not setupShare.responseProtocol then return end
+        local payload = buildNormalWirePayload(compact, false)
+        payload.setupHash = hash
+        payload.classId = compact.classId
+        payload.raceId = compact.raceId
         setupShare.responseProtocol:Send(payload)
+        sent = true
+    end
+
+    if sent then
         lastResponseTime[hash] = now
         -- log.Debug(function() return string.format("SetupShare: sent setup response for hash %d", hash) end)
     end
 end
 
----Handles incoming setup response (protocol 434)
----@param unitTag string
+---Decodes set entries from LGB wire data.
 ---@param data table
-local function onSetupResponse(unitTag, data)
-    if AreUnitsEqual(unitTag, "player") then return end
-
-    local displayName = BattleScrolls.utils.GetUndecoratedDisplayName(unitTag)
-    if not displayName or displayName == "" then return end
-
-    local hash = data.setupHash
-    if not hash then return end
-
-    -- Reconstruct CompactSetup from wire data
-    ---@type CompactSetupSet[]
+---@return CompactSetupSet[]
+local function decodeWireSets(data)
     local sets = {}
     if data.set then
         for _, s in ipairs(data.set) do
@@ -592,87 +691,183 @@ local function onSetupResponse(unitTag, data)
             }
         end
     end
+    return sets
+end
 
-    ---@type CompactTraitEntry[]
-    local armorTraits = {}
-    if data.armorTrait then
-        for _, t in ipairs(data.armorTrait) do
-            armorTraits[#armorTraits + 1] = { traitType = t.traitType, count = t.count }
+---Decodes grouped trait entries from LGB wire data.
+---@param entries table[]|nil
+---@return CompactTraitEntry[]
+local function decodeWireTraits(entries)
+    local traits = {}
+    if entries then
+        for _, t in ipairs(entries) do
+            traits[#traits + 1] = { traitType = t.traitType, count = t.count }
         end
     end
+    return traits
+end
 
-    ---@type CompactEnchantEntry[]
-    local armorEnchants = {}
-    if data.armorEnchant then
-        for _, e in ipairs(data.armorEnchant) do
-            armorEnchants[#armorEnchants + 1] = { enchantId = e.enchantId, count = e.count }
+---Decodes grouped enchant entries from LGB wire data.
+---@param entries table[]|nil
+---@return CompactEnchantEntry[]
+local function decodeWireEnchants(entries)
+    local enchants = {}
+    if entries then
+        for _, e in ipairs(entries) do
+            enchants[#enchants + 1] = { enchantId = e.enchantId, count = e.count }
         end
     end
+    return enchants
+end
 
-    ---@type CompactTraitEntry[]
-    local jewelryTraits = {}
-    if data.jewelryTrait then
-        for _, t in ipairs(data.jewelryTrait) do
-            jewelryTraits[#jewelryTraits + 1] = { traitType = t.traitType, count = t.count }
-        end
-    end
-
-    ---@type CompactEnchantEntry[]
-    local jewelryEnchants = {}
-    if data.jewelryEnchant then
-        for _, e in ipairs(data.jewelryEnchant) do
-            jewelryEnchants[#jewelryEnchants + 1] = { enchantId = e.enchantId, count = e.count }
-        end
-    end
-
-    -- Scribed abilities
-    ---@type CompactScribedAbility[]
+---Decodes scribed ability entries from LGB wire data.
+---@param entries table[]|nil
+---@return CompactScribedAbility[]
+local function decodeWireScribedAbilities(entries)
     local scribedAbilities = {}
-    if data.scribedAbility then
-        for _, sa in ipairs(data.scribedAbility) do
+    if entries then
+        for _, sa in ipairs(entries) do
             scribedAbilities[#scribedAbilities + 1] = {
                 abilityId = sa.abilityId,
                 scriptIds = { sa.scriptId1, sa.scriptId2, sa.scriptId3 },
             }
         end
     end
+    return scribedAbilities
+end
 
-    ---@type CompactSetup
-    local compact = {
-        classId = data.classId,
-        raceId = data.raceId,
+---Reconstructs a normal CompactSetup from flat legacy fields or protocol 436 normal body fields.
+---@param common table
+---@param data table
+---@return CompactSetup
+local function decodeNormalCompact(common, data)
+    return {
+        classId = common.classId,
+        raceId = common.raceId,
         frontAbilities = data.frontAbilities,
         backAbilities = data.backAbilities,
         werewolfAbilities = data.werewolfAbilities,
-        sets = sets,
-        armorWeights = { data.lightCount, data.mediumCount, data.heavyCount },
-        weaponTypes = { data.frontMHWeaponType, data.frontOHWeaponType, data.backMHWeaponType, data.backOHWeaponType },
-        armorTraits = armorTraits,
-        armorEnchants = armorEnchants,
-        jewelryTraits = jewelryTraits,
-        jewelryEnchants = jewelryEnchants,
-        weaponTraits = { data.frontMHTrait, data.frontOHTrait, data.backMHTrait, data.backOHTrait },
-        weaponEnchants = { data.frontMHEnchant, data.frontOHEnchant, data.backMHEnchant, data.backOHEnchant },
+        sets = decodeWireSets(data),
+        armorWeights = { data.lightCount or 0, data.mediumCount or 0, data.heavyCount or 0 },
+        weaponTypes = {
+            data.frontMHWeaponType or 0,
+            data.frontOHWeaponType or 0,
+            data.backMHWeaponType or 0,
+            data.backOHWeaponType or 0,
+        },
+        armorTraits = decodeWireTraits(data.armorTrait),
+        armorEnchants = decodeWireEnchants(data.armorEnchant),
+        jewelryTraits = decodeWireTraits(data.jewelryTrait),
+        jewelryEnchants = decodeWireEnchants(data.jewelryEnchant),
+        weaponTraits = {
+            data.frontMHTrait or 0,
+            data.frontOHTrait or 0,
+            data.backMHTrait or 0,
+            data.backOHTrait or 0,
+        },
+        weaponEnchants = {
+            data.frontMHEnchant or 0,
+            data.frontOHEnchant or 0,
+            data.backMHEnchant or 0,
+            data.backOHEnchant or 0,
+        },
         champion = data.champion or {},
         foodAbilityIds = data.foodAbilityIds or {},
         mundusAbilityIds = data.mundusAbilityIds or {},
         classSkillLineIds = data.classSkillLineIds or { 0, 0, 0 },
-        scribedAbilities = scribedAbilities,
+        classMasteryAbilityIds = data.classMasteryAbilityIds,
+        scribedAbilities = decodeWireScribedAbilities(data.scribedAbility),
         frontPoisonEffect = data.frontPoisonEffect,
         frontPoisonItemId = data.frontPoisonItemId,
         backPoisonEffect = data.backPoisonEffect,
         backPoisonItemId = data.backPoisonItemId,
     }
+end
+
+---Reconstructs a Vengeance CompactSetup from protocol 436 Vengeance body fields.
+---@param common table
+---@param data table
+---@return CompactSetup
+local function decodeVengeanceCompact(common, data)
+    local perkDefIds = data.vengeancePerkDefIds or {}
+    return {
+        classId = common.classId,
+        raceId = common.raceId,
+        isVengeance = true,
+        frontAbilities = data.frontAbilities,
+        backAbilities = data.backAbilities,
+        werewolfAbilities = data.werewolfAbilities,
+        sets = {},
+        armorWeights = { 0, 0, 0 },
+        weaponTypes = {
+            data.frontMHWeaponType or 0,
+            data.frontOHWeaponType or 0,
+            data.backMHWeaponType or 0,
+            data.backOHWeaponType or 0,
+        },
+        armorTraits = {},
+        armorEnchants = {},
+        jewelryTraits = {},
+        jewelryEnchants = {},
+        weaponTraits = { 0, 0, 0, 0 },
+        weaponEnchants = { 0, 0, 0, 0 },
+        champion = {},
+        foodAbilityIds = {},
+        mundusAbilityIds = {},
+        classSkillLineIds = {},
+        loadoutSkillLineId = data.loadoutSkillLineId,
+        vengeancePerkDefIds = { perkDefIds[1] or 0, perkDefIds[2] or 0, perkDefIds[3] or 0 },
+        scribedAbilities = decodeWireScribedAbilities(data.scribedAbility),
+    }
+end
+
+---Stores a decoded compact setup for a sender.
+---@param unitTag string
+---@param hash number
+---@param compact CompactSetup
+local function storeDecodedSetup(unitTag, hash, compact)
+    if AreUnitsEqual(unitTag, "player") then return end
+
+    local displayName = BattleScrolls.utils.GetUndecoratedDisplayName(unitTag)
+    if not displayName or displayName == "" then return end
 
     setupShare:storeSetup(displayName, hash, compact)
     -- log.Debug(function() return string.format("SetupShare: received and stored setup from %s hash %d", displayName, hash) end)
+end
+
+---Handles incoming legacy normal setup response (protocol 434).
+---@param unitTag string
+---@param data table
+local function onLegacySetupResponse(unitTag, data)
+    local hash = data.setupHash
+    if not hash then return end
+    storeDecodedSetup(unitTag, hash, decodeNormalCompact(data, data))
+end
+
+---Handles incoming setup response with normal/Vengeance variants (protocol 436).
+---@param unitTag string
+---@param data table
+local function onSetupResponseV3(unitTag, data)
+    local hash = data.setupHash
+    if not hash then return end
+
+    local compact
+    if data.vengeanceSetup then
+        compact = decodeVengeanceCompact(data, data.vengeanceSetup)
+    elseif data.normalSetup then
+        compact = decodeNormalCompact(data, data.normalSetup)
+    else
+        return
+    end
+
+    storeDecodedSetup(unitTag, hash, compact)
 end
 
 -- =============================================================================
 -- PROTOCOL FIELD DECLARATIONS
 -- =============================================================================
 
----Declares an optional ability bar array field (6 × 18-bit abilityId)
+---Declares an optional ability bar array field (6 x 18-bit abilityId)
 ---@param LGB table LibGroupBroadcast reference
 ---@param name string Unique field name (e.g. "frontAbilities")
 ---@return table field
@@ -683,6 +878,161 @@ local function createAbilityBarField(LGB, name)
             { maxLength = 6 }
         )
     )
+end
+
+---Appends field declarations to a protocol.
+---@param protocol Protocol
+---@param fields table[]
+local function addFieldsToProtocol(protocol, fields)
+    for _, field in ipairs(fields) do
+        protocol:AddField(field)
+    end
+end
+
+---Creates LGB fields for the normal build payload body.
+---@param LGB table LibGroupBroadcast reference
+---@param includeClassMasteryAbilities boolean
+---@return table[] fields
+local function createNormalSetupFields(LGB, includeClassMasteryAbilities)
+    local fields = {
+        createAbilityBarField(LGB, "frontAbilities"),
+        createAbilityBarField(LGB, "backAbilities"),
+        createAbilityBarField(LGB, "werewolfAbilities"),
+        LGB.CreateArrayField(
+            LGB.CreateTableField("set", {
+                LGB.CreateNumericField("setId", { minValue = 0, numBits = 10, trimValues = true }),
+                LGB.CreateNumericField("frontCount", { minValue = 0, numBits = 3, trimValues = true }),
+                LGB.CreateNumericField("backCount", { minValue = 0, numBits = 3, trimValues = true }),
+            }),
+            { maxLength = 6 }
+        ),
+        LGB.CreateNumericField("lightCount", { minValue = 0, numBits = 3, trimValues = true }),
+        LGB.CreateNumericField("mediumCount", { minValue = 0, numBits = 3, trimValues = true }),
+        LGB.CreateNumericField("heavyCount", { minValue = 0, numBits = 3, trimValues = true }),
+        LGB.CreateNumericField("frontMHWeaponType", { minValue = 0, numBits = 5, trimValues = true }),
+        LGB.CreateNumericField("frontOHWeaponType", { minValue = 0, numBits = 5, trimValues = true }),
+        LGB.CreateNumericField("backMHWeaponType", { minValue = 0, numBits = 5, trimValues = true }),
+        LGB.CreateNumericField("backOHWeaponType", { minValue = 0, numBits = 5, trimValues = true }),
+        LGB.CreateArrayField(
+            LGB.CreateTableField("armorTrait", {
+                LGB.CreateNumericField("traitType", { minValue = 0, numBits = 6, trimValues = true }),
+                LGB.CreateNumericField("count", { minValue = 0, numBits = 3, trimValues = true }),
+            }),
+            { maxLength = 4 }
+        ),
+        LGB.CreateArrayField(
+            LGB.CreateTableField("armorEnchant", {
+                LGB.CreateNumericField("enchantId", { minValue = 0, numBits = 9, trimValues = true }),
+                LGB.CreateNumericField("count", { minValue = 0, numBits = 3, trimValues = true }),
+            }),
+            { maxLength = 4 }
+        ),
+        LGB.CreateArrayField(
+            LGB.CreateTableField("jewelryTrait", {
+                LGB.CreateNumericField("traitType", { minValue = 0, numBits = 6, trimValues = true }),
+                LGB.CreateNumericField("count", { minValue = 0, numBits = 3, trimValues = true }),
+            }),
+            { maxLength = 3 }
+        ),
+        LGB.CreateArrayField(
+            LGB.CreateTableField("jewelryEnchant", {
+                LGB.CreateNumericField("enchantId", { minValue = 0, numBits = 9, trimValues = true }),
+                LGB.CreateNumericField("count", { minValue = 0, numBits = 3, trimValues = true }),
+            }),
+            { maxLength = 3 }
+        ),
+        LGB.CreateNumericField("frontMHTrait", { minValue = 0, numBits = 6, trimValues = true }),
+        LGB.CreateNumericField("frontOHTrait", { minValue = 0, numBits = 6, trimValues = true }),
+        LGB.CreateNumericField("backMHTrait", { minValue = 0, numBits = 6, trimValues = true }),
+        LGB.CreateNumericField("backOHTrait", { minValue = 0, numBits = 6, trimValues = true }),
+        LGB.CreateNumericField("frontMHEnchant", { minValue = 0, numBits = 9, trimValues = true }),
+        LGB.CreateNumericField("frontOHEnchant", { minValue = 0, numBits = 9, trimValues = true }),
+        LGB.CreateNumericField("backMHEnchant", { minValue = 0, numBits = 9, trimValues = true }),
+        LGB.CreateNumericField("backOHEnchant", { minValue = 0, numBits = 9, trimValues = true }),
+        LGB.CreateArrayField(
+            LGB.CreateNumericField("champion", { minValue = 0, numBits = 10, trimValues = true }),
+            { maxLength = 12 }
+        ),
+        LGB.CreateArrayField(
+            LGB.CreateNumericField("foodAbilityIds", { minValue = 0, numBits = 18, trimValues = true }),
+            { maxLength = 3 }
+        ),
+        LGB.CreateArrayField(
+            LGB.CreateNumericField("mundusAbilityIds", { minValue = 0, numBits = 18, trimValues = true }),
+            { maxLength = 2 }
+        ),
+    }
+
+    if includeClassMasteryAbilities then
+        fields[#fields + 1] = LGB.CreateVariantField({
+            LGB.CreateArrayField(
+                LGB.CreateNumericField("classSkillLineIds", { minValue = 0, numBits = 10, trimValues = true }),
+                { maxLength = 3 }
+            ),
+            LGB.CreateArrayField(
+                LGB.CreateNumericField("classMasteryAbilityIds", { minValue = 0, numBits = 20, trimValues = true }),
+                { maxLength = 5 }
+            ),
+        })
+    else
+        fields[#fields + 1] = LGB.CreateArrayField(
+            LGB.CreateNumericField("classSkillLineIds", { minValue = 0, numBits = 10, trimValues = true }),
+            { maxLength = 3 }
+        )
+    end
+
+    fields[#fields + 1] = LGB.CreateArrayField(
+        LGB.CreateTableField("scribedAbility", {
+            LGB.CreateNumericField("abilityId", { minValue = 0, numBits = 18, trimValues = true }),
+            LGB.CreateNumericField("scriptId1", { minValue = 0, numBits = 8, trimValues = true }),
+            LGB.CreateNumericField("scriptId2", { minValue = 0, numBits = 8, trimValues = true }),
+            LGB.CreateNumericField("scriptId3", { minValue = 0, numBits = 8, trimValues = true }),
+        }),
+        { maxLength = 7 }
+    )
+    fields[#fields + 1] = LGB.CreateOptionalField(
+        LGB.CreateVariantField({
+            LGB.CreateNumericField("frontPoisonEffect", { minValue = 0, numBits = 24, trimValues = true }),
+            LGB.CreateNumericField("frontPoisonItemId", { minValue = 0, numBits = 18, trimValues = true }),
+        })
+    )
+    fields[#fields + 1] = LGB.CreateOptionalField(
+        LGB.CreateVariantField({
+            LGB.CreateNumericField("backPoisonEffect", { minValue = 0, numBits = 24, trimValues = true }),
+            LGB.CreateNumericField("backPoisonItemId", { minValue = 0, numBits = 18, trimValues = true }),
+        })
+    )
+
+    return fields
+end
+
+---Creates LGB fields for the Vengeance payload body.
+---@param LGB table LibGroupBroadcast reference
+---@return table[] fields
+local function createVengeanceSetupFields(LGB)
+    return {
+        createAbilityBarField(LGB, "frontAbilities"),
+        createAbilityBarField(LGB, "backAbilities"),
+        createAbilityBarField(LGB, "werewolfAbilities"),
+        LGB.CreateNumericField("frontMHWeaponType", { minValue = 0, numBits = 5, trimValues = true }),
+        LGB.CreateNumericField("frontOHWeaponType", { minValue = 0, numBits = 5, trimValues = true }),
+        LGB.CreateNumericField("backMHWeaponType", { minValue = 0, numBits = 5, trimValues = true }),
+        LGB.CreateNumericField("backOHWeaponType", { minValue = 0, numBits = 5, trimValues = true }),
+        LGB.CreateNumericField("loadoutSkillLineId", { minValue = 0, numBits = 10, trimValues = true }),
+        LGB.CreateArrayField(
+            LGB.CreateNumericField("vengeancePerkDefIds", { minValue = 0, numBits = 20, trimValues = true }),
+            { maxLength = 3 }
+        ),
+        LGB.CreateArrayField(
+            LGB.CreateTableField("scribedAbility", {
+                LGB.CreateNumericField("abilityId", { minValue = 0, numBits = 18, trimValues = true }),
+                LGB.CreateNumericField("scriptId1", { minValue = 0, numBits = 8, trimValues = true }),
+                LGB.CreateNumericField("scriptId2", { minValue = 0, numBits = 8, trimValues = true }),
+                LGB.CreateNumericField("scriptId3", { minValue = 0, numBits = 8, trimValues = true }),
+            }),
+            { maxLength = 7 }
+        ),
+    }
 end
 
 -- =============================================================================
@@ -714,138 +1064,32 @@ function setupShare:Initialize()
     end
     self.requestProtocol = requestProtocol
 
-    -- Shared response protocol field declarations (everything after classId/raceId)
-    local function addResponseFields(protocol)
-        -- Abilities: optional bars (each needs a unique field name for LGB)
-        protocol:AddField(createAbilityBarField(LGB, "frontAbilities"))
-        protocol:AddField(createAbilityBarField(LGB, "backAbilities"))
-        protocol:AddField(createAbilityBarField(LGB, "werewolfAbilities"))
-
-        -- Sets (grouped with per-bar counts)
-        protocol:AddField(LGB.CreateArrayField(
-            LGB.CreateTableField("set", {
-                LGB.CreateNumericField("setId", { minValue = 0, numBits = 10, trimValues = true }),
-                LGB.CreateNumericField("frontCount", { minValue = 0, numBits = 3, trimValues = true }),
-                LGB.CreateNumericField("backCount", { minValue = 0, numBits = 3, trimValues = true }),
-            }),
-            { maxLength = 6 }
-        ))
-
-        -- Armor weights
-        protocol:AddField(LGB.CreateNumericField("lightCount", { minValue = 0, numBits = 3, trimValues = true }))
-        protocol:AddField(LGB.CreateNumericField("mediumCount", { minValue = 0, numBits = 3, trimValues = true }))
-        protocol:AddField(LGB.CreateNumericField("heavyCount", { minValue = 0, numBits = 3, trimValues = true }))
-
-        -- Weapon types (positional)
-        protocol:AddField(LGB.CreateNumericField("frontMHWeaponType", { minValue = 0, numBits = 5, trimValues = true }))
-        protocol:AddField(LGB.CreateNumericField("frontOHWeaponType", { minValue = 0, numBits = 5, trimValues = true }))
-        protocol:AddField(LGB.CreateNumericField("backMHWeaponType", { minValue = 0, numBits = 5, trimValues = true }))
-        protocol:AddField(LGB.CreateNumericField("backOHWeaponType", { minValue = 0, numBits = 5, trimValues = true }))
-
-        -- Armor traits: grouped {traitType, count}
-        protocol:AddField(LGB.CreateArrayField(
-            LGB.CreateTableField("armorTrait", {
-                LGB.CreateNumericField("traitType", { minValue = 0, numBits = 6, trimValues = true }),
-                LGB.CreateNumericField("count", { minValue = 0, numBits = 3, trimValues = true }),
-            }),
-            { maxLength = 4 }
-        ))
-        -- Armor enchants: grouped {enchantId, count}
-        protocol:AddField(LGB.CreateArrayField(
-            LGB.CreateTableField("armorEnchant", {
-                LGB.CreateNumericField("enchantId", { minValue = 0, numBits = 9, trimValues = true }),
-                LGB.CreateNumericField("count", { minValue = 0, numBits = 3, trimValues = true }),
-            }),
-            { maxLength = 4 }
-        ))
-
-        -- Jewelry traits
-        protocol:AddField(LGB.CreateArrayField(
-            LGB.CreateTableField("jewelryTrait", {
-                LGB.CreateNumericField("traitType", { minValue = 0, numBits = 6, trimValues = true }),
-                LGB.CreateNumericField("count", { minValue = 0, numBits = 3, trimValues = true }),
-            }),
-            { maxLength = 3 }
-        ))
-        -- Jewelry enchants
-        protocol:AddField(LGB.CreateArrayField(
-            LGB.CreateTableField("jewelryEnchant", {
-                LGB.CreateNumericField("enchantId", { minValue = 0, numBits = 9, trimValues = true }),
-                LGB.CreateNumericField("count", { minValue = 0, numBits = 3, trimValues = true }),
-            }),
-            { maxLength = 3 }
-        ))
-
-        -- Weapon traits (positional, 4 slots)
-        protocol:AddField(LGB.CreateNumericField("frontMHTrait", { minValue = 0, numBits = 6, trimValues = true }))
-        protocol:AddField(LGB.CreateNumericField("frontOHTrait", { minValue = 0, numBits = 6, trimValues = true }))
-        protocol:AddField(LGB.CreateNumericField("backMHTrait", { minValue = 0, numBits = 6, trimValues = true }))
-        protocol:AddField(LGB.CreateNumericField("backOHTrait", { minValue = 0, numBits = 6, trimValues = true }))
-
-        -- Weapon enchants (positional, 4 slots)
-        protocol:AddField(LGB.CreateNumericField("frontMHEnchant", { minValue = 0, numBits = 9, trimValues = true }))
-        protocol:AddField(LGB.CreateNumericField("frontOHEnchant", { minValue = 0, numBits = 9, trimValues = true }))
-        protocol:AddField(LGB.CreateNumericField("backMHEnchant", { minValue = 0, numBits = 9, trimValues = true }))
-        protocol:AddField(LGB.CreateNumericField("backOHEnchant", { minValue = 0, numBits = 9, trimValues = true }))
-
-        -- Champion: fixed 12 slots
-        protocol:AddField(LGB.CreateArrayField(
-            LGB.CreateNumericField("champion", { minValue = 0, numBits = 10, trimValues = true }),
-            { maxLength = 12 }
-        ))
-
-        -- Food (up to 3 buff ability IDs) + Mundus
-        protocol:AddField(LGB.CreateArrayField(
-            LGB.CreateNumericField("foodAbilityIds", { minValue = 0, numBits = 18, trimValues = true }),
-            { maxLength = 3 }
-        ))
-        protocol:AddField(LGB.CreateArrayField(
-            LGB.CreateNumericField("mundusAbilityIds", { minValue = 0, numBits = 18, trimValues = true }),
-            { maxLength = 2 }
-        ))
-
-        -- Class skill lines (3 IDs)
-        protocol:AddField(LGB.CreateArrayField(
-            LGB.CreateNumericField("classSkillLineIds", { minValue = 0, numBits = 10, trimValues = true }),
-            { maxLength = 3 }
-        ))
-
-        -- Scribed ability details (sparse: only scribed abilities)
-        protocol:AddField(LGB.CreateArrayField(
-            LGB.CreateTableField("scribedAbility", {
-                LGB.CreateNumericField("abilityId", { minValue = 0, numBits = 18, trimValues = true }),
-                LGB.CreateNumericField("scriptId1", { minValue = 0, numBits = 8, trimValues = true }),
-                LGB.CreateNumericField("scriptId2", { minValue = 0, numBits = 8, trimValues = true }),
-                LGB.CreateNumericField("scriptId3", { minValue = 0, numBits = 8, trimValues = true }),
-            }),
-            { maxLength = 7 }
-        ))
-
-        -- Poisons (variant: crafted = PotionEffect 24-bit, unique = item ID 18-bit)
-        protocol:AddField(LGB.CreateOptionalField(
-            LGB.CreateVariantField({
-                LGB.CreateNumericField("frontPoisonEffect", { minValue = 0, numBits = 24, trimValues = true }),
-                LGB.CreateNumericField("frontPoisonItemId", { minValue = 0, numBits = 18, trimValues = true }),
-            })
-        ))
-        protocol:AddField(LGB.CreateOptionalField(
-            LGB.CreateVariantField({
-                LGB.CreateNumericField("backPoisonEffect", { minValue = 0, numBits = 24, trimValues = true }),
-                LGB.CreateNumericField("backPoisonItemId", { minValue = 0, numBits = 18, trimValues = true }),
-            })
-        ))
-    end
-
-    -- Protocol 434: Setup Response (send + read, 8-bit classId/raceId)
+    -- Protocol 434: Setup Response V2 (live legacy, normal builds only)
     local responseProtocol = handler:DeclareProtocol(434, "BattleScrolls_SetupResponseV2")
     responseProtocol:AddField(LGB.CreateNumericField("setupHash", { minValue = 0, numBits = 16, trimValues = true }))
     responseProtocol:AddField(LGB.CreateNumericField("classId", { minValue = 0, numBits = 8, trimValues = true }))
     responseProtocol:AddField(LGB.CreateNumericField("raceId", { minValue = 0, numBits = 8, trimValues = true }))
-    addResponseFields(responseProtocol)
-    responseProtocol:OnData(onSetupResponse)
+    addFieldsToProtocol(responseProtocol, createNormalSetupFields(LGB, false))
+    responseProtocol:OnData(onLegacySetupResponse)
     if not responseProtocol:Finalize({ isRelevantInCombat = false, replaceQueuedMessages = false }) then
         log.Warn("SetupShare: response protocol 434 failed to finalize")
         return
     end
     self.responseProtocol = responseProtocol
+
+    -- Protocol 436: Setup Response V3 (unreleased Class Mastery/Vengeance patch)
+    local responseProtocolV3 = handler:DeclareProtocol(436, "BattleScrolls_SetupResponseV3")
+    responseProtocolV3:AddField(LGB.CreateNumericField("setupHash", { minValue = 0, numBits = 16, trimValues = true }))
+    responseProtocolV3:AddField(LGB.CreateNumericField("classId", { minValue = 0, numBits = 8, trimValues = true }))
+    responseProtocolV3:AddField(LGB.CreateNumericField("raceId", { minValue = 0, numBits = 8, trimValues = true }))
+    responseProtocolV3:AddField(LGB.CreateVariantField({
+        LGB.CreateTableField("normalSetup", createNormalSetupFields(LGB, true)),
+        LGB.CreateTableField("vengeanceSetup", createVengeanceSetupFields(LGB)),
+    }))
+    responseProtocolV3:OnData(onSetupResponseV3)
+    if not responseProtocolV3:Finalize({ isRelevantInCombat = false, replaceQueuedMessages = false }) then
+        log.Warn("SetupShare: response protocol 436 failed to finalize")
+        return
+    end
+    self.responseProtocolV3 = responseProtocolV3
 end

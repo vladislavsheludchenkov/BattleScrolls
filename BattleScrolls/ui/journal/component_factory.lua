@@ -53,6 +53,15 @@ local CHAMP_ROW_HEIGHT = 40
 local CHAMP_ICON_SIZE = 32
 local CHAMP_ICON_GAP = 16
 
+-- Vengeance perk row sizing. Basegame uses a 52px icon/background with a 104px border.
+local VENGEANCE_PERK_ICON_SIZE = 40
+local VENGEANCE_PERK_FRAME_SIZE = VENGEANCE_PERK_ICON_SIZE * 2
+local VENGEANCE_PERK_ROW_HEIGHT = VENGEANCE_PERK_FRAME_SIZE
+local VENGEANCE_PERK_OVERVIEW_ICON_SIZE = 52
+local VENGEANCE_PERK_OVERVIEW_FRAME_SIZE = VENGEANCE_PERK_OVERVIEW_ICON_SIZE * 2
+local VENGEANCE_PERK_OVERVIEW_ROW_HEIGHT = VENGEANCE_PERK_OVERVIEW_FRAME_SIZE
+local VENGEANCE_PERK_LABEL_GAP = 20
+
 -- 3-column champion row
 local CHAMP_3COL_ROW_HEIGHT = 36
 local CHAMP_3COL_ICON_GAP = 8
@@ -259,6 +268,11 @@ end
 local ComponentFactory = {}
 ComponentFactory.__index = ComponentFactory
 
+---@class VengeancePerkRowItem
+---@field slotFlag number
+---@field icon string
+---@field name string
+
 function ComponentFactory.new()
     return setmetatable({ pools = {} }, ComponentFactory)
 end
@@ -281,11 +295,14 @@ function ComponentFactory:Initialize(panel)
         labeledBar      = ControlPool.new(nil, parent, "LabeledBar"),
         sideBySideBars  = ControlPool.new(nil, parent, "SideBars"),
         championRow2Col = ControlPool.new(nil, parent, "Champ2Col"),
+        vengeancePerkRow2Col = ControlPool.new(nil, parent, "VengPerk2Col"),
         iconTextRow     = ControlPool.new(nil, parent, "IconText"),
         plainTextRow    = ControlPool.new(nil, parent, "PlainText"),
+        horizontalStack = ControlPool.new(nil, parent, "HStack"),
         iconTextRow3Col = ControlPool.new(nil, parent, "IconText3Col"),
         textRow3Col     = ControlPool.new(nil, parent, "Text3Col"),
         championRow3Col = ControlPool.new(nil, parent, "Champ3Col"),
+        vengeancePerkRow3Col = ControlPool.new(nil, parent, "VengPerk3Col"),
     }
 end
 
@@ -374,7 +391,7 @@ end
 ---@param icon string Texture path
 ---@param text string
 ---@param color ZO_ColorDef|table|nil
----@param showFrame boolean|nil Whether to show edge frame (default true)
+---@param showFrame boolean|nil Whether to show icon frame (default true)
 ---@return Control
 function ColumnBuilder:IconTextRow(icon, text, color, showFrame)
     local row = self.pools.iconTextRow:Acquire()
@@ -393,15 +410,40 @@ function ColumnBuilder:IconTextRow(icon, text, color, showFrame)
         row.frame:SetAnchor(TOPLEFT, row.iconCtrl, TOPLEFT, -ICON_TEXT_FRAME_INSET, -ICON_TEXT_FRAME_INSET)
         row.frame:SetAnchor(BOTTOMRIGHT, row.iconCtrl, BOTTOMRIGHT, ICON_TEXT_FRAME_INSET, ICON_TEXT_FRAME_INSET)
 
+        row.circleFrame = CreateControl(row:GetName() .. "CircleFrame", row, CT_TEXTURE)
+        row.circleFrame:SetTexture("EsoUI/Art/Miscellaneous/Gamepad/gp_passiveFrame_64.dds")
+        row.circleFrame:SetColor(ZO_NORMAL_TEXT:UnpackRGBA())
+        row.circleFrame:SetDrawLevel(1)
+        row.circleFrame:SetAnchor(TOPLEFT, row.iconCtrl, TOPLEFT, -ICON_TEXT_FRAME_INSET, -ICON_TEXT_FRAME_INSET)
+        row.circleFrame:SetAnchor(BOTTOMRIGHT, row.iconCtrl, BOTTOMRIGHT, ICON_TEXT_FRAME_INSET, ICON_TEXT_FRAME_INSET)
+
         row.label = CreateControl(row:GetName() .. "Label", row, CT_LABEL)
         row.label:SetFont("ZoFontGamepad27")
         row.label:SetAnchor(LEFT, row, LEFT, ICON_TEXT_LABEL_OFFSET, 0)
+        row.label:SetMaxLineCount(1)
+        row.label:SetWrapMode(TEXT_WRAP_MODE_ELLIPSIS)
+        row.label:SetVerticalAlignment(TEXT_ALIGN_CENTER)
+
+        row._layoutWidth = function(control, width)
+            control:SetWidth(width)
+            control.label:SetWidth(math.max(0, width - ICON_TEXT_LABEL_OFFSET))
+            control.label:SetHeight(ICON_TEXT_ROW_HEIGHT)
+        end
+        row._measureWidth = function(control)
+            return ICON_TEXT_LABEL_OFFSET + control.label:GetTextWidth() + 4
+        end
     end
 
     row:SetHeight(ICON_TEXT_ROW_HEIGHT)
+    row._layoutWidth(row, self.width)
     row.iconCtrl:SetTexture(icon)
     row.iconCtrl:SetHidden(false)
-    row.frame:SetHidden(showFrame == false)
+
+    local frameVisible = showFrame ~= false
+    local isPassive = frameVisible and journal.utils.isPassiveIcon(icon)
+    row.frame:SetHidden(not frameVisible or isPassive)
+    row.circleFrame:SetHidden(not frameVisible or not isPassive)
+
     row.label:SetText(text)
 
     if color then
@@ -696,6 +738,64 @@ end
 -- Composite Factories
 -------------------------
 
+---Creates a horizontal stack using each child's measured width.
+---Accepts controls as varargs or as arrays, matching Section()/mount().
+---@param gap number Horizontal gap between children
+---@param ... Control|Control[]|nil Children
+---@return Control|nil container
+function ColumnBuilder:HorizontalStack(gap, ...)
+    local children = collectArgs(...)
+    if #children == 0 then return nil end
+
+    local container = self.pools.horizontalStack:Acquire()
+    local childCount = #children
+    gap = gap or 0
+    local totalGap = gap * math.max(0, childCount - 1)
+    local availableWidth = math.max(0, self.width - totalGap)
+    local childWidths = {}
+    local totalChildWidth = 0
+    for index, child in ipairs(children) do
+        local childWidth = child._measureWidth and child._measureWidth(child) or child:GetWidth()
+        childWidth = math.max(0, math.floor(childWidth or 0))
+        childWidths[index] = childWidth
+        totalChildWidth = totalChildWidth + childWidth
+    end
+
+    if totalChildWidth > availableWidth and totalChildWidth > 0 then
+        local scale = availableWidth / totalChildWidth
+        local scaledTotal = 0
+        for index, childWidth in ipairs(childWidths) do
+            childWidth = math.max(0, math.floor(childWidth * scale))
+            childWidths[index] = childWidth
+            scaledTotal = scaledTotal + childWidth
+        end
+        childWidths[childCount] = childWidths[childCount] + (availableWidth - scaledTotal)
+    end
+
+    local offsetX = 0
+    local maxHeight = 0
+
+    for index, child in ipairs(children) do
+        local childWidth = childWidths[index]
+        child:SetParent(container)
+        child:ClearAnchors()
+        child:SetAnchor(TOPLEFT, container, TOPLEFT, offsetX, 0)
+        child:SetWidth(childWidth)
+        if child._layoutWidth then
+            child._layoutWidth(child, childWidth)
+        end
+        child:SetHidden(false)
+
+        maxHeight = math.max(maxHeight, child:GetHeight())
+        offsetX = offsetX + childWidth + gap
+    end
+
+    container:SetHeight(maxHeight)
+    container:SetWidth(math.max(0, offsetX - gap))
+    container._topGap = children[1]._topGap or DEFAULT_CHILD_GAP
+    return container
+end
+
 ---Creates a section with header and stacked children.
 ---Returns nil if no children (conditional rendering).
 ---@param title string Section header text
@@ -951,6 +1051,101 @@ function ColumnBuilder:ChampionRow2Col(leftName, leftIcon, rightName, rightIcon)
     row:SetHeight(CHAMP_ROW_HEIGHT)
     row:SetWidth(self.width)
     row._topGap = 3
+    return row
+end
+
+---Ensures a programmatic Vengeance perk row has enough columns.
+---@param row Control
+---@param count number
+local function ensureVengeancePerkColumns(row, count)
+    if not row.perkCols then row.perkCols = {} end
+
+    while #row.perkCols < count do
+        local index = #row.perkCols + 1
+        local col = {}
+
+        col.framedIcon = journal.utils.createVengeancePerkFramedIcon(row)
+
+        col.label = CreateControl(row:GetName() .. "C" .. index .. "Label", row, CT_LABEL)
+        col.label:SetColor(ZO_SELECTED_TEXT:UnpackRGBA())
+        col.label:SetMaxLineCount(1)
+        col.label:SetWrapMode(TEXT_WRAP_MODE_ELLIPSIS)
+        col.label:SetVerticalAlignment(TEXT_ALIGN_CENTER)
+
+        row.perkCols[index] = col
+    end
+end
+
+---@param col table
+---@param item VengeancePerkRowItem|nil
+---@param row Control
+---@param offsetX number
+---@param colWidth number
+---@param iconSize number
+---@param frameSize number
+---@param rowHeight number
+---@param font string
+local function layoutVengeancePerkColumn(col, item, row, offsetX, colWidth, iconSize, frameSize, rowHeight, font)
+    if not item or item.name == "" then
+        col.framedIcon:SetHidden(true)
+        col.label:SetHidden(true)
+        return
+    end
+
+    local frameBleed = math.max(0, math.floor((frameSize - iconSize) / 2))
+    local iconCenterX = offsetX + frameBleed + math.floor(iconSize / 2)
+
+    journal.utils.setupVengeancePerkFramedIcon(col.framedIcon, item.slotFlag, item.icon, iconSize)
+    col.framedIcon:ClearAnchors()
+    col.framedIcon:SetAnchor(CENTER, row, LEFT, iconCenterX, 0)
+
+    local labelOffsetX = offsetX + frameBleed + iconSize + VENGEANCE_PERK_LABEL_GAP
+    col.label:SetFont(font)
+    col.label:SetHeight(rowHeight)
+    col.label:ClearAnchors()
+    col.label:SetAnchor(LEFT, row, LEFT, labelOffsetX, 0)
+    col.label:SetWidth(math.max(0, colWidth - frameBleed - iconSize - VENGEANCE_PERK_LABEL_GAP))
+    col.label:SetText(item.name)
+    col.label:SetHidden(false)
+end
+
+---Creates a 2-column Vengeance perk row with ESO-style framed icons.
+---@param left VengeancePerkRowItem
+---@param right VengeancePerkRowItem|nil
+---@return Control
+function ColumnBuilder:VengeancePerkRow2Col(left, right)
+    local row = self.pools.vengeancePerkRow2Col:Acquire()
+    ensureVengeancePerkColumns(row, 2)
+
+    local halfWidth = math.floor(self.width / 2)
+    layoutVengeancePerkColumn(row.perkCols[1], left, row, 0, halfWidth,
+        VENGEANCE_PERK_ICON_SIZE, VENGEANCE_PERK_FRAME_SIZE, VENGEANCE_PERK_ROW_HEIGHT, "ZoFontGamepad34")
+    layoutVengeancePerkColumn(row.perkCols[2], right, row, halfWidth, halfWidth,
+        VENGEANCE_PERK_ICON_SIZE, VENGEANCE_PERK_FRAME_SIZE, VENGEANCE_PERK_ROW_HEIGHT, "ZoFontGamepad34")
+
+    row:SetHeight(VENGEANCE_PERK_ROW_HEIGHT)
+    row:SetWidth(self.width)
+    row._topGap = 1
+    return row
+end
+
+---Creates a 3-column Vengeance perk row with larger overview icons.
+---@param items (VengeancePerkRowItem|nil)[]
+---@return Control
+function ColumnBuilder:VengeancePerkRow3Col(items)
+    local row = self.pools.vengeancePerkRow3Col:Acquire()
+    ensureVengeancePerkColumns(row, 3)
+
+    local colWidth = math.floor(self.width / 3)
+    for c = 1, 3 do
+        layoutVengeancePerkColumn(row.perkCols[c], items[c], row, (c - 1) * colWidth, colWidth,
+            VENGEANCE_PERK_OVERVIEW_ICON_SIZE, VENGEANCE_PERK_OVERVIEW_FRAME_SIZE,
+            VENGEANCE_PERK_OVERVIEW_ROW_HEIGHT, "ZoFontGamepad27")
+    end
+
+    row:SetHeight(VENGEANCE_PERK_OVERVIEW_ROW_HEIGHT)
+    row:SetWidth(self.width)
+    row._topGap = 1
     return row
 end
 

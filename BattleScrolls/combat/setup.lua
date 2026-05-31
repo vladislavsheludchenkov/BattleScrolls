@@ -8,6 +8,7 @@
 --   - Equipment per slot (set, trait, armor/weapon type, enchant)
 --   - Race, class, class skill lines
 --   - Mundus stone(s), food buff(s)
+--   - Vengeance loadout/perks when in a Vengeance ruleset
 -----------------------------------------------------------
 
 if not SemisPlaygroundCheckAccess() then
@@ -47,12 +48,21 @@ BattleScrolls = BattleScrolls or {}
 ---@field raceId number
 ---@field classId number
 ---@field classSkillLineIds number[] -- 3 entries (one per class skill line)
+---@field classMasteryAbilityIds number[]|nil -- Active Class Mastery passive ability IDs (nil when unavailable or none selected)
 ---@field mundusAbilityIds number[]|nil -- 0-2 mundus stone buff ability IDs
 ---@field foods PlayerSetupFood[]|nil -- Top 1-3 food buffs (nil if no food)
 ---@field werewolfAbilities PlayerSetupAbility[]|nil -- Werewolf bar (only if player transformed during fight)
 ---@field werewolfEntireFight boolean|nil -- true if player was in werewolf form the entire fight
+---@field isVengeance boolean|nil -- true when captured in a Vengeance ruleset
+---@field loadoutSkillLineId number|nil -- Vengeance loadout skill line ID
+---@field vengeancePerkDefIds number[]|nil -- {red, yellow, blue} Vengeance perk def IDs; 0 = empty
+---@field weaponTypes number[]|nil -- {frontMH, frontOH, backMH, backOH}; Vengeance stores weapon types only
 
 local FOOD_ABILITY_INFO = BattleScrolls.constants.foodAbilityInfo
+local VENGEANCE_LOADOUTS_BY_SKILL_LINE_ID = BattleScrolls.constants.VENGEANCE_LOADOUTS_BY_SKILL_LINE_ID
+local VENGEANCE_PERK_SLOTS = BattleScrolls.constants.VENGEANCE_PERK_SLOTS
+local VENGEANCE_PERK_SCAN_MAX_RANK = 100
+local VENGEANCE_PERK_EMPTY_RANK_RUN_LIMIT = 10
 
 -- Fixed slot order (no slot IDs stored, position is implicit)
 local EQUIP_SLOTS = {
@@ -194,17 +204,187 @@ local function captureEquipSlots()
     return result
 end
 
+---@return (string|false)[]
+local function emptyEquipSlots()
+    local result = {}
+    for i = 1, #EQUIP_SLOTS do
+        result[i] = false
+    end
+    return result
+end
+
+---Captures only weapon type IDs from equipment slot links.
+---@param equipSlots (string|false)[]
+---@return number[] weaponTypes {frontMH, frontOH, backMH, backOH}
+local function captureWeaponTypes(equipSlots)
+    local function weaponType(slotIndex)
+        local link = equipSlots[slotIndex]
+        if link then
+            return GetItemLinkWeaponType(link) or 0
+        end
+        return 0
+    end
+
+    return {
+        weaponType(5),
+        weaponType(6),
+        weaponType(13),
+        weaponType(14),
+    }
+end
+
+---@return boolean
+local function isVengeanceRuleset()
+    return type(IsCurrentCampaignVengeanceRuleset) == "function"
+        and IsCurrentCampaignVengeanceRuleset() == true
+end
+
+---@return number|nil skillLineId
+local function captureVengeanceLoadoutSkillLineId()
+    for skillType = SKILL_TYPE_ITERATION_BEGIN, SKILL_TYPE_ITERATION_END do
+        for skillLineIndex = 1, GetNumSkillLines(skillType) do
+            local skillLineId = GetSkillLineId(skillType, skillLineIndex)
+            local loadout = VENGEANCE_LOADOUTS_BY_SKILL_LINE_ID[skillLineId]
+            if loadout then
+                local _, _, isActive = GetSkillLineDynamicInfo(skillType, skillLineIndex)
+                if isActive then
+                    return skillLineId
+                end
+            end
+        end
+    end
+
+    return nil
+end
+
+---@type table<string, number>|nil
+local vengeancePerkDefIdsByName = nil
+
+---Builds a lookup from localized perk name to stable perk def ID.
+---ESO exposes active perk indices for slots, but def IDs are only available from
+---the Veterancy reward track.
+---@return table<string, number>
+local function getVengeancePerkDefIdsByName()
+    if vengeancePerkDefIdsByName then
+        return vengeancePerkDefIdsByName
+    end
+
+    local requestParsed = _G["RequestParsedPerkAvailabilityForCurrentSeason"]
+    if type(requestParsed) == "function" then
+        requestParsed()
+    end
+
+    local getNumberOfPerksUnlocked = _G["GetNumberOfPerksUnlockedAtVeterancyRank"]
+    local getPerkDefId = _G["GetPerkDefIdForPerkAtVeterancyRank"]
+    local getPerkName = _G["GetVengeancePerkName"]
+    local result = {}
+
+    if type(getNumberOfPerksUnlocked) == "function"
+        and type(getPerkDefId) == "function"
+        and type(getPerkName) == "function" then
+        local foundPerkRank = false
+        local emptyRun = 0
+        for rank = 1, VENGEANCE_PERK_SCAN_MAX_RANK do
+            local numPerks = getNumberOfPerksUnlocked(rank) or 0
+            if numPerks > 0 then
+                foundPerkRank = true
+                emptyRun = 0
+                for unlockIndex = 1, numPerks do
+                    local defId = getPerkDefId(rank, unlockIndex)
+                    if defId and defId > 0 then
+                        local name = getPerkName(defId)
+                        if name and name ~= "" then
+                            result[name] = defId
+                        end
+                    end
+                end
+            elseif foundPerkRank then
+                emptyRun = emptyRun + 1
+                if emptyRun >= VENGEANCE_PERK_EMPTY_RANK_RUN_LIMIT then
+                    break
+                end
+            end
+        end
+    end
+
+    vengeancePerkDefIdsByName = result
+    return result
+end
+
+---Captures active Vengeance perks as stable def IDs in red/yellow/blue order.
+---@return number[]|nil
+local function captureVengeancePerks()
+    local getIndexInSlot = _G["GetIndexOfPerkInSlotForRole"]
+    local getPerkNameAtIndex = _G["GetVengeancePerkNameAtIndex"]
+    if type(getIndexInSlot) ~= "function" or type(getPerkNameAtIndex) ~= "function" then
+        return nil
+    end
+
+    local defIdsByName = getVengeancePerkDefIdsByName()
+    local result = { 0, 0, 0 }
+    local hasPerk = false
+
+    for i, slotFlag in ipairs(VENGEANCE_PERK_SLOTS) do
+        local perkIndex = getIndexInSlot(slotFlag)
+        if perkIndex and perkIndex > 0 and perkIndex <= MAX_PERKS_AVAILABLE_PER_LOADOUT then
+            local name = getPerkNameAtIndex(perkIndex)
+            local defId = name and defIdsByName[name] or nil
+            if defId and defId > 0 then
+                result[i] = defId
+                hasPerk = true
+            end
+        end
+    end
+
+    return hasPerk and result or nil
+end
+
+---Checks whether a class skill line is a Class Mastery line.
+---@param skillLineId number
+---@return boolean
+local function isClassMasterySkillLine(skillLineId)
+    return type(IsClassMasterySkillLine) == "function" and IsClassMasterySkillLine(skillLineId) == true
+end
+
 ---Captures active class skill line IDs (up to 3, may include lines from other classes via subclassing)
 ---@return number[]
 local function captureClassSkillLines()
     local result = {}
     for skillLineIndex = 1, GetNumSkillLines(SKILL_TYPE_CLASS) do
+        local skillLineId = GetSkillLineId(SKILL_TYPE_CLASS, skillLineIndex)
         local _, _, isActive = GetSkillLineDynamicInfo(SKILL_TYPE_CLASS, skillLineIndex)
-        if isActive then
-            result[#result + 1] = GetSkillLineId(SKILL_TYPE_CLASS, skillLineIndex)
+        if isActive and not isClassMasterySkillLine(skillLineId) then
+            result[#result + 1] = skillLineId
         end
     end
     return result
+end
+
+---Captures active Class Mastery passive ability IDs for the player's class.
+---Builds with no selected Class Mastery passives keep showing class skill lines.
+---@return number[]|nil
+local function captureClassMasteryAbilities()
+    if type(IsClassMasterySkillLine) ~= "function" then return nil end
+
+    local playerClassId = GetUnitClassId("player")
+    local result = {}
+    for skillLineIndex = 1, GetNumSkillLines(SKILL_TYPE_CLASS) do
+        local skillLineId = GetSkillLineId(SKILL_TYPE_CLASS, skillLineIndex)
+        if isClassMasterySkillLine(skillLineId)
+            and GetSkillLineClassId(SKILL_TYPE_CLASS, skillLineIndex) == playerClassId then
+            for skillIndex = 1, GetNumSkillAbilities(SKILL_TYPE_CLASS, skillLineIndex) do
+                local _, _, _, isPassive, _, isPurchased = GetSkillAbilityInfo(SKILL_TYPE_CLASS, skillLineIndex, skillIndex)
+                if isPassive and isPurchased then
+                    local abilityId = GetSkillAbilityId(SKILL_TYPE_CLASS, skillLineIndex, skillIndex, false)
+                    if abilityId and abilityId > 0 then
+                        result[#result + 1] = abilityId
+                    end
+                end
+            end
+        end
+    end
+
+    return #result > 0 and result or nil
 end
 
 ---Scans active buffs for mundus stone ability IDs (0-2 results)
@@ -251,6 +431,37 @@ local function extractFoodsFromEffects(effectsOnPlayer)
         end
     end
     return foods
+end
+
+---@return PlayerSetup
+local function captureSetupSnapshot()
+    local capturedEquipSlots = captureEquipSlots()
+    local isVengeance = isVengeanceRuleset()
+
+    local food = (not isVengeance) and captureFoodFromBuffs() or nil
+
+    ---@type PlayerSetup
+    local setup = {
+        abilities = captureAbilities(),
+        champion = isVengeance and {} or captureChampion(),
+        equipSlots = isVengeance and emptyEquipSlots() or capturedEquipSlots,
+        frontBarDisabled = false,
+        backBarDisabled = false,
+        frontPoison = (not isVengeance) and capturePoison(EQUIP_SLOT_POISON) or nil,
+        backPoison = (not isVengeance) and capturePoison(EQUIP_SLOT_BACKUP_POISON) or nil,
+        raceId = GetUnitRaceId("player"),
+        classId = GetUnitClassId("player"),
+        classSkillLineIds = isVengeance and {} or captureClassSkillLines(),
+        classMasteryAbilityIds = (not isVengeance) and captureClassMasteryAbilities() or nil,
+        mundusAbilityIds = (not isVengeance) and captureMundus() or nil,
+        foods = food and { food } or nil,
+        isVengeance = isVengeance or nil,
+        loadoutSkillLineId = isVengeance and captureVengeanceLoadoutSkillLineId() or nil,
+        vengeancePerkDefIds = isVengeance and captureVengeancePerks() or nil,
+        weaponTypes = isVengeance and captureWeaponTypes(capturedEquipSlots) or nil,
+    }
+
+    return setup
 end
 
 ---@class SetupCapture : StateObserver
@@ -315,25 +526,7 @@ function setupCapture:OnStateInitialized()
             end)
     end
 
-    ---@type PlayerSetup
-    BattleScrolls.state.playerSetup = {
-        abilities = captureAbilities(),
-        champion = captureChampion(),
-        equipSlots = captureEquipSlots(),
-        frontBarDisabled = false,
-        backBarDisabled = false,
-        frontPoison = capturePoison(EQUIP_SLOT_POISON),
-        backPoison = capturePoison(EQUIP_SLOT_BACKUP_POISON),
-        raceId = GetUnitRaceId("player"),
-        classId = GetUnitClassId("player"),
-        classSkillLineIds = captureClassSkillLines(),
-        mundusAbilityIds = captureMundus(),
-    }
-    -- Capture food from active buffs as fallback (in case effect tracking is off)
-    local food = captureFoodFromBuffs()
-    if food then
-        BattleScrolls.state.playerSetup.foods = { food }
-    end
+    BattleScrolls.state.playerSetup = captureSetupSnapshot()
 end
 
 ---Wipes ability data for a bar, replacing all entries with empty.
@@ -362,6 +555,10 @@ local function finalizeBarSwapLock(setup)
         -- Wipe back weapon slots (indices 13-14)
         setup.equipSlots[13] = false
         setup.equipSlots[14] = false
+        if setup.weaponTypes then
+            setup.weaponTypes[3] = 0
+            setup.weaponTypes[4] = 0
+        end
     else
         setup.frontBarDisabled = true
         setup.frontPoison = nil
@@ -369,6 +566,10 @@ local function finalizeBarSwapLock(setup)
         -- Wipe front weapon slots (indices 5-6)
         setup.equipSlots[5] = false
         setup.equipSlots[6] = false
+        if setup.weaponTypes then
+            setup.weaponTypes[1] = 0
+            setup.weaponTypes[2] = 0
+        end
     end
 end
 
@@ -401,22 +602,7 @@ end
 ---Captures a PlayerSetup snapshot from current live player data (works outside combat).
 ---@return PlayerSetup
 function setupCapture:captureCurrentSetup()
-    local food = captureFoodFromBuffs()
-    ---@type PlayerSetup
-    local setup = {
-        abilities = captureAbilities(),
-        champion = captureChampion(),
-        equipSlots = captureEquipSlots(),
-        frontBarDisabled = false,
-        backBarDisabled = false,
-        frontPoison = capturePoison(EQUIP_SLOT_POISON),
-        backPoison = capturePoison(EQUIP_SLOT_BACKUP_POISON),
-        raceId = GetUnitRaceId("player"),
-        classId = GetUnitClassId("player"),
-        classSkillLineIds = captureClassSkillLines(),
-        mundusAbilityIds = captureMundus(),
-        foods = food and { food } or nil,
-    }
+    local setup = captureSetupSnapshot()
 
     -- Werewolf: show WW bar only if currently transformed or WW ult is slotted
     local werewolfBar = captureWerewolfBar()
@@ -441,12 +627,20 @@ function setupCapture:captureCurrentSetup()
                 wipeAbilities(setup.abilities.back)
                 setup.equipSlots[13] = false
                 setup.equipSlots[14] = false
+                if setup.weaponTypes then
+                    setup.weaponTypes[3] = 0
+                    setup.weaponTypes[4] = 0
+                end
             else
                 setup.frontBarDisabled = true
                 setup.frontPoison = nil
                 wipeAbilities(setup.abilities.front)
                 setup.equipSlots[5] = false
                 setup.equipSlots[6] = false
+                if setup.weaponTypes then
+                    setup.weaponTypes[1] = 0
+                    setup.weaponTypes[2] = 0
+                end
             end
         end
     end
@@ -459,6 +653,7 @@ end
 ---@param setup PlayerSetup
 ---@param effectsOnPlayer table<number, EffectStats>
 function setupCapture.finalizeEffectData(setup, effectsOnPlayer)
+    if setup.isVengeance then return end
     local foods = extractFoodsFromEffects(effectsOnPlayer)
     if foods then
         setup.foods = foods

@@ -12,7 +12,7 @@ BattleScrolls = BattleScrolls or {}
 local binaryStorage = {}
 BattleScrolls.binaryStorage = binaryStorage
 
-local CURRENT_VERSION = 15
+local CURRENT_VERSION = 16
 
 -- Import BitEncoder/BitDecoder from bitcodec module
 local BitEncoder = BattleScrolls.bitcodec.BitEncoder
@@ -84,8 +84,11 @@ local BITS = {
     RACE_ID = 8,
     CLASS_ID = 8,
     SKILL_LINE_ID = 16,
+    CLASS_MASTERY_ABILITY_COUNT = 3,
     MUNDUS_COUNT = 2,
     FOOD_COUNT = 2,
+    WEAPON_TYPE = 5,
+    VENGEANCE_PERK_DEF_ID = 20,
 }
 
 local EQUIP_SLOT_COUNT = 14
@@ -968,21 +971,35 @@ local function readAbilityBar(decoder)
     return bar
 end
 
-local function writeSetup(encoder, setup)
-    -- Abilities: 12 slots (6 front + 6 back)
-    writeAbilityBar(encoder, setup.abilities.front)
-    writeAbilityBar(encoder, setup.abilities.back)
-
-    -- Champion: variable-length
-    local champion = setup.champion or {}
+---@param encoder BitEncoder
+---@param champion PlayerSetupChampionSkill[]|nil
+local function writeChampionPayload(encoder, champion)
+    champion = champion or {}
     local championCount = writeCount(encoder, #champion, BITS.CHAMPION_COUNT)
     for i = 1, championCount do
         encoder:writeUInt(champion[i].skillId, BITS.CHAMPION_SKILL_ID)
         encoder:writeUInt(champion[i].disciplineId, BITS.DISCIPLINE_ID)
     end
+end
 
-    -- Equipment: 14 fixed slots as item link strings (no poison)
-    local equipSlots = setup.equipSlots or {}
+---@param decoder BitDecoder
+---@return PlayerSetupChampionSkill[]
+local function readChampionPayload(decoder)
+    local champion = {}
+    local championCount = decoder:readUInt(BITS.CHAMPION_COUNT)
+    for _ = 1, championCount do
+        champion[#champion + 1] = {
+            skillId = decoder:readUInt(BITS.CHAMPION_SKILL_ID),
+            disciplineId = decoder:readUInt(BITS.DISCIPLINE_ID),
+        }
+    end
+    return champion
+end
+
+---@param encoder BitEncoder
+---@param equipSlots (string|false)[]|nil
+local function writeEquipSlotsPayload(encoder, equipSlots)
+    equipSlots = equipSlots or {}
     for i = 1, EQUIP_SLOT_COUNT do
         local link = equipSlots[i]
         if link and link ~= "" then
@@ -992,12 +1009,34 @@ local function writeSetup(encoder, setup)
             encoder:writeBit(false)
         end
     end
+end
 
-    -- Bar disabled flags (bar swap locked)
-    encoder:writeBit(setup.frontBarDisabled or false)
-    encoder:writeBit(setup.backBarDisabled or false)
+---@param decoder BitDecoder
+---@return (string|false)[]
+local function readEquipSlotsPayload(decoder)
+    local equipSlots = {}
+    for i = 1, EQUIP_SLOT_COUNT do
+        if decoder:readBit() then
+            equipSlots[i] = decoder:readString()
+        else
+            equipSlots[i] = false
+        end
+    end
+    return equipSlots
+end
 
-    -- Poisons: 2 slots (front, back) as item link strings (v11+)
+---@return (string|false)[]
+local function makeEmptyEquipSlots()
+    local equipSlots = {}
+    for i = 1, EQUIP_SLOT_COUNT do
+        equipSlots[i] = false
+    end
+    return equipSlots
+end
+
+---@param encoder BitEncoder
+---@param setup PlayerSetup
+local function writePoisonPayload(encoder, setup)
     if setup.frontPoison then
         encoder:writeBit(true)
         encoder:writeString(setup.frontPoison.itemLink)
@@ -1010,16 +1049,73 @@ local function writeSetup(encoder, setup)
     else
         encoder:writeBit(false)
     end
+end
 
-    -- Race, class, skill lines, mundus, food
-    encoder:writeUInt(setup.raceId or 0, BITS.RACE_ID)
-    encoder:writeUInt(setup.classId or 0, BITS.CLASS_ID)
+---@param decoder BitDecoder
+---@param version number
+---@return PlayerSetupPoison|nil frontPoison
+---@return PlayerSetupPoison|nil backPoison
+local function readPoisonPayload(decoder, version)
+    local frontPoison = nil
+    local backPoison = nil
+    if version >= 11 then
+        if decoder:readBit() then
+            frontPoison = { itemLink = decoder:readString() }
+        end
+        if decoder:readBit() then
+            backPoison = { itemLink = decoder:readString() }
+        end
+    else
+        -- v10 and earlier stored poison ability IDs; consume and discard them.
+        if decoder:readBit() then decoder:readUInt(BITS.ABILITY_ID) end
+        if decoder:readBit() then decoder:readUInt(BITS.ABILITY_ID) end
+    end
+    return frontPoison, backPoison
+end
 
+---@param encoder BitEncoder
+---@param setup PlayerSetup
+local function writeClassPayload(encoder, setup)
     local classSkillLineIds = setup.classSkillLineIds or {}
     for i = 1, 3 do
         encoder:writeUInt(classSkillLineIds[i] or 0, BITS.SKILL_LINE_ID)
     end
 
+    if setup.classMasteryAbilityIds then
+        encoder:writeBit(true)
+        local classMasteryAbilityIds = setup.classMasteryAbilityIds
+        local classMasteryAbilityCount = writeCount(encoder, #classMasteryAbilityIds, BITS.CLASS_MASTERY_ABILITY_COUNT)
+        for i = 1, classMasteryAbilityCount do
+            encoder:writeUInt(classMasteryAbilityIds[i], BITS.ABILITY_ID)
+        end
+    else
+        encoder:writeBit(false)
+    end
+end
+
+---@param decoder BitDecoder
+---@param result PlayerSetup
+---@param version number
+local function readClassPayload(decoder, result, version)
+    local classSkillLineIds = {}
+    for i = 1, 3 do
+        classSkillLineIds[i] = decoder:readUInt(BITS.SKILL_LINE_ID)
+    end
+    result.classSkillLineIds = classSkillLineIds
+
+    if version >= 16 and decoder:readBit() then
+        local classMasteryAbilityCount = decoder:readUInt(BITS.CLASS_MASTERY_ABILITY_COUNT)
+        local classMasteryAbilityIds = {}
+        for _ = 1, classMasteryAbilityCount do
+            classMasteryAbilityIds[#classMasteryAbilityIds + 1] = decoder:readUInt(BITS.ABILITY_ID)
+        end
+        result.classMasteryAbilityIds = classMasteryAbilityIds
+    end
+end
+
+---@param encoder BitEncoder
+---@param setup PlayerSetup
+local function writeMundusAndFoodPayload(encoder, setup)
     local mundus = setup.mundusAbilityIds or {}
     local mundusCount = writeCount(encoder, #mundus, BITS.MUNDUS_COUNT)
     for i = 1, mundusCount do
@@ -1037,87 +1133,11 @@ local function writeSetup(encoder, setup)
             encoder:writeBit(false)
         end
     end
-
-    -- v10+: werewolf bar
-    if setup.werewolfAbilities then
-        encoder:writeBit(true)
-        encoder:writeBit(setup.werewolfEntireFight or false)
-        writeAbilityBar(encoder, setup.werewolfAbilities)
-    else
-        encoder:writeBit(false)
-    end
 end
 
----Reads a PlayerSetup from decoder
 ---@param decoder BitDecoder
----@param version number Binary format version
----@return PlayerSetup
-local function readSetup(decoder, version)
-    -- Abilities: 12 slots (6 front + 6 back)
-    local front = readAbilityBar(decoder)
-    local back = readAbilityBar(decoder)
-
-    -- Champion
-    local championCount = decoder:readUInt(BITS.CHAMPION_COUNT)
-    local champion = {}
-    for _ = 1, championCount do
-        champion[#champion + 1] = {
-            skillId = decoder:readUInt(BITS.CHAMPION_SKILL_ID),
-            disciplineId = decoder:readUInt(BITS.DISCIPLINE_ID),
-        }
-    end
-
-    -- Equipment: 14 fixed slots as item link strings
-    local equipSlots = {}
-    for i = 1, EQUIP_SLOT_COUNT do
-        if decoder:readBit() then
-            equipSlots[i] = decoder:readString()
-        else
-            equipSlots[i] = false
-        end
-    end
-
-    -- Bar disabled flags (bar swap locked)
-    local frontBarDisabled = decoder:readBit()
-    local backBarDisabled = decoder:readBit()
-
-    -- Poisons: v11+ stores item link strings, v10 stored ability IDs (decoded as nil)
-    local frontPoison = nil
-    local backPoison = nil
-    if version >= 11 then
-        if decoder:readBit() then
-            frontPoison = { itemLink = decoder:readString() }
-        end
-        if decoder:readBit() then
-            backPoison = { itemLink = decoder:readString() }
-        end
-    else
-        -- v10: consume old format (bit + uint) but discard
-        if decoder:readBit() then decoder:readUInt(BITS.ABILITY_ID) end
-        if decoder:readBit() then decoder:readUInt(BITS.ABILITY_ID) end
-    end
-
-    ---@type PlayerSetup
-    local result = {
-        abilities = { front = front, back = back },
-        champion = champion,
-        equipSlots = equipSlots,
-        frontBarDisabled = frontBarDisabled,
-        backBarDisabled = backBarDisabled,
-        frontPoison = frontPoison,
-        backPoison = backPoison,
-    }
-
-    -- Race, class, skill lines, mundus, food
-    result.raceId = decoder:readUInt(BITS.RACE_ID)
-    result.classId = decoder:readUInt(BITS.CLASS_ID)
-
-    local classSkillLineIds = {}
-    for i = 1, 3 do
-        classSkillLineIds[i] = decoder:readUInt(BITS.SKILL_LINE_ID)
-    end
-    result.classSkillLineIds = classSkillLineIds
-
+---@param result PlayerSetup
+local function readMundusAndFoodPayload(decoder, result)
     local mundusCount = decoder:readUInt(BITS.MUNDUS_COUNT)
     if mundusCount > 0 then
         local mundus = {}
@@ -1142,14 +1162,210 @@ local function readSetup(decoder, version)
         end
         result.foods = foods
     end
+end
 
-    -- v10+: werewolf bar
+---@param encoder BitEncoder
+---@param setup PlayerSetup
+local function writeWerewolfPayload(encoder, setup)
+    if setup.werewolfAbilities then
+        encoder:writeBit(true)
+        encoder:writeBit(setup.werewolfEntireFight or false)
+        writeAbilityBar(encoder, setup.werewolfAbilities)
+    else
+        encoder:writeBit(false)
+    end
+end
+
+---@param decoder BitDecoder
+---@param result PlayerSetup
+---@param version number
+local function readWerewolfPayload(decoder, result, version)
     if version >= 10 and decoder:readBit() then
         result.werewolfEntireFight = decoder:readBit()
         result.werewolfAbilities = readAbilityBar(decoder)
     end
+end
+
+---@param encoder BitEncoder
+---@param setup PlayerSetup
+local function writeSetupHeader(encoder, setup)
+    writeAbilityBar(encoder, setup.abilities.front)
+    writeAbilityBar(encoder, setup.abilities.back)
+    encoder:writeBit(setup.frontBarDisabled or false)
+    encoder:writeBit(setup.backBarDisabled or false)
+    encoder:writeUInt(setup.raceId or 0, BITS.RACE_ID)
+    encoder:writeUInt(setup.classId or 0, BITS.CLASS_ID)
+end
+
+---@param encoder BitEncoder
+---@param setup PlayerSetup
+local function writeNormalSetupPayload(encoder, setup)
+    writeChampionPayload(encoder, setup.champion)
+    writeEquipSlotsPayload(encoder, setup.equipSlots)
+    writePoisonPayload(encoder, setup)
+    writeClassPayload(encoder, setup)
+    writeMundusAndFoodPayload(encoder, setup)
+    writeWerewolfPayload(encoder, setup)
+end
+
+---@param encoder BitEncoder
+---@param setup PlayerSetup
+local function writeVengeanceSetupPayload(encoder, setup)
+    local weaponTypes = setup.weaponTypes or {}
+    for i = 1, 4 do
+        encoder:writeUInt(weaponTypes[i] or 0, BITS.WEAPON_TYPE)
+    end
+
+    encoder:writeUInt(setup.loadoutSkillLineId or 0, BITS.SKILL_LINE_ID)
+
+    local perks = setup.vengeancePerkDefIds or {}
+    for i = 1, 3 do
+        encoder:writeUInt(perks[i] or 0, BITS.VENGEANCE_PERK_DEF_ID)
+    end
+end
+
+---@param encoder BitEncoder
+---@param setup PlayerSetup
+local function writeSetup(encoder, setup)
+    writeSetupHeader(encoder, setup)
+
+    local isVengeance = setup.isVengeance == true
+    encoder:writeBit(isVengeance)
+    if isVengeance then
+        writeVengeanceSetupPayload(encoder, setup)
+    else
+        writeNormalSetupPayload(encoder, setup)
+    end
+end
+
+---@param decoder BitDecoder
+---@param version number
+---@param front PlayerSetupAbility[]
+---@param back PlayerSetupAbility[]
+---@return PlayerSetup
+local function readLegacyNormalSetup(decoder, version, front, back)
+    local champion = readChampionPayload(decoder)
+    local equipSlots = readEquipSlotsPayload(decoder)
+    local frontBarDisabled = decoder:readBit()
+    local backBarDisabled = decoder:readBit()
+    local frontPoison, backPoison = readPoisonPayload(decoder, version)
+
+    ---@type PlayerSetup
+    local result = {
+        abilities = { front = front, back = back },
+        champion = champion,
+        equipSlots = equipSlots,
+        frontBarDisabled = frontBarDisabled,
+        backBarDisabled = backBarDisabled,
+        frontPoison = frontPoison,
+        backPoison = backPoison,
+        raceId = decoder:readUInt(BITS.RACE_ID),
+        classId = decoder:readUInt(BITS.CLASS_ID),
+    }
+
+    readClassPayload(decoder, result, version)
+    readMundusAndFoodPayload(decoder, result)
+    readWerewolfPayload(decoder, result, version)
 
     return result
+end
+
+---@param decoder BitDecoder
+---@param version number
+---@param front PlayerSetupAbility[]
+---@param back PlayerSetupAbility[]
+---@param frontBarDisabled boolean
+---@param backBarDisabled boolean
+---@param raceId number
+---@param classId number
+---@return PlayerSetup
+local function readNormalSetupPayload(decoder, version, front, back, frontBarDisabled, backBarDisabled, raceId, classId)
+    ---@type PlayerSetup
+    local result = {
+        abilities = { front = front, back = back },
+        champion = readChampionPayload(decoder),
+        equipSlots = readEquipSlotsPayload(decoder),
+        frontBarDisabled = frontBarDisabled,
+        backBarDisabled = backBarDisabled,
+        raceId = raceId,
+        classId = classId,
+    }
+
+    local frontPoison, backPoison = readPoisonPayload(decoder, version)
+    result.frontPoison = frontPoison
+    result.backPoison = backPoison
+
+    readClassPayload(decoder, result, version)
+    readMundusAndFoodPayload(decoder, result)
+    readWerewolfPayload(decoder, result, version)
+
+    return result
+end
+
+---@param decoder BitDecoder
+---@param front PlayerSetupAbility[]
+---@param back PlayerSetupAbility[]
+---@param frontBarDisabled boolean
+---@param backBarDisabled boolean
+---@param raceId number
+---@param classId number
+---@return PlayerSetup
+local function readVengeanceSetupPayload(decoder, front, back, frontBarDisabled, backBarDisabled, raceId, classId)
+    local weaponTypes = {}
+    for i = 1, 4 do
+        weaponTypes[i] = decoder:readUInt(BITS.WEAPON_TYPE)
+    end
+
+    local loadoutSkillLineId = decoder:readUInt(BITS.SKILL_LINE_ID)
+
+    local vengeancePerkDefIds = {}
+    for i = 1, 3 do
+        vengeancePerkDefIds[i] = decoder:readUInt(BITS.VENGEANCE_PERK_DEF_ID)
+    end
+
+    ---@type PlayerSetup
+    local result = {
+        abilities = { front = front, back = back },
+        champion = {},
+        equipSlots = makeEmptyEquipSlots(),
+        frontBarDisabled = frontBarDisabled,
+        backBarDisabled = backBarDisabled,
+        raceId = raceId,
+        classId = classId,
+        classSkillLineIds = {},
+        isVengeance = true,
+        weaponTypes = weaponTypes,
+        vengeancePerkDefIds = vengeancePerkDefIds,
+    }
+
+    if loadoutSkillLineId > 0 then
+        result.loadoutSkillLineId = loadoutSkillLineId
+    end
+
+    return result
+end
+
+---Reads a PlayerSetup from decoder
+---@param decoder BitDecoder
+---@param version number Binary format version
+---@return PlayerSetup
+local function readSetup(decoder, version)
+    local front = readAbilityBar(decoder)
+    local back = readAbilityBar(decoder)
+
+    if version < 16 then
+        return readLegacyNormalSetup(decoder, version, front, back)
+    end
+
+    local frontBarDisabled = decoder:readBit()
+    local backBarDisabled = decoder:readBit()
+    local raceId = decoder:readUInt(BITS.RACE_ID)
+    local classId = decoder:readUInt(BITS.CLASS_ID)
+    if decoder:readBit() then
+        return readVengeanceSetupPayload(decoder, front, back, frontBarDisabled, backBarDisabled, raceId, classId)
+    end
+
+    return readNormalSetupPayload(decoder, version, front, back, frontBarDisabled, backBarDisabled, raceId, classId)
 end
 
 -- =============================================================================

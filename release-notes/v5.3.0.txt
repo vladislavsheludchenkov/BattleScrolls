@@ -1,0 +1,6 @@
+New features:
+- Class Mastery passives are now supported and shown instead of the skill line list when there's at least one purchased
+- First-class support for Vengeance, with custom Build overview hiding irrelevant parts and showing vengeance-specific details (Loadout and Perks)
+
+Small changes:
+- Trash is now called basepop in English to match the language devs are using

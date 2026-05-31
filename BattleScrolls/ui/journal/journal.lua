@@ -452,6 +452,37 @@ local function BattleScrolls_AbilityEntry_OnSetup(control, data, selected, resel
     end
 end
 
+local function getVengeancePerkEntryFramedIcon(control)
+    if control.vengeanceFramedIcon then
+        return control.vengeanceFramedIcon
+    end
+
+    local framedIcon = BattleScrolls.journal.utils.createVengeancePerkFramedIcon(control)
+    framedIcon:SetAnchor(CENTER, control:GetNamedChild("Label"), LEFT, ZO_GAMEPAD_DEFAULT_LIST_ENTRY_ICON_X_OFFSET, 0)
+    control.vengeanceFramedIcon = framedIcon
+    return framedIcon
+end
+
+local function BattleScrolls_VengeancePerkEntry_OnSetup(control, data, selected, reselectingDuringRebuild, enabled, active)
+    ZO_SharedGamepadEntry_OnSetup(control, data, selected, reselectingDuringRebuild, enabled, active)
+
+    local icon = control:GetNamedChild("Icon")
+    if icon then
+        icon:SetHidden(true)
+    end
+
+    if data.vengeanceSlotFlag ~= nil then
+        local framedIcon = getVengeancePerkEntryFramedIcon(control)
+        BattleScrolls.journal.utils.setupVengeancePerkFramedIcon(
+            framedIcon,
+            data.vengeanceSlotFlag,
+            data.iconFile or "",
+            ZO_GAMEPAD_DEFAULT_LIST_ENTRY_ICON_DIMENSION)
+    elseif control.vengeanceFramedIcon then
+        control.vengeanceFramedIcon:SetHidden(true)
+    end
+end
+
 -------------------------
 -- Lists
 -------------------------
@@ -462,6 +493,8 @@ function BattleScrolls_Journal_Gamepad:InitializeLists()
         -- Ability entry template with icon frames
         list:AddDataTemplate("BattleScrolls_AbilityEntryTemplate", BattleScrolls_AbilityEntry_OnSetup, ZO_GamepadMenuEntryTemplateParametricListFunction)
         list:AddDataTemplateWithHeader("BattleScrolls_AbilityEntryTemplate", BattleScrolls_AbilityEntry_OnSetup, ZO_GamepadMenuEntryTemplateParametricListFunction, nil, "ZO_GamepadMenuEntryHeaderTemplate")
+        list:AddDataTemplate("BattleScrolls_VengeancePerkEntryTemplate", BattleScrolls_VengeancePerkEntry_OnSetup, ZO_GamepadMenuEntryTemplateParametricListFunction)
+        list:AddDataTemplateWithHeader("BattleScrolls_VengeancePerkEntryTemplate", BattleScrolls_VengeancePerkEntry_OnSetup, ZO_GamepadMenuEntryTemplateParametricListFunction, nil, "ZO_GamepadMenuEntryHeaderTemplate")
         list:SetNoItemText(noItemText)
         list:SetReselectBehavior(ZO_PARAMETRIC_SCROLL_LIST_RESELECT_BEHAVIOR.RESELECT_OLD_INDEX)
     end

@@ -388,6 +388,7 @@ journal.AbilityIconStyle = {
 ---@class CompactSetup
 ---@field classId number 4 bits
 ---@field raceId number 4 bits
+---@field isVengeance boolean|nil True when this is a Vengeance ruleset setup
 ---@field frontAbilities number[]|nil 6 abilityIds, nil when bar disabled
 ---@field backAbilities number[]|nil 6 abilityIds, nil when bar disabled
 ---@field werewolfAbilities number[]|nil 6 abilityIds, nil when no WW
@@ -404,6 +405,9 @@ journal.AbilityIconStyle = {
 ---@field foodAbilityIds number[] 0-3 food ability IDs
 ---@field mundusAbilityIds number[] 0-2 mundus ability IDs
 ---@field classSkillLineIds number[] 3 class skill line IDs
+---@field classMasteryAbilityIds number[]|nil Active Class Mastery passive ability IDs; nil when class skill lines are used
+---@field loadoutSkillLineId number|nil Vengeance loadout skill line ID
+---@field vengeancePerkDefIds number[]|nil Vengeance perk def IDs in red/yellow/blue order
 ---@field scribedAbilities CompactScribedAbility[] 0-4 scribed ability details
 ---@field frontPoisonEffect number|nil Front bar crafted poison PotionEffect integer
 ---@field frontPoisonItemId number|nil Front bar unique poison item ID

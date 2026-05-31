@@ -21,6 +21,12 @@
             </Controls>
         </Control>
 
+        <Control name="BattleScrolls_VengeancePerkEntryTemplate" inherits="ZO_GamepadItemSubEntryTemplate" virtual="true">
+            <Controls>
+                <Texture name="$(parent)Icon" override="true" hidden="true"/>
+            </Controls>
+        </Control>
+
         <!-- Horizontal list row with left-aligned label and icon (matches ZO_GamepadMenuEntryTemplateLowercase34) -->
         <Control name="BattleScrolls_HorizontalListRow" inherits="ZO_GamepadMenuEntryDimensionsTemplate" virtual="true">
             <OnInitialized>
@@ -358,6 +364,19 @@
                     <Anchor point="LEFT" relativeTo="$(parent)Icon" relativePoint="RIGHT" offsetX="16"/>
                     <Anchor point="RIGHT"/>
                     <Dimensions y="40"/>
+                </Label>
+            </Controls>
+        </Control>
+
+        <Control name="BattleScrolls_VengeancePerkTooltipRow" virtual="true">
+            <Dimensions y="80"/>
+            <Controls>
+                <Label name="$(parent)Label" font="ZoFontGamepad34" modifyTextType="NONE"
+                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_SELECTED"
+                       maxLineCount="1" wrapMode="ELLIPSIS" verticalAlignment="CENTER">
+                    <Anchor point="LEFT" offsetX="92"/>
+                    <Anchor point="RIGHT"/>
+                    <Dimensions y="80"/>
                 </Label>
             </Controls>
         </Control>

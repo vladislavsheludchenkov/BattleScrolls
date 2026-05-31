@@ -256,7 +256,10 @@ function OverviewRenderer.renderOverview(ctx)
         -- Healing Out
         local healingOutRaw, healingOutReal = utils.calculateHealingTotals(encounter.healingStats.healingOutToGroup)
         if healingOutRaw > 0 then
-            local header = healingSectionStarted and nil or GetString(BATTLESCROLLS_HEADER_HEALING)
+            local header = nil
+            if not healingSectionStarted then
+                header = GetString(BATTLESCROLLS_HEADER_HEALING)
+            end
             EntryBuilder.addEntry(list, {
                 label = GetString(BATTLESCROLLS_STAT_RAW_HEALING_OUT),
                 sublabel = ZO_CommaDelimitNumber(healingOutRaw),
@@ -284,7 +287,10 @@ function OverviewRenderer.renderOverview(ctx)
         -- Healing In
         local healingInRaw, healingInReal = utils.calculateHealingTotals(encounter.healingStats.healingInFromGroup)
         if healingInRaw > 0 then
-            local header = healingSectionStarted and nil or GetString(BATTLESCROLLS_HEADER_HEALING)
+            local header = nil
+            if not healingSectionStarted then
+                header = GetString(BATTLESCROLLS_HEADER_HEALING)
+            end
             EntryBuilder.addEntry(list, {
                 label = GetString(BATTLESCROLLS_STAT_RAW_HEALING_IN),
                 sublabel = ZO_CommaDelimitNumber(healingInRaw),

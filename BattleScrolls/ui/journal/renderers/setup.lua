@@ -12,6 +12,8 @@ local constants = BattleScrolls.constants
 local FOOD_ABILITY_INFO = constants.foodAbilityInfo
 local FOOD_COMBO_STRINGS = constants.FOOD_COMBO_STRINGS
 local RACE_ICONS = constants.raceIcons
+local VENGEANCE_LOADOUTS_BY_SKILL_LINE_ID = constants.VENGEANCE_LOADOUTS_BY_SKILL_LINE_ID
+local VENGEANCE_PERK_SLOTS = constants.VENGEANCE_PERK_SLOTS
 
 local analysis = BattleScrolls.setupAnalysis
 
@@ -119,9 +121,11 @@ end
 
 -- Fallback champion icon
 local CHAMPION_ICON = "EsoUI/Art/MenuBar/Gamepad/gp_playerMenu_icon_champion.dds"
+local EMPTY_VENGEANCE_PERK_ICON = "EsoUI/Art/Vengeance/perk_empty_slot.dds"
 
 -- Inline icon size for text rows (race, class, mundus, food, scribing)
 local INLINE_ICON_SIZE = 28
+local CLASS_MASTERY_PASSIVE_GAP = 12
 
 -- Left indent for Q3 detail lines under sub-headers
 local Q3_INDENT = 16
@@ -263,6 +267,85 @@ local function resolveClassSkillLines(classSkillLineIds)
     return result
 end
 
+---Resolves Vengeance loadout display info from its skill line ID.
+---@param skillLineId number|nil
+---@return { name: string, icon: string }|nil
+local function resolveVengeanceLoadout(skillLineId)
+    if not skillLineId or skillLineId <= 0 then return nil end
+    local loadout = VENGEANCE_LOADOUTS_BY_SKILL_LINE_ID[skillLineId]
+    if not loadout then return nil end
+
+    local name = GetSkillLineNameById(skillLineId)
+    if not name or name == "" then return nil end
+
+    return {
+        name = ZO_CachedStrFormat(SI_SKILLS_ENTRY_LINE_NAME_FORMAT, name),
+        icon = loadout.icon,
+    }
+end
+
+---Resolves Class Mastery passive ability display info.
+---@param classMasteryAbilityIds number[]|nil
+---@return { abilityId: number, name: string, icon: string }[]
+local function resolveClassMasteryAbilities(classMasteryAbilityIds)
+    local result = {}
+    if not classMasteryAbilityIds then return result end
+    for _, abilityId in ipairs(classMasteryAbilityIds) do
+        if abilityId > 0 then
+            local name = GetAbilityName(abilityId, "")
+            if name and name ~= "" then
+                result[#result + 1] = {
+                    abilityId = abilityId,
+                    name = zo_strformat("<<C:1>>", name),
+                    icon = journal.utils.getAbilityIcon(abilityId) or "",
+                }
+            end
+        end
+    end
+    return result
+end
+
+---Returns the localized Vengeance perk slot name.
+---@param slotFlag number VENGEANCE_PERK_SLOT_* flag
+---@return string
+local function getVengeancePerkSlotName(slotFlag)
+    local name = zo_strformat("<<1>>", GetString("SI_VENGEANCEPERKSLOTFLAGS", slotFlag))
+    return name ~= "" and name or GetString(BATTLESCROLLS_SETUP_PERKS)
+end
+
+---Resolves Vengeance perk display info in fixed red/yellow/blue order.
+---@param perkDefIds number[]|nil
+---@return { slotFlag: number, slotName: string, defId: number, name: string, icon: string }[]
+local function resolveVengeancePerkSlots(perkDefIds)
+    local result = {}
+    local getPerkName = _G["GetVengeancePerkName"]
+    local getPerkIcon = _G["GetVengeancePerkIcon"]
+    local canResolvePerks = type(getPerkName) == "function" and type(getPerkIcon) == "function"
+
+    for i, slotFlag in ipairs(VENGEANCE_PERK_SLOTS) do
+        local defId = perkDefIds and (perkDefIds[i] or 0) or 0
+        local name = ""
+        local icon = EMPTY_VENGEANCE_PERK_ICON
+        if canResolvePerks and defId > 0 then
+            local rawName = getPerkName(defId)
+            if rawName and rawName ~= "" then
+                name = zo_strformat("<<C:1>>", rawName)
+                icon = getPerkIcon(defId) or EMPTY_VENGEANCE_PERK_ICON
+                if icon == "" then icon = EMPTY_VENGEANCE_PERK_ICON end
+            end
+        end
+        result[#result + 1] = {
+            slotFlag = slotFlag,
+            slotName = getVengeancePerkSlotName(slotFlag),
+            defId = defId,
+            name = name,
+            icon = icon,
+        }
+    end
+
+    return result
+end
+
 ---Resolves food display info from a food entry.
 ---@param food PlayerSetupFood
 ---@param playerAliveTimeMs number|nil Player alive time in ms (for uptime calculation, matches effects tab)
@@ -340,7 +423,7 @@ local function buildCharacterSection(col, setupData, playerAliveTimeMs)
             local racePart = raceIcon ~= "" and inlineIcon(raceIcon) .. raceName or raceName
             local classPart = classIcon ~= "" and inlineIcon(classIcon) .. className or className
             local line = racePart .. "  " .. classPart
-            if setupData.mundusAbilityIds then
+            if not setupData.isVengeance and setupData.mundusAbilityIds then
                 for _, abilityId in ipairs(setupData.mundusAbilityIds) do
                     local name = zo_strformat("<<C:1>>", GetAbilityName(abilityId, ""))
                     if name ~= "" then
@@ -352,21 +435,36 @@ local function buildCharacterSection(col, setupData, playerAliveTimeMs)
         end
     end
 
-    -- Class skill lines (with collectible icons)
-    if setupData.classSkillLineIds then
-        local skillLines = resolveClassSkillLines(setupData.classSkillLineIds)
-        if #skillLines > 0 then
-            local skillParts = {}
-            for _, sl in ipairs(skillLines) do
-                local part = sl.icon ~= "" and inlineIcon(sl.icon) .. sl.name or sl.name
-                skillParts[#skillParts + 1] = part
+    if setupData.isVengeance then
+        local loadout = resolveVengeanceLoadout(setupData.loadoutSkillLineId)
+        if loadout then
+            local line = loadout.icon ~= "" and inlineIcon(loadout.icon) .. loadout.name or loadout.name
+            charRows[#charRows + 1] = col:PlainTextRow(line, ZO_HIGHLIGHT_TEXT)
+        end
+    else
+        -- Class Mastery passives when available; otherwise class skill lines.
+        local classMasteryAbilities = resolveClassMasteryAbilities(setupData.classMasteryAbilityIds)
+        if #classMasteryAbilities > 0 then
+            local passiveRows = {}
+            for _, ability in ipairs(classMasteryAbilities) do
+                passiveRows[#passiveRows + 1] = col:IconTextRow(ability.icon, ability.name, ZO_HIGHLIGHT_TEXT)
             end
-            charRows[#charRows + 1] = col:PlainTextRow(table.concat(skillParts, "  "), ZO_HIGHLIGHT_TEXT)
+            charRows[#charRows + 1] = col:HorizontalStack(CLASS_MASTERY_PASSIVE_GAP, passiveRows)
+        elseif setupData.classSkillLineIds then
+            local skillLines = resolveClassSkillLines(setupData.classSkillLineIds)
+            if #skillLines > 0 then
+                local skillParts = {}
+                for _, sl in ipairs(skillLines) do
+                    local part = sl.icon ~= "" and inlineIcon(sl.icon) .. sl.name or sl.name
+                    skillParts[#skillParts + 1] = part
+                end
+                charRows[#charRows + 1] = col:PlainTextRow(table.concat(skillParts, "  "), ZO_HIGHLIGHT_TEXT)
+            end
         end
     end
 
     -- Food
-    if setupData.foods and #setupData.foods > 0 then
+    if not setupData.isVengeance and setupData.foods and #setupData.foods > 0 then
         for _, food in ipairs(setupData.foods) do
             local name, icon, uptimeSuffix = resolveFoodDisplay(food, playerAliveTimeMs)
             if name ~= "" then
@@ -456,6 +554,34 @@ end
 
 -- Fallback icon for bars with no equipped weapon
 local EMPTY_MAIN_HAND_ICON = "EsoUI/Art/CharacterWindow/gearSlot_mainHand.dds"
+
+---Gets a generic icon for a weapon type, falling back to the empty main-hand slot.
+---@param weaponType number|nil
+---@return string
+local function getWeaponTypeIcon(weaponType)
+    local itemFilterUtils = _G["ZO_ItemFilterUtils"]
+    if weaponType and weaponType > 0 and itemFilterUtils and itemFilterUtils.GetWeaponTypeFilterIcons then
+        local icons = itemFilterUtils.GetWeaponTypeFilterIcons(weaponType)
+        if icons then
+            return icons.up or icons.over or icons.down or EMPTY_MAIN_HAND_ICON
+        end
+    end
+    return EMPTY_MAIN_HAND_ICON
+end
+
+---Gets the primary icon for a front/back weapon type pair.
+---@param weaponTypes number[]|nil {frontMH, frontOH, backMH, backOH}
+---@param isFront boolean
+---@return string
+local function getVengeanceWeaponBarIcon(weaponTypes, isFront)
+    local mainIndex = isFront and 1 or 3
+    local offIndex = isFront and 2 or 4
+    local mainType = weaponTypes and weaponTypes[mainIndex] or 0
+    if mainType and mainType > 0 then
+        return getWeaponTypeIcon(mainType)
+    end
+    return getWeaponTypeIcon(weaponTypes and weaponTypes[offIndex] or 0)
+end
 
 ---Gets the weapon icon for a bar from the equipped main-hand slot
 ---@param equipSlots (string|false)[]|nil
@@ -608,11 +734,49 @@ local function getWeaponTypeName(weaponType)
     return zo_strformat("<<1>>", raw)
 end
 
+---Gets readable weapon type names from fixed front/back MH/OH weapon type IDs.
+---@param weaponTypes number[]|nil {frontMH, frontOH, backMH, backOH}
+---@param frontBarDisabled boolean|nil
+---@param backBarDisabled boolean|nil
+---@return string frontWeapon, string backWeapon
+local function getWeaponTypesFromIds(weaponTypes, frontBarDisabled, backBarDisabled)
+    local disabledText = zo_strformat("<<1>>", GetString(SI_CHECK_BUTTON_DISABLED))
+    local emptyText = zo_strformat("<<1>>", GetString(SI_WEAPONCONFIGTYPE11))
+
+    local function barWeaponName(mainType, offType, disabled)
+        if disabled then return disabledText end
+        mainType = mainType or 0
+        offType = offType or 0
+        if mainType <= 0 then
+            if offType > 0 then
+                return getWeaponTypeName(offType)
+            end
+            return emptyText
+        end
+
+        local main = getWeaponTypeName(mainType)
+        if not TWO_HANDED_TYPES[mainType] and offType > 0 then
+            local off = getWeaponTypeName(offType)
+            if off ~= "" then
+                return joinBarWeapons(main, off)
+            end
+        end
+        return main
+    end
+
+    return barWeaponName(weaponTypes and weaponTypes[1], weaponTypes and weaponTypes[2], frontBarDisabled),
+        barWeaponName(weaponTypes and weaponTypes[3], weaponTypes and weaponTypes[4], backBarDisabled)
+end
+
 ---Gets a readable weapon type name from both bars.
 ---Returns localized "Disabled" for a bar that is disabled (bar swap locked).
 ---@param setupData PlayerSetup
 ---@return string frontWeapon, string backWeapon
 local function getWeaponTypes(setupData)
+    if setupData.weaponTypes then
+        return getWeaponTypesFromIds(setupData.weaponTypes, setupData.frontBarDisabled, setupData.backBarDisabled)
+    end
+
     local equipSlots = setupData.equipSlots
     local disabledText = zo_strformat("<<1>>", GetString(SI_CHECK_BUTTON_DISABLED))
 
@@ -756,18 +920,36 @@ end
 
 local EntryBuilder = journal.EntryBuilder
 
----Builds an icon-list tooltip for character info (class skill lines with collectible icons).
+---Builds an icon-list tooltip for character info.
 ---@param classSkillLineIds number[]|nil
+---@param classMasteryAbilityIds number[]|nil
 ---@return TooltipDescriptor
-local function buildCharacterTooltip(classSkillLineIds)
+local function buildCharacterTooltip(classSkillLineIds, classMasteryAbilityIds)
     local rows = {}
-    if classSkillLineIds then
+    local classMasteryAbilities = resolveClassMasteryAbilities(classMasteryAbilityIds)
+    if #classMasteryAbilities > 0 then
+        for _, ability in ipairs(classMasteryAbilities) do
+            rows[#rows + 1] = { label = ability.name, icon = ability.icon, abilityId = ability.abilityId }
+        end
+        return { type = "iconList", title = GetString(BATTLESCROLLS_SETUP_CLASS_MASTERY), rows = rows }
+    elseif classSkillLineIds then
         local skillLines = resolveClassSkillLines(classSkillLineIds)
         for _, sl in ipairs(skillLines) do
             rows[#rows + 1] = { label = sl.name, icon = sl.icon }
         end
     end
     return { type = "iconList", title = GetString(BATTLESCROLLS_SETUP_CLASS_SKILLS), rows = rows }
+end
+
+---Builds a tooltip for a Vengeance perk.
+---@param slot { slotFlag: number, defId: number, name: string }
+---@return TooltipDescriptor
+local function buildVengeancePerkTooltip(slot)
+    return {
+        type = "vengeancePerk",
+        perkDefId = slot.defId,
+        slotFlag = slot.slotFlag,
+    }
 end
 
 ---Builds a tooltip for champion skills grouped by discipline.
@@ -784,6 +966,55 @@ local function buildChampionTooltip(champion)
         groups[#groups + 1] = { headerLabel = discipline.name, headerIcon = discipline.icon, rows = rows }
     end
     return { type = "iconList", title = GetString(SI_MAIN_MENU_CHAMPION), groups = groups }
+end
+
+---Builds a 2-column Vengeance perks section.
+---@param col ColumnBuilder
+---@param perkDefIds number[]|nil
+---@return Control|nil section
+local function buildVengeancePerksSection2Col(col, perkDefIds)
+    local slots = resolveVengeancePerkSlots(perkDefIds)
+    local perks = {}
+    for _, slot in ipairs(slots) do
+        if slot.name ~= "" then
+            perks[#perks + 1] = slot
+        end
+    end
+    if #perks == 0 then return nil end
+
+    local rows = {}
+    local i = 1
+    while i <= #perks do
+        rows[#rows + 1] = col:VengeancePerkRow2Col(perks[i], perks[i + 1])
+        i = i + 2
+    end
+
+    return col:Section(GetString(BATTLESCROLLS_SETUP_PERKS), rows)
+end
+
+---Builds a 3-column Vengeance perks section, aligned by red/yellow/blue slot.
+---@param col ColumnBuilder
+---@param perkDefIds number[]|nil
+---@param headerColor ZO_ColorDef|nil
+---@return Control|nil section
+local function buildVengeancePerksSection3Col(col, perkDefIds, headerColor)
+    local slots = resolveVengeancePerkSlots(perkDefIds)
+    local hasPerk = false
+    local headerItems = {}
+
+    for i, slot in ipairs(slots) do
+        headerItems[i] = { text = slot.slotName, color = headerColor or ZO_HIGHLIGHT_TEXT, uppercase = true }
+        if slot.name ~= "" then
+            hasPerk = true
+        end
+    end
+
+    if not hasPerk then return nil end
+
+    return col:Section(GetString(BATTLESCROLLS_SETUP_PERKS), {
+        col:TextRow3Col(headerItems),
+        col:VengeancePerkRow3Col(slots),
+    })
 end
 
 ---Pre-resolves a bar's abilities into TooltipAbility format with scripts and isUltimate.
@@ -829,25 +1060,44 @@ function setup.renderSetup(ctx)
         -------------------------
         -- Section 0: Character (race/class, mundus, food)
         -------------------------
-        if setupData.raceId or setupData.classId or setupData.mundusAbilityIds or setupData.foods then
+        if setupData.raceId or setupData.classId or setupData.mundusAbilityIds or setupData.foods
+            or setupData.loadoutSkillLineId then
             local isFirst = true
 
             -- Race + Class entry
             if setupData.raceId and setupData.classId then
                 local raceName, className, raceIcon, classIcon = resolveRaceClass(setupData.raceId, setupData.classId)
                 if raceName ~= "" and className ~= "" then
+                    local characterTooltip = nil
+                    if not setupData.isVengeance then
+                        characterTooltip = buildCharacterTooltip(setupData.classSkillLineIds, setupData.classMasteryAbilityIds)
+                    end
                     EntryBuilder.addEntry(list, {
                         label = raceName .. " " .. className,
                         icon = (classIcon ~= "" and classIcon) or (raceIcon ~= "" and raceIcon) or nil,
                         header = isFirst and GetString(BATTLESCROLLS_SETUP_CHARACTER) or nil,
-                        tooltip = buildCharacterTooltip(setupData.classSkillLineIds),
+                        tooltip = characterTooltip,
+                    })
+                    isFirst = false
+                end
+            end
+
+            -- Vengeance loadout entry
+            if setupData.isVengeance then
+                local loadout = resolveVengeanceLoadout(setupData.loadoutSkillLineId)
+                if loadout then
+                    EntryBuilder.addEntry(list, {
+                        label = loadout.name,
+                        icon = loadout.icon,
+                        sublabel = GetString(BATTLESCROLLS_SETUP_LOADOUT),
+                        header = isFirst and GetString(BATTLESCROLLS_SETUP_CHARACTER) or nil,
                     })
                     isFirst = false
                 end
             end
 
             -- Mundus stone entries
-            if setupData.mundusAbilityIds then
+            if not setupData.isVengeance and setupData.mundusAbilityIds then
                 for _, abilityId in ipairs(setupData.mundusAbilityIds) do
                     local name = zo_strformat("<<C:1>>", GetAbilityName(abilityId, ""))
                     if name ~= "" then
@@ -868,7 +1118,7 @@ function setup.renderSetup(ctx)
             end
 
             -- Food entries
-            if setupData.foods then
+            if not setupData.isVengeance and setupData.foods then
                 for _, food in ipairs(setupData.foods) do
                     local name, icon, _, itemLink = resolveFoodDisplay(food)
                     if name ~= "" then
@@ -897,8 +1147,12 @@ function setup.renderSetup(ctx)
         -------------------------
         -- Section 1: Abilities
         -------------------------
-        local frontIcon = getBarIcon(setupData.equipSlots, FRONT_MAIN_HAND_INDEX)
-        local backIcon = getBarIcon(setupData.equipSlots, BACK_MAIN_HAND_INDEX)
+        local frontIcon = setupData.isVengeance
+            and getVengeanceWeaponBarIcon(setupData.weaponTypes, true)
+            or getBarIcon(setupData.equipSlots, FRONT_MAIN_HAND_INDEX)
+        local backIcon = setupData.isVengeance
+            and getVengeanceWeaponBarIcon(setupData.weaponTypes, false)
+            or getBarIcon(setupData.equipSlots, BACK_MAIN_HAND_INDEX)
 
         EntryBuilder.addEntry(list, {
             label = GetString(BATTLESCROLLS_SETUP_FRONT_BAR),
@@ -924,9 +1178,27 @@ function setup.renderSetup(ctx)
         LibEffect.Yield():Await()
 
         -------------------------
-        -- Section 2: Champion (single entry, tooltip shows individual skills)
+        -- Section 2: Champion/Perks
         -------------------------
-        if setupData.champion and #setupData.champion > 0 then
+        if setupData.isVengeance then
+            local slots = resolveVengeancePerkSlots(setupData.vengeancePerkDefIds)
+            local addedPerk = false
+            for _, slot in ipairs(slots) do
+                if slot.name ~= "" then
+                    EntryBuilder.addEntry(list, {
+                        label = slot.name,
+                        header = not addedPerk and GetString(BATTLESCROLLS_SETUP_PERKS) or nil,
+                        icon = slot.icon,
+                        vengeanceSlotFlag = slot.slotFlag,
+                        tooltip = buildVengeancePerkTooltip(slot),
+                    })
+                    addedPerk = true
+                end
+            end
+            if addedPerk then
+                LibEffect.Yield():Await()
+            end
+        elseif setupData.champion and #setupData.champion > 0 then
             EntryBuilder.addEntry(list, {
                 label = GetString(SI_MAIN_MENU_CHAMPION),
                 icon = CHAMPION_ICON,
@@ -938,62 +1210,79 @@ function setup.renderSetup(ctx)
         end
 
         -------------------------
-        -- Section 3: Gear Items (individual entries per equip slot, like armory)
+        -- Section 3: Gear Items (normal) / weapon types (Vengeance)
         -------------------------
         if setupData.equipSlots then
-            local headersUsed = {}
+            if setupData.isVengeance then
+                local frontWeapon, backWeapon = getWeaponTypes(setupData)
+                local header = zo_strformat("<<C:1>>",
+                    GetString("SI_EQUIPSLOTVISUALCATEGORY", EQUIP_SLOT_VISUAL_CATEGORY_WEAPONS))
+                EntryBuilder.addEntry(list, {
+                    label = frontWeapon,
+                    icon = getVengeanceWeaponBarIcon(setupData.weaponTypes, true),
+                    sublabel = GetString(BATTLESCROLLS_SETUP_FRONT_BAR),
+                    header = header,
+                })
+                EntryBuilder.addEntry(list, {
+                    label = backWeapon,
+                    icon = getVengeanceWeaponBarIcon(setupData.weaponTypes, false),
+                    sublabel = GetString(BATTLESCROLLS_SETUP_BACK_BAR),
+                })
+            else
+                local headersUsed = {}
 
-            -- Determine which off-hand slots to hide (2H main hand)
-            local hideFrontOff, hideBackOff = getHiddenOffHands(setupData.equipSlots)
+                -- Determine which off-hand slots to hide (2H main hand)
+                local hideFrontOff, hideBackOff = getHiddenOffHands(setupData.equipSlots)
 
-            for _, gearEntry in ipairs(GEAR_DISPLAY_ORDER) do
-                local slotIdx = gearEntry.index
-                local esoSlot = INDEX_TO_ESO_SLOT[slotIdx]
-                local link = setupData.equipSlots[slotIdx]
+                for _, gearEntry in ipairs(GEAR_DISPLAY_ORDER) do
+                    local slotIdx = gearEntry.index
+                    local esoSlot = INDEX_TO_ESO_SLOT[slotIdx]
+                    local link = setupData.equipSlots[slotIdx]
 
-                -- Skip hidden off-hand slots (2H main hand)
-                if slotIdx == 6 and hideFrontOff then
-                    -- skip front off-hand
-                elseif slotIdx == 14 and hideBackOff then
-                    -- skip back off-hand
-                else
-                    -- First entry of each visual category gets a header
-                    local header = nil
-                    if headersUsed[gearEntry.category] == nil then
-                        header = zo_strformat("<<C:1>>", GetString("SI_EQUIPSLOTVISUALCATEGORY", gearEntry.category))
-                        headersUsed[gearEntry.category] = true
-                    end
-
-                    if link then
-                        local name = getGearItemName(link, esoSlot)
-                        local sublabel = buildGearSublabel(link, esoSlot)
-                        local icon = GetItemLinkIcon(link)
-
-                        -- Quality coloring
-                        local quality = GetItemLinkDisplayQuality(link)
-                        local nameColors = nil
-                        if quality > 0 then
-                            ---@diagnostic disable-next-line: undefined-field -- ZO_GamepadEntryData static method
-                            local selected, unselected = ZO_GamepadEntryData.GetColorsBasedOnQuality(nil, quality)
-                            nameColors = { selected, unselected }
+                    -- Skip hidden off-hand slots (2H main hand)
+                    if slotIdx == 6 and hideFrontOff then
+                        -- skip front off-hand
+                    elseif slotIdx == 14 and hideBackOff then
+                        -- skip back off-hand
+                    else
+                        -- First entry of each visual category gets a header
+                        local header = nil
+                        if headersUsed[gearEntry.category] == nil then
+                            header = zo_strformat("<<C:1>>", GetString("SI_EQUIPSLOTVISUALCATEGORY", gearEntry.category))
+                            headersUsed[gearEntry.category] = true
                         end
 
-                        EntryBuilder.addEntry(list, {
-                            label = name,
-                            icon = icon,
-                            sublabel = sublabel,
-                            header = header,
-                            nameColors = nameColors,
-                            tooltip = { type = "item", itemLink = link },
-                        })
-                    else
-                        local slotName = zo_strformat("<<C:1>>", GetString("SI_EQUIPSLOT", esoSlot))
-                        local emptyIcon = ZO_Character_GetEmptyEquipSlotTexture(esoSlot)
-                        EntryBuilder.addEntry(list, {
-                            label = slotName,
-                            icon = emptyIcon,
-                            header = header,
-                        })
+                        if link then
+                            local name = getGearItemName(link, esoSlot)
+                            local sublabel = buildGearSublabel(link, esoSlot)
+                            local icon = GetItemLinkIcon(link)
+
+                            -- Quality coloring
+                            local quality = GetItemLinkDisplayQuality(link)
+                            local nameColors = nil
+                            if quality > 0 then
+                                ---@diagnostic disable-next-line: undefined-field -- ZO_GamepadEntryData static method
+                                local selected, unselected = ZO_GamepadEntryData.GetColorsBasedOnQuality(nil, quality)
+                                nameColors = { selected, unselected }
+                            end
+
+                            EntryBuilder.addEntry(list, {
+                                label = name,
+                                icon = icon,
+                                sublabel = sublabel,
+                                header = header,
+                                nameColors = nameColors,
+                                tooltip = { type = "item", itemLink = link },
+                            })
+                        else
+                            local slotName = zo_strformat("<<C:1>>", GetString("SI_EQUIPSLOT", esoSlot))
+                            local emptyIcon = ZO_Character_GetEmptyEquipSlotTexture(esoSlot)
+                            EntryBuilder.addEntry(list, {
+                                label = slotName,
+                                icon = emptyIcon,
+                                header = header,
+                            })
+                        end
                     end
                 end
             end
@@ -1004,7 +1293,7 @@ function setup.renderSetup(ctx)
         -------------------------
         -- Section 4: Poisons
         -------------------------
-        if setupData.frontPoison or setupData.backPoison then
+        if not setupData.isVengeance and (setupData.frontPoison or setupData.backPoison) then
             local isFirst = true
 
             if setupData.frontPoison then
@@ -1139,10 +1428,12 @@ function setup.buildSetupPanelSpec(ctx)
             local abilityItems = buildAbilityRows(col2, setupData, false, true) or {}
 
             -------------------------
-            -- Q2: Champion Stars (2-column layout)
+            -- Q2: Champion Stars / Vengeance perks (2-column layout)
             -------------------------
             local championSection
-            if setupData.champion and #setupData.champion > 0 then
+            if setupData.isVengeance then
+                championSection = buildVengeancePerksSection2Col(col2, setupData.vengeancePerkDefIds)
+            elseif setupData.champion and #setupData.champion > 0 then
                 local champRows = {}
                 local resolvedDisciplines = resolveChampionDisciplines(setupData.champion)
 
@@ -1176,7 +1467,7 @@ function setup.buildSetupPanelSpec(ctx)
                 local col3 = q3
                 local q3Sections = {}
 
-                local setLines = formatActiveSets(setupData.equipSlots)
+                local setLines = setupData.isVengeance and {} or formatActiveSets(setupData.equipSlots)
 
                 if #setLines > 0 then
                     local setRows = {}
@@ -1189,40 +1480,54 @@ function setup.buildSetupPanelSpec(ctx)
                 -------------------------
                 -- Q3: Equipment by Category
                 -------------------------
-                renderEquipmentCategories(col3, {
-                    {
-                        category = EQUIP_SLOT_VISUAL_CATEGORY_APPAREL,
-                        traitFn = function() return groupTraits(setupData.equipSlots, ARMOR_SLOT_INDICES) end,
-                        enchantFn = function() return groupEnchants(setupData.equipSlots, ARMOR_SLOT_INDICES) end,
-                        weightFn = function()
-                            local light, medium, heavy = countArmorWeights(setupData.equipSlots)
-                            return formatArmorWeights(light, medium, heavy)
-                        end,
-                    },
-                    {
-                        category = EQUIP_SLOT_VISUAL_CATEGORY_ACCESSORIES,
-                        traitFn = function() return groupTraits(setupData.equipSlots, JEWELRY_SLOT_INDICES) end,
-                        enchantFn = function() return groupEnchants(setupData.equipSlots, JEWELRY_SLOT_INDICES) end,
-                    },
-                    {
-                        category = EQUIP_SLOT_VISUAL_CATEGORY_WEAPONS,
-                        traitFn = function()
-                            local ft, bt = getWeaponTraitsByBar(setupData.equipSlots)
-                            return formatFrontBack(ft, bt)
-                        end,
-                        enchantFn = function()
-                            local fe, be = getWeaponEnchants(setupData.equipSlots)
-                            return formatFrontBack(fe, be)
-                        end,
-                        typeFn = function()
-                            local fw, bw = getWeaponTypes(setupData)
-                            return formatFrontBack(fw, bw)
-                        end,
-                    },
-                }, q3Sections)
+                if setupData.isVengeance then
+                    renderEquipmentCategories(col3, {
+                        {
+                            category = EQUIP_SLOT_VISUAL_CATEGORY_WEAPONS,
+                            traitFn = function() return "" end,
+                            enchantFn = function() return "" end,
+                            typeFn = function()
+                                local fw, bw = getWeaponTypes(setupData)
+                                return formatFrontBack(fw, bw)
+                            end,
+                        },
+                    }, q3Sections)
+                else
+                    renderEquipmentCategories(col3, {
+                        {
+                            category = EQUIP_SLOT_VISUAL_CATEGORY_APPAREL,
+                            traitFn = function() return groupTraits(setupData.equipSlots, ARMOR_SLOT_INDICES) end,
+                            enchantFn = function() return groupEnchants(setupData.equipSlots, ARMOR_SLOT_INDICES) end,
+                            weightFn = function()
+                                local light, medium, heavy = countArmorWeights(setupData.equipSlots)
+                                return formatArmorWeights(light, medium, heavy)
+                            end,
+                        },
+                        {
+                            category = EQUIP_SLOT_VISUAL_CATEGORY_ACCESSORIES,
+                            traitFn = function() return groupTraits(setupData.equipSlots, JEWELRY_SLOT_INDICES) end,
+                            enchantFn = function() return groupEnchants(setupData.equipSlots, JEWELRY_SLOT_INDICES) end,
+                        },
+                        {
+                            category = EQUIP_SLOT_VISUAL_CATEGORY_WEAPONS,
+                            traitFn = function()
+                                local ft, bt = getWeaponTraitsByBar(setupData.equipSlots)
+                                return formatFrontBack(ft, bt)
+                            end,
+                            enchantFn = function()
+                                local fe, be = getWeaponEnchants(setupData.equipSlots)
+                                return formatFrontBack(fe, be)
+                            end,
+                            typeFn = function()
+                                local fw, bw = getWeaponTypes(setupData)
+                                return formatFrontBack(fw, bw)
+                            end,
+                        },
+                    }, q3Sections)
+                end
 
                 -- Poisons
-                if setupData.frontPoison or setupData.backPoison then
+                if not setupData.isVengeance and (setupData.frontPoison or setupData.backPoison) then
                     local poisonRows = {}
                     poisonRows[#poisonRows + 1] = col3:SubHeader(GetString(BATTLESCROLLS_SETUP_POISONS))
                     local frontPoisonName = setupData.frontPoison
@@ -1278,7 +1583,7 @@ function setup.renderSetupToQ3(col3, setupData, playerAliveTimeMs)
     -------------------------
     -- GEAR SETS section
     -------------------------
-    if setupData.equipSlots then
+    if not setupData.isVengeance and setupData.equipSlots then
         local setLines = formatActiveSets(setupData.equipSlots)
 
         if #setLines > 0 then
@@ -1295,9 +1600,12 @@ function setup.renderSetupToQ3(col3, setupData, playerAliveTimeMs)
     end
 
     -------------------------
-    -- CHAMPION section (3-column aligned by discipline)
+    -- CHAMPION/PERKS section (3-column aligned)
     -------------------------
-    if setupData.champion and #setupData.champion > 0 then
+    if setupData.isVengeance then
+        q3Sections[#q3Sections + 1] =
+            buildVengeancePerksSection3Col(col3, setupData.vengeancePerkDefIds, COLOR_TRAIT)
+    elseif setupData.champion and #setupData.champion > 0 then
         local champRows = {}
         local resolvedDisciplines = resolveChampionDisciplines(setupData.champion)
 
@@ -1424,21 +1732,11 @@ end
 
 ---Gets weapon type display for compact setup (front/back from weaponTypes array).
 ---@param weaponTypes number[] {frontMH, frontOH, backMH, backOH}
+---@param frontBarDisabled boolean|nil
+---@param backBarDisabled boolean|nil
 ---@return string formatted "Front / Back" weapon type string
-local function getCompactWeaponTypes(weaponTypes)
-    local frontMH = getWeaponTypeName(weaponTypes[1])
-    local backMH = getWeaponTypeName(weaponTypes[3])
-
-    local front = frontMH
-    if not TWO_HANDED_TYPES[weaponTypes[1]] and weaponTypes[2] > 0 then
-        front = joinBarWeapons(frontMH, getWeaponTypeName(weaponTypes[2]))
-    end
-
-    local back = backMH
-    if not TWO_HANDED_TYPES[weaponTypes[3]] and weaponTypes[4] > 0 then
-        back = joinBarWeapons(backMH, getWeaponTypeName(weaponTypes[4]))
-    end
-
+local function getCompactWeaponTypes(weaponTypes, frontBarDisabled, backBarDisabled)
+    local front, back = getWeaponTypesFromIds(weaponTypes, frontBarDisabled, backBarDisabled)
     return formatFrontBack(front, back)
 end
 
@@ -1512,6 +1810,14 @@ function setup.buildCompactSetupPanelSpec(compact)
         build = function(q2, q3, q4)
             local COLOR_TYPE = ZO_SELECTED_TEXT
             local COLOR_TRAIT = ZO_HIGHLIGHT_TEXT
+            ---@type number[]|nil
+            local mundusAbilityIds = compact.mundusAbilityIds
+            ---@type number[]|nil
+            local classMasteryAbilityIds = compact.classMasteryAbilityIds
+            if compact.isVengeance then
+                mundusAbilityIds = nil
+                classMasteryAbilityIds = nil
+            end
 
             -------------------------
             -- Q2: Character Info
@@ -1520,12 +1826,19 @@ function setup.buildCompactSetupPanelSpec(compact)
             local adapted = {
                 raceId = compact.raceId,
                 classId = compact.classId,
-                mundusAbilityIds = compact.mundusAbilityIds,
-                classSkillLineIds = compact.classSkillLineIds,
+                isVengeance = compact.isVengeance,
+                mundusAbilityIds = mundusAbilityIds,
+                classSkillLineIds = compact.isVengeance and {} or compact.classSkillLineIds,
+                classMasteryAbilityIds = classMasteryAbilityIds,
+                loadoutSkillLineId = compact.loadoutSkillLineId,
+                vengeancePerkDefIds = compact.vengeancePerkDefIds,
+                weaponTypes = compact.weaponTypes,
                 foods = {},
             }
-            for _, abilityId in ipairs(compact.foodAbilityIds) do
-                adapted.foods[#adapted.foods + 1] = { abilityId = abilityId }
+            if not compact.isVengeance then
+                for _, abilityId in ipairs(compact.foodAbilityIds) do
+                    adapted.foods[#adapted.foods + 1] = { abilityId = abilityId }
+                end
             end
 
             local charSection = buildCharacterSection(q2, adapted, nil)
@@ -1577,10 +1890,12 @@ function setup.buildCompactSetupPanelSpec(compact)
             local abilityItems = buildAbilityRows(q2, adapted, false, true, true) or {}
 
             -------------------------
-            -- Q2: Champion Stars
+            -- Q2: Champion Stars / Vengeance perks
             -------------------------
             local championSection
-            if compact.champion then
+            if compact.isVengeance then
+                championSection = buildVengeancePerksSection2Col(q2, compact.vengeancePerkDefIds)
+            elseif compact.champion then
                 ---@type PlayerSetupChampionSkill[]
                 local champSkills = {}
                 for i, skillId in ipairs(compact.champion) do
@@ -1624,7 +1939,7 @@ function setup.buildCompactSetupPanelSpec(compact)
             local q3Sections = {}
 
             -- Gear Sets
-            local setLines = formatActiveSetsFromCompact(compact.sets)
+            local setLines = compact.isVengeance and {} or formatActiveSetsFromCompact(compact.sets)
             if #setLines > 0 then
                 local setRows = {}
                 for _, line in ipairs(setLines) do
@@ -1634,33 +1949,54 @@ function setup.buildCompactSetupPanelSpec(compact)
             end
 
             -- Equipment by Category (same order as Setup tab: Apparel → Accessories → Weapons)
-            renderEquipmentCategories(col3, {
-                {
-                    category = EQUIP_SLOT_VISUAL_CATEGORY_APPAREL,
-                    traitFn = function() return formatGroupedTraits(compact.armorTraits) end,
-                    enchantFn = function() return formatGroupedEnchants(compact.armorEnchants) end,
-                    weightFn = function()
-                        return formatArmorWeights(
-                            compact.armorWeights[1], compact.armorWeights[2], compact.armorWeights[3])
-                    end,
-                },
-                {
-                    category = EQUIP_SLOT_VISUAL_CATEGORY_ACCESSORIES,
-                    traitFn = function() return formatGroupedTraits(compact.jewelryTraits) end,
-                    enchantFn = function() return formatGroupedEnchants(compact.jewelryEnchants) end,
-                },
-                {
-                    category = EQUIP_SLOT_VISUAL_CATEGORY_WEAPONS,
-                    traitFn = function() return getCompactWeaponTraits(compact.weaponTraits, compact.weaponTypes) end,
-                    enchantFn = function() return getCompactWeaponEnchants(compact.weaponEnchants, compact.weaponTypes) end,
-                    typeFn = function() return getCompactWeaponTypes(compact.weaponTypes) end,
-                },
-            }, q3Sections)
+            if compact.isVengeance then
+                renderEquipmentCategories(col3, {
+                    {
+                        category = EQUIP_SLOT_VISUAL_CATEGORY_WEAPONS,
+                        traitFn = function() return "" end,
+                        enchantFn = function() return "" end,
+                        typeFn = function()
+                            return getCompactWeaponTypes(
+                                compact.weaponTypes,
+                                compact.frontAbilities == nil,
+                                compact.backAbilities == nil)
+                        end,
+                    },
+                }, q3Sections)
+            else
+                renderEquipmentCategories(col3, {
+                    {
+                        category = EQUIP_SLOT_VISUAL_CATEGORY_APPAREL,
+                        traitFn = function() return formatGroupedTraits(compact.armorTraits) end,
+                        enchantFn = function() return formatGroupedEnchants(compact.armorEnchants) end,
+                        weightFn = function()
+                            return formatArmorWeights(
+                                compact.armorWeights[1], compact.armorWeights[2], compact.armorWeights[3])
+                        end,
+                    },
+                    {
+                        category = EQUIP_SLOT_VISUAL_CATEGORY_ACCESSORIES,
+                        traitFn = function() return formatGroupedTraits(compact.jewelryTraits) end,
+                        enchantFn = function() return formatGroupedEnchants(compact.jewelryEnchants) end,
+                    },
+                    {
+                        category = EQUIP_SLOT_VISUAL_CATEGORY_WEAPONS,
+                        traitFn = function() return getCompactWeaponTraits(compact.weaponTraits, compact.weaponTypes) end,
+                        enchantFn = function() return getCompactWeaponEnchants(compact.weaponEnchants, compact.weaponTypes) end,
+                        typeFn = function()
+                            return getCompactWeaponTypes(
+                                compact.weaponTypes,
+                                compact.frontAbilities == nil,
+                                compact.backAbilities == nil)
+                        end,
+                    },
+                }, q3Sections)
+            end
 
             -- Poisons
             local hasFrontPoison = compact.frontPoisonEffect or compact.frontPoisonItemId
             local hasBackPoison = compact.backPoisonEffect or compact.backPoisonItemId
-            if hasFrontPoison or hasBackPoison then
+            if not compact.isVengeance and (hasFrontPoison or hasBackPoison) then
                 local poisonRows = {}
                 poisonRows[#poisonRows + 1] = col3:SubHeader(GetString(BATTLESCROLLS_SETUP_POISONS))
                 local frontPoisonName = ""

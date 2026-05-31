@@ -229,6 +229,75 @@ function utils.isPassiveIcon(abilityIcon)
         or string.find(abilityIcon, "ability_werewolf_010", 1, true) ~= nil
 end
 
+local EMPTY_VENGEANCE_PERK_ICON = "EsoUI/Art/Vengeance/perk_empty_slot.dds"
+local vengeancePerkFramedIconControlId = 0
+
+---Creates a Vengeance framed-icon control with a short global name.
+---The basegame template appends child names, so long pooled-row names can collide after ESO truncates them.
+---@param parent Control
+---@return Control
+function utils.createVengeancePerkFramedIcon(parent)
+    vengeancePerkFramedIconControlId = vengeancePerkFramedIconControlId + 1
+    local control = CreateControlFromVirtual(
+        "BattleScrollsVengeancePerkIcon" .. vengeancePerkFramedIconControlId,
+        parent,
+        "ZO_VengeancePerk_FramedIcon")
+    control:SetMouseEnabled(false)
+    control:SetHidden(true)
+    return control
+end
+
+---Configures a control inheriting ZO_VengeancePerk_FramedIcon without using unstable perk indices.
+---@param control Control
+---@param slotFlag number
+---@param icon string|nil
+---@param iconSize number|nil
+function utils.setupVengeancePerkFramedIcon(control, slotFlag, icon, iconSize)
+    iconSize = iconSize or 52
+    local frameSize = iconSize * 2
+    local displayIcon = (icon and icon ~= "") and icon or EMPTY_VENGEANCE_PERK_ICON
+
+    control:SetDimensions(iconSize, iconSize)
+
+    local iconControl = control:GetNamedChild("Icon")
+    local backgroundControl = control:GetNamedChild("Background")
+    local borderControl = control:GetNamedChild("Border")
+
+    if iconControl then
+        iconControl:SetDimensions(iconSize, iconSize)
+    end
+    if backgroundControl then
+        backgroundControl:SetDimensions(iconSize, iconSize)
+    end
+    if borderControl then
+        borderControl:SetDimensions(frameSize, frameSize)
+    end
+
+    local framedIcon = control.object
+    if framedIcon and framedIcon.SetPerkSlot and framedIcon.SetPerkData then
+        framedIcon:SetPerkSlot(slotFlag)
+        framedIcon:SetPerkData({
+            GetIcon = function() return displayIcon end,
+        })
+        if framedIcon.SetPerkDisabled then
+            framedIcon:SetPerkDisabled(false)
+        end
+    else
+        local manager = _G["ZO_VENGEANCE_MANAGER"]
+        if iconControl then
+            iconControl:SetTexture(displayIcon)
+        end
+        if backgroundControl and manager and manager.GetPerkBackgroundBySlot then
+            backgroundControl:SetTexture(manager:GetPerkBackgroundBySlot(slotFlag))
+        end
+        if borderControl and manager and manager.GetPerkBorderBySlot then
+            borderControl:SetTexture(manager:GetPerkBorderBySlot(slotFlag))
+        end
+    end
+
+    control:SetHidden(false)
+end
+
 -------------------------
 -- Damage Type Helpers
 -------------------------

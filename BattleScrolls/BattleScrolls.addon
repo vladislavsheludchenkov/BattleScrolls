@@ -1,7 +1,7 @@
 ## Title: Battle Scrolls
 ## Author: Semigroup1329
 ## Description: Combat metrics tracking on consoles with native gamepad UI.
-## APIVersion: 101049
+## APIVersion: 101049 101050
 ## AddOnVersion: {{addon_version}}
 ## Version: {{version}}
 ## IsLibrary: False

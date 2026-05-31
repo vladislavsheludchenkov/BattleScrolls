@@ -16,7 +16,8 @@ local journal = BattleScrolls.journal
 ---@field sublabel string|nil Right-side value text
 ---@field icon string|nil Icon path
 ---@field header string|nil Section header (first-in-group)
----@field frame boolean|nil Show icon edge/circle frame (true → BattleScrolls_AbilityEntryTemplate)
+---@field frame boolean|nil Show icon edge/circle frame (true -> BattleScrolls_AbilityEntryTemplate)
+---@field vengeanceSlotFlag number|nil Show the icon with a Vengeance slot frame
 ---@field tooltip TooltipDescriptor|nil
 ---@field isFavorite boolean|nil Whether this is a favorited effect
 ---@field onFavoriteToggle (fun())|nil Callback when user toggles favorite
@@ -40,7 +41,10 @@ local journal = BattleScrolls.journal
 
 ---@class IconRow
 ---@field label string
----@field icon string
+---@field icon string|nil
+---@field abilityId number|nil Use a framed ability row instead of the plain icon-list row
+---@field isUltimate boolean|nil
+---@field vengeanceSlotFlag number|nil Use a Vengeance slot frame for the row icon
 
 ---@alias TooltipDescriptor
 ---| { type: "text", title: string, text: string }
@@ -50,6 +54,7 @@ local journal = BattleScrolls.journal
 ---| { type: "detailRows", title: string, subtitle: string|nil, rows: DetailRow[] }
 ---| { type: "abilityList", title: string, abilities: TooltipAbility[] }
 ---| { type: "iconList", title: string, groups: IconGroup[]|nil, rows: IconRow[]|nil }
+---| { type: "vengeancePerk", perkDefId: number, slotFlag: number }
 
 ---@class PanelSpec
 ---@field layout string|nil Layout mode: "three-column" (default), "two-column", "wide-right", "wide-left"
@@ -63,15 +68,30 @@ local EntryBuilder = {}
 ---@diagnostic disable-next-line: undefined-doc-name -- ESO API type not in LuaLS definitions
 ---@return ZO_GamepadEntryData entryData
 function EntryBuilder.addEntry(list, spec)
-    local template = spec.frame
-        and "BattleScrolls_AbilityEntryTemplate"
-        or "ZO_GamepadItemSubEntryTemplate"
+    local usesVengeanceFrame = spec.vengeanceSlotFlag ~= nil
+    local template
+    if usesVengeanceFrame then
+        template = "BattleScrolls_VengeancePerkEntryTemplate"
+    elseif spec.frame then
+        template = "BattleScrolls_AbilityEntryTemplate"
+    else
+        template = "ZO_GamepadItemSubEntryTemplate"
+    end
 
-    local entryData = ZO_GamepadEntryData:New(spec.label, spec.icon)
+    local entryIcon = spec.icon
+    if usesVengeanceFrame then
+        entryIcon = nil
+    end
+    local entryData = ZO_GamepadEntryData:New(spec.label, entryIcon)
 
     if spec.icon then
         entryData.iconFile = spec.icon
-        entryData:SetIconTintOnSelection(true)
+        if not usesVengeanceFrame then
+            entryData:SetIconTintOnSelection(true)
+        end
+    end
+    if usesVengeanceFrame then
+        entryData.vengeanceSlotFlag = spec.vengeanceSlotFlag
     end
 
     if spec.sublabel then

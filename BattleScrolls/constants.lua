@@ -36,6 +36,8 @@ end
 ---@field DAMAGE_SHIELDED_ICON string Synthetic shielded damage icon
 ---@field HEAL_ABSORBED_ICON string Synthetic absorbed healing icon
 ---@field HEALTH_RECOVERY_ICON string Synthetic health recovery icon
+---@field VENGEANCE_LOADOUTS_BY_SKILL_LINE_ID table<number, VengeanceLoadoutDef> Vengeance loadout metadata keyed by skill line id
+---@field VENGEANCE_PERK_SLOTS number[] Positional perk slot order: red, yellow, blue
 
 ---@type BattleScrollsConstants
 local constants = {}
@@ -65,6 +67,23 @@ constants.INFERRED_COMPANION_UNIT_ID = 16777214
 constants.DAMAGE_SHIELDED_ICON = "EsoUI/Art/Icons/scribing_primary_damageshield.dds"
 constants.HEAL_ABSORBED_ICON = "EsoUI/Art/Icons/scribing_primary_trauma.dds"
 constants.HEALTH_RECOVERY_ICON = GetAbilityIcon(61698) -- Major Fortitude
+
+---@class VengeanceLoadoutDef
+---@field skillLineId number
+---@field icon string
+
+constants.VENGEANCE_LOADOUTS_BY_SKILL_LINE_ID = {
+    [339] = { skillLineId = 339, icon = "EsoUI/Art/Icons/Vengeance/loadout_soldier.dds" },
+    [340] = { skillLineId = 340, icon = "EsoUI/Art/Icons/Vengeance/loadout_vanguard.dds" },
+    [341] = { skillLineId = 341, icon = "EsoUI/Art/Icons/Vengeance/loadout_battlemedic.dds" },
+    [342] = { skillLineId = 342, icon = "EsoUI/Art/Icons/Vengeance/loadout_scout.dds" },
+}
+
+constants.VENGEANCE_PERK_SLOTS = {
+    VENGEANCE_PERK_SLOT_RED,
+    VENGEANCE_PERK_SLOT_YELLOW,
+    VENGEANCE_PERK_SLOT_BLUE,
+}
 
 constants.SingleTargetDamageProcAbilityIds = {
     [185843] = true, -- Inspired Scholarship

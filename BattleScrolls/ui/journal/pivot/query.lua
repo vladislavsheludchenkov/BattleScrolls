@@ -59,7 +59,11 @@ function query.applyFieldSelection(q, fieldName, selectedKey)
     elseif fieldName == "encounterFilter" then
         q.scope.encounterCategory = selectedKey
     elseif fieldName == "targets" then
-        q.targetMode = selectedKey == pivot.TargetMode.ALL and nil or selectedKey
+        if selectedKey == pivot.TargetMode.ALL then
+            q.targetMode = nil
+        else
+            q.targetMode = selectedKey
+        end
     elseif fieldName == "domain" then
         q.domain = selectedKey
         q.targetMode = nil  -- reset target filter when domain changes
