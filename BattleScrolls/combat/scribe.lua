@@ -809,6 +809,7 @@ function scribe:ImportEncounterFromStateAsync()
         instance._instanceDataVersion = encodedFields._instanceDataVersion
         table.insert(instance.encounters, compactEncounter)
         instance._estimatedSize = nil
+        encounter = nil -- compact form is on instance; drop full table from the async stack
 
         LibEffect.YieldWithGC():Await()
 
