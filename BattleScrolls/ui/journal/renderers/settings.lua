@@ -955,10 +955,59 @@ local function renderPerformanceSettings(list, settings, defaults, onRefresh, ef
     end
 end
 
+---Renders sharing/privacy settings. Live combat data is always shared; only
+---encounter history and build are opt-out (and bidirectional when off).
+local function renderPrivacySettings(list, settings)
+    local shareHistoryData = {
+        text = GetString(BATTLESCROLLS_SETTINGS_SHARE_ENCOUNTER_HISTORY),
+        header = GetString(BATTLESCROLLS_SETTINGS_SHARING),
+        tooltip = textTooltip(GetString(BATTLESCROLLS_SETTINGS_SHARE_ENCOUNTER_HISTORY), GetString(BATTLESCROLLS_SETTINGS_SHARE_ENCOUNTER_HISTORY_TT)),
+        getFunction = function()
+            return settings and settings.shareEncounterHistory ~= false
+        end,
+        setFunction = function(value)
+            if settings then
+                settings.shareEncounterHistory = value
+            end
+        end,
+        toggleFunction = function()
+            if settings then
+                settings.shareEncounterHistory = not (settings.shareEncounterHistory ~= false)
+            end
+        end,
+    }
+    list:AddEntry("ZO_GamepadOptionsCheckboxRowWithHeader", shareHistoryData)
+
+    local shareBuildData = {
+        text = GetString(BATTLESCROLLS_SETTINGS_SHARE_BUILD),
+        tooltip = textTooltip(GetString(BATTLESCROLLS_SETTINGS_SHARE_BUILD), GetString(BATTLESCROLLS_SETTINGS_SHARE_BUILD_TT)),
+        getFunction = function()
+            return settings and settings.shareBuild ~= false
+        end,
+        setFunction = function(value)
+            if settings then
+                settings.shareBuild = value
+            end
+        end,
+        toggleFunction = function()
+            if settings then
+                settings.shareBuild = not (settings.shareBuild ~= false)
+            end
+        end,
+    }
+    list:AddEntry("ZO_GamepadOptionsCheckboxRow", shareBuildData)
+
+    -- Non-interactive note: live combat data is always shared.
+    local liveAlwaysData = {
+        text = GetString(BATTLESCROLLS_SETTINGS_SHARE_LIVE_ALWAYS),
+        tooltip = textTooltip(GetString(BATTLESCROLLS_SETTINGS_SHARING), GetString(BATTLESCROLLS_SETTINGS_SHARE_LIVE_ALWAYS_TT)),
+    }
+    list:AddEntry("ZO_GamepadOptionsLabelRow", liveAlwaysData)
+end
+
 -------------------------
 -- Public API
 -------------------------
-
 ---Renders the Settings list
 ---@param list any The parametric list
 ---@param onRefresh function Callback to refresh the list when settings change
@@ -970,6 +1019,8 @@ function SettingsRenderer.renderSettings(list, onRefresh)
 
     local personalEnabled = renderDpsMeterPersonalSettings(list, settings, defaults, onRefresh)
     renderDpsMeterGroupSettings(list, settings, defaults, onRefresh, personalEnabled)
+
+    renderPrivacySettings(list, settings)
 
     local recordingEnabled = renderRecordingSettings(list, settings, defaults, onRefresh)
     if not recordingEnabled then

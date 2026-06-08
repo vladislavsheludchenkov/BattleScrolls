@@ -174,6 +174,8 @@ BattleScrolls = BattleScrolls or {}
 ---@field favoriteEffects table<number, boolean>
 ---@field pivotQueries table<string, PivotQuery>|nil Saved pivot queries
 ---@field hasCompletedOnboarding boolean
+---@field shareEncounterHistory boolean Share post-fight encounter breakdowns with group (bidirectional: off also hides others')
+---@field shareBuild boolean Share build/setup with group (bidirectional: off also hides others')
 
 ---@class StorageData
 ---@field version number Version of the saved variables structure
@@ -261,6 +263,10 @@ storage.defaults = {
         storageSizePreset = "medium", -- Storage size preset key
         favoriteEffects = {}, -- Favorite effects keyed by abilityId (account-wide)
         hasCompletedOnboarding = false, -- whether user has completed initial setup
+        -- Privacy: live combat data is always shared; these two axes are opt-out.
+        -- Bidirectional: disabling an axis also hides others' data in that axis.
+        shareEncounterHistory = true, -- share post-fight encounter breakdowns
+        shareBuild = true, -- share build/setup (skills, gear, CP)
     }
 }
 
@@ -431,6 +437,22 @@ end
 function storage:GetCurrentSizePreset()
     local presetKey = self.savedVariables and self.savedVariables.settings and self.savedVariables.settings.storageSizePreset
     return self.sizePresets[presetKey] or self.sizePresets.medium
+end
+
+---Whether encounter-history sharing is enabled (defaults to true when unset).
+---Bidirectional: when false, also suppresses receiving/displaying others' history.
+---@return boolean
+function storage:ShouldShareEncounterHistory()
+    local settings = self.savedVariables and self.savedVariables.settings
+    return not settings or settings.shareEncounterHistory ~= false
+end
+
+---Whether build/setup sharing is enabled (defaults to true when unset).
+---Bidirectional: when false, also suppresses requesting/displaying others' builds.
+---@return boolean
+function storage:ShouldShareBuild()
+    local settings = self.savedVariables and self.savedVariables.settings
+    return not settings or settings.shareBuild ~= false
 end
 
 ---Rounds up to the next power of 2 (Lua allocates array/hash in powers of 2)

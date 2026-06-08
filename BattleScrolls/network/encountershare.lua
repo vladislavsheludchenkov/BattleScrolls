@@ -92,6 +92,12 @@ local function onReceive(unitTag, data)
         return
     end
 
+    -- Bidirectional privacy: if we don't share our encounter history,
+    -- we don't receive or display others' shared encounters either.
+    if not BattleScrolls.storage:ShouldShareEncounterHistory() then
+        return
+    end
+
     -- Reconstruct full timestamp from 17 low bits
     -- Handle clock drift in both directions (sender ahead or behind)
     local now = GetTimeStamp()
@@ -240,7 +246,9 @@ function encounterShare:send(sharedData, timestampS, setupHash)
     -- Store setupHash on sharedData for local callbacks
     sharedData.setupHash = setupHash
 
-    if IsUnitGrouped("player") then
+    -- Privacy: only broadcast to the group when encounter-history sharing is on.
+    -- The local "player" callback still fires so the player's own Journal works.
+    if IsUnitGrouped("player") and BattleScrolls.storage:ShouldShareEncounterHistory() then
         encounterShare.protocol:Send(payload)
     end
     notifyAllCallbacks("player", sharedData)

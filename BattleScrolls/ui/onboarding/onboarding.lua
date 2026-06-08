@@ -20,6 +20,7 @@ BS_ONBOARDING_CENTER_OFFSET = 15 + ZO_GAMEPAD_DEFAULT_LIST_ENTRY_SELECTED_HEIGHT
 local STEP = {
     WELCOME = "welcome",
     METER = "meter",
+    SHARING = "sharing",
     STORAGE = "storage",
     EFFECTS = "effects",
     COMPLETE = "complete",
@@ -27,7 +28,7 @@ local STEP = {
 
 -- Builds the list of steps to show
 local function BuildActiveSteps()
-    return { STEP.WELCOME, STEP.METER, STEP.STORAGE, STEP.EFFECTS, STEP.COMPLETE }
+    return { STEP.WELCOME, STEP.METER, STEP.SHARING, STEP.STORAGE, STEP.EFFECTS, STEP.COMPLETE }
 end
 
 -------------------------
@@ -79,6 +80,21 @@ local function BuildStorageOptions()
             id = "xl",
             label = GetString(BATTLESCROLLS_ONBOARDING_STORAGE_GENEROUS),
             description = GetString(BATTLESCROLLS_ONBOARDING_STORAGE_GENEROUS_DESC),
+        },
+    }
+end
+
+local function BuildSharingOptions()
+    return {
+        {
+            id = "full",
+            label = GetString(BATTLESCROLLS_ONBOARDING_SHARING_FULL),
+            description = GetString(BATTLESCROLLS_ONBOARDING_SHARING_FULL_DESC),
+        },
+        {
+            id = "live",
+            label = GetString(BATTLESCROLLS_ONBOARDING_SHARING_LIVE),
+            description = GetString(BATTLESCROLLS_ONBOARDING_SHARING_LIVE_DESC),
         },
     }
 end
@@ -149,6 +165,7 @@ function BattleScrolls_Onboarding_Gamepad:Initialize(control)
     self.pendingPreset = nil
     self.pendingStoragePreset = nil
     self.pendingEffects = nil
+    self.pendingSharing = nil
 
     -- Completion callback (set by caller to avoid circular dependency)
     self.onCompleteCallback = nil
@@ -443,6 +460,8 @@ function BattleScrolls_Onboarding_Gamepad:GetStepTitle(step)
         return GetString(BATTLESCROLLS_ONBOARDING_WELCOME_TEXT)
     elseif step == STEP.METER then
         return GetString(BATTLESCROLLS_ONBOARDING_METER_QUESTION)
+    elseif step == STEP.SHARING then
+        return GetString(BATTLESCROLLS_ONBOARDING_SHARING_QUESTION)
     elseif step == STEP.STORAGE then
         return GetString(BATTLESCROLLS_ONBOARDING_STORAGE_QUESTION)
     elseif step == STEP.EFFECTS then
@@ -458,6 +477,8 @@ function BattleScrolls_Onboarding_Gamepad:GetOptionsForStep(step)
         return BuildWelcomeOptions()
     elseif step == STEP.METER then
         return BuildMeterOptions()
+    elseif step == STEP.SHARING then
+        return BuildSharingOptions()
     elseif step == STEP.STORAGE then
         return BuildStorageOptions()
     elseif step == STEP.EFFECTS then
@@ -567,6 +588,8 @@ function BattleScrolls_Onboarding_Gamepad:SelectCurrentOption()
     -- Store the selection based on current step
     if currentStep == STEP.METER then
         self.pendingPreset = option.id
+    elseif currentStep == STEP.SHARING then
+        self.pendingSharing = option.id
     elseif currentStep == STEP.STORAGE then
         self.pendingStoragePreset = option.id
     elseif currentStep == STEP.EFFECTS then
@@ -596,6 +619,13 @@ function BattleScrolls_Onboarding_Gamepad:ApplyAndFinish()
     -- Apply storage preset
     if self.pendingStoragePreset then
         settings.storageSizePreset = self.pendingStoragePreset
+    end
+
+    -- Apply sharing/privacy selection (live combat is always shared)
+    if self.pendingSharing then
+        local shareAll = (self.pendingSharing == "full")
+        settings.shareEncounterHistory = shareAll
+        settings.shareBuild = shareAll
     end
 
     -- Apply effects tracking based on selection
@@ -660,6 +690,7 @@ function BattleScrolls_Onboarding_Gamepad:ApplyDefaultsAndFinish()
     self.pendingPreset = firstMeterPreset
     self.pendingStoragePreset = "medium"
     self.pendingEffects = "essential"
+    self.pendingSharing = "full"
 
     -- Use the regular apply and finish
     self:ApplyAndFinish()
@@ -681,6 +712,7 @@ function BattleScrolls_Onboarding_Gamepad:ResetState()
     self.pendingPreset = nil
     self.pendingStoragePreset = nil
     self.pendingEffects = nil
+    self.pendingSharing = nil
     self.savedMeterSettings = nil
     self.isPreviewActive = false
 end

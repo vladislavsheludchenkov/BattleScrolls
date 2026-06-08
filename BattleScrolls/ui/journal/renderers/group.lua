@@ -90,19 +90,23 @@ local function buildMemberList(ctx)
     local localDisplayName = BattleScrolls.utils.GetUndecoratedDisplayName()
     local localAlreadyPresent = false
 
-    -- Add shared data entries
+    -- Add shared data entries (others' data only shown when history sharing is on;
+    -- the local player's own row is always kept)
     if sharedData then
+        local showRemote = BattleScrolls.storage:ShouldShareEncounterHistory()
         for _, entry in ipairs(sharedData) do
             local isLocal = entry.displayName == localDisplayName
             if isLocal then
                 localAlreadyPresent = true
             end
-            table.insert(members, {
-                displayName = entry.displayName,
-                data = entry.data,
-                isLocal = isLocal,
-                role = entry.role,
-            })
+            if isLocal or showRemote then
+                table.insert(members, {
+                    displayName = entry.displayName,
+                    data = entry.data,
+                    isLocal = isLocal,
+                    role = entry.role,
+                })
+            end
         end
     end
 
@@ -547,10 +551,11 @@ function GroupRenderer.renderGroup(ctx)
                 end,
             }
 
-            -- Build panelSpec (only when CompactSetup available)
+            -- Build panelSpec (only when CompactSetup available).
+            -- Others' builds are hidden when build sharing is off; your own always shows.
             local buildPanelSpec = nil
             local setupHash = memberData.setupHash
-            if setupHash and setupShare then
+            if setupHash and setupShare and (member.isLocal or BattleScrolls.storage:ShouldShareBuild()) then
                 local compactSetup = setupShare:getSetup(memberName, setupHash)
                 if compactSetup then
                     buildPanelSpec = setupRenderer.buildCompactSetupPanelSpec(compactSetup)

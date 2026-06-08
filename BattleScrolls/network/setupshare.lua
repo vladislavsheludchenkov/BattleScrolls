@@ -483,6 +483,11 @@ end
 ---@param displayName string Sender's display name
 ---@param hash number 16-bit setup hash
 function setupShare:onEncounterHashReceived(displayName, hash)
+    -- Bidirectional privacy: if we don't share our build, we don't request
+    -- or display others' builds either.
+    if not BattleScrolls.storage:ShouldShareBuild() then
+        return
+    end
     if self:hasSetup(displayName, hash) then
         -- log.Debug(function() return string.format("SetupShare: already have setup for %s hash %d", displayName, hash) end)
         return -- Already have this setup
@@ -625,6 +630,9 @@ end
 ---@param data table
 local function onSetupRequest(unitTag, data)
     if AreUnitsEqual(unitTag, "player") then return end
+
+    -- Privacy: don't respond with our build when build sharing is disabled.
+    if not BattleScrolls.storage:ShouldShareBuild() then return end
 
     local hash = data.setupHash
     if not hash then return end
@@ -827,6 +835,10 @@ end
 ---@param compact CompactSetup
 local function storeDecodedSetup(unitTag, hash, compact)
     if AreUnitsEqual(unitTag, "player") then return end
+
+    -- Bidirectional privacy: don't store others' builds (even broadcast responses
+    -- to another member's request) when our build sharing is off.
+    if not BattleScrolls.storage:ShouldShareBuild() then return end
 
     local displayName = BattleScrolls.utils.GetUndecoratedDisplayName(unitTag)
     if not displayName or displayName == "" then return end

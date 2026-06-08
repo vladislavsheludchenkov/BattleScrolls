@@ -192,6 +192,17 @@ ZO_CreateStringId("BATTLESCROLLS_SETTINGS_RECORD_IN_ADVENTURE_ZONE_TEXT",
 ZO_CreateStringId("BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TITLE", "Recording Filters")
 ZO_CreateStringId("BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT", "Zone and fight type filters are combined: a fight must match at least one zone AND one fight type to be recorded.")
 
+-------------------------
+-- Sharing (Privacy) Settings
+-------------------------
+ZO_CreateStringId("BATTLESCROLLS_SETTINGS_SHARING", "Sharing")
+ZO_CreateStringId("BATTLESCROLLS_SETTINGS_SHARE_ENCOUNTER_HISTORY", "Share Encounter History")
+ZO_CreateStringId("BATTLESCROLLS_SETTINGS_SHARE_ENCOUNTER_HISTORY_TT", "Share your post-fight encounter breakdowns with group members, who can open them in their Journal. Turning this off also hides others' shared encounters from you.")
+ZO_CreateStringId("BATTLESCROLLS_SETTINGS_SHARE_BUILD", "Share Build")
+ZO_CreateStringId("BATTLESCROLLS_SETTINGS_SHARE_BUILD_TT", "Share your build (skills, gear, and Champion Points) with group members. Turning this off also hides others' builds from you.")
+ZO_CreateStringId("BATTLESCROLLS_SETTINGS_SHARE_LIVE_ALWAYS", "Live combat data is always shared with your group.")
+ZO_CreateStringId("BATTLESCROLLS_SETTINGS_SHARE_LIVE_ALWAYS_TT", "Your real-time damage and healing on the group meter is always shared while grouped. Only your encounter history and build can be made private.")
+
 -- Storage/History settings
 ZO_CreateStringId("BATTLESCROLLS_SETTINGS_HISTORY_SIZE_LIMIT", "History Size Limit")
 ZO_CreateStringId("BATTLESCROLLS_SETTINGS_HISTORY_SIZE_LIMIT_TITLE", "History Size Limit")
@@ -687,6 +698,12 @@ ZO_CreateStringId("BATTLESCROLLS_ONBOARDING_EFFECTS_ESSENTIAL", "Essential Only"
 ZO_CreateStringId("BATTLESCROLLS_ONBOARDING_EFFECTS_ESSENTIAL_DESC", "Track your buffs and boss debuffs only. Skips group tracking to reduce memory usage.")
 ZO_CreateStringId("BATTLESCROLLS_ONBOARDING_EFFECTS_DISABLED", "Disabled")
 ZO_CreateStringId("BATTLESCROLLS_ONBOARDING_EFFECTS_DISABLED_DESC", "No buff/debuff tracking. Lowest memory usage, but no uptime data in reports.")
+-- Sharing (Privacy)
+ZO_CreateStringId("BATTLESCROLLS_ONBOARDING_SHARING_QUESTION", "What do you want to share with your group?")
+ZO_CreateStringId("BATTLESCROLLS_ONBOARDING_SHARING_FULL", "Full Sharing")
+ZO_CreateStringId("BATTLESCROLLS_ONBOARDING_SHARING_FULL_DESC", "Share your live meter, encounter breakdowns, and build - and see everyone else's. Best for improving together.")
+ZO_CreateStringId("BATTLESCROLLS_ONBOARDING_SHARING_LIVE", "Live Only")
+ZO_CreateStringId("BATTLESCROLLS_ONBOARDING_SHARING_LIVE_DESC", "Share live damage/healing on the group meter, but keep your encounter history and build private. You won't see others' history or builds either.")
 -- Completion
 ZO_CreateStringId("BATTLESCROLLS_ONBOARDING_COMPLETE_TITLE", "You're All Set!")
 ZO_CreateStringId("BATTLESCROLLS_ONBOARDING_COMPLETE_TEXT", "Battle Scrolls is ready to track your combat.\n\nNow go fight something!\n\nYour encounters will appear here in the Journal. You can adjust these settings anytime from the Settings tab.")
