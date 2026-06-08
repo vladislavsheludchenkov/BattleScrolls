@@ -736,11 +736,42 @@ local function decodeWireScribedAbilities(entries)
     return scribedAbilities
 end
 
+local CLASS_PAYLOAD_VARIANT_KEY = "variants(classSkillLineIds, classMasteryAbilityIds)"
+local CLASS_SKILL_LINE_ID_WIRE_MAX = 1023
+
+---Decodes class skill lines or Class Mastery abilities from a normal setup body.
+---LibGroupBroadcast's VariantField preserves variant labels at the top level,
+---but when nested in a TableField the value is keyed by the synthetic
+---"variants(...)" label. Recover that shape without changing the wire protocol.
+---@param data table
+---@return number[] classSkillLineIds
+---@return number[]|nil classMasteryAbilityIds
+local function decodeClassPayload(data)
+    if data.classSkillLineIds or data.classMasteryAbilityIds then
+        return data.classSkillLineIds or { 0, 0, 0 }, data.classMasteryAbilityIds
+    end
+
+    local nestedVariant = data[CLASS_PAYLOAD_VARIANT_KEY]
+    if type(nestedVariant) ~= "table" then
+        return { 0, 0, 0 }, nil
+    end
+
+    for _, value in ipairs(nestedVariant) do
+        if value > CLASS_SKILL_LINE_ID_WIRE_MAX then
+            return { 0, 0, 0 }, nestedVariant
+        end
+    end
+
+    return nestedVariant, nil
+end
+
 ---Reconstructs a normal CompactSetup from flat legacy fields or protocol 436 normal body fields.
 ---@param common table
 ---@param data table
 ---@return CompactSetup
 local function decodeNormalCompact(common, data)
+    local classSkillLineIds, classMasteryAbilityIds = decodeClassPayload(data)
+
     return {
         classId = common.classId,
         raceId = common.raceId,
@@ -774,8 +805,8 @@ local function decodeNormalCompact(common, data)
         champion = data.champion or {},
         foodAbilityIds = data.foodAbilityIds or {},
         mundusAbilityIds = data.mundusAbilityIds or {},
-        classSkillLineIds = data.classSkillLineIds or { 0, 0, 0 },
-        classMasteryAbilityIds = data.classMasteryAbilityIds,
+        classSkillLineIds = classSkillLineIds,
+        classMasteryAbilityIds = classMasteryAbilityIds,
         scribedAbilities = decodeWireScribedAbilities(data.scribedAbility),
         frontPoisonEffect = data.frontPoisonEffect,
         frontPoisonItemId = data.frontPoisonItemId,

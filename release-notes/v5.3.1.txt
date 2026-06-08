@@ -1,0 +1,2 @@
+Bugfixes:
+- Other players' class masteries and skill lines are now correctly displayed in their builds on the Group tab
