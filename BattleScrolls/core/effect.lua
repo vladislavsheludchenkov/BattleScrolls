@@ -329,7 +329,7 @@ function Effect.Yield()
     return yieldEffect
 end
 
----Create an Effect that yields and requests GC
+---Create an Effect that yields and requests GC (unreachable objects only; not Async stack locals).
 ---@return Effect<nil>
 function Effect.YieldWithGC()
     return yieldWithGCEffect
@@ -552,6 +552,21 @@ local function runAsync(effect, fiber, onDone)
     local nextSuccess, nextValue  -- arguments for next resume
     local task = getTask(fiber)
 
+    -- Clear thread ref when the fiber finishes or is cancelled (suspended threads stay reachable while referenced).
+    local function releaseCoroutine()
+        co = nil
+    end
+
+    local function finishCancelled()
+        releaseCoroutine()
+        onDone(false, CancelledError.New())
+    end
+
+    local function finishDone(success, value)
+        releaseCoroutine()
+        onDone(success, value)
+    end
+
     -- Set up cancellation
     fiber._cancelFn = function()
         cancelled = true
@@ -560,12 +575,12 @@ local function runAsync(effect, fiber, onDone)
 
     local function step()
         if cancelled then
-            onDone(false, CancelledError.New())
+            finishCancelled()
             return
         end
 
         if coroutine.status(co) == "dead" then
-            onDone(false, "coroutine died unexpectedly (engine frame budget exceeded?)")
+            finishDone(false, "coroutine died unexpectedly (engine frame budget exceeded?)")
             return
         end
 
@@ -573,12 +588,12 @@ local function runAsync(effect, fiber, onDone)
         local ok, yielded = coroutine.resume(co, nextSuccess, nextValue)
 
         if not ok then
-            onDone(false, yielded)
+            finishDone(false, yielded)
             return
         end
 
         if coroutine.status(co) == "dead" then
-            onDone(true, yielded)
+            finishDone(true, yielded)
             return
         end
 
@@ -587,7 +602,7 @@ local function runAsync(effect, fiber, onDone)
             -- Awaiting a Fiber
             yielded:OnComplete(function(f)
                 if cancelled then
-                    onDone(false, CancelledError.New())
+                    finishCancelled()
                     return
                 end
                 nextSuccess = f:IsSucceeded()
@@ -610,7 +625,7 @@ local function runAsync(effect, fiber, onDone)
 
             runEffect(yielded, childFiber, function(success, value)
                 if cancelled then
-                    onDone(false, CancelledError.New())
+                    finishCancelled()
                     return
                 end
                 nextSuccess = success

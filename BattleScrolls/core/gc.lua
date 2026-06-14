@@ -12,6 +12,7 @@
 -- provides a RequestGC() API that performs incremental GC
 -- in small steps, yielding between each. Cooldown equals
 -- the time the GC cycle took.
+-- Does not collect objects still held on a suspended Async coroutine stack.
 -----------------------------------------------------------
 
 if not SemisPlaygroundCheckAccess() then

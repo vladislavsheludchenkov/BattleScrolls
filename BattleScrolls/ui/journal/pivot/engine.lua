@@ -1002,7 +1002,8 @@ function engine.runDecodeQueryAsync(query, scopedEncounters, onProgress)
                     end
                 end
             end
-            -- decoded goes out of scope, GC can collect
+            -- Release decode before the next iteration (suspended Async keeps locals reachable).
+            decoded = nil
 
             if onProgress then onProgress(idx, #scopedEncounters) end
         end
