@@ -62,12 +62,16 @@ BattleScrolls = BattleScrolls or {}
 ---@field skillActivations number Total skill/ultimate activations
 ---@field totalWeavingErrors number Total skill→skill count (no LA in between)
 ---@field doubleLaErrors number Total la→la count (double light attack without a skill)
+---@field downtimeMs number Sum of gaps of 3s or more between casts, kept out of the per-ability delays (0 in pre-v20 recordings)
+---@field downtimeGaps number Count of those gaps
 ---@field byAbility WeavingAbilityData[] Per-ability weaving breakdown
 
 ---Binary-encoded encounter (v3+)
 ---@class CompactEncounter
 ---@field _v number Schema version (3+)
 ---@field _data string[] Array of base64-encoded data chunks
+---@field _shared CompactSharedEntry[]|nil Binary-encoded shared group entries (v17+; pre-v17 encounters use the plain sharedData field)
+---@field _setupHash number|nil 16-bit hash referencing the own-setup pool when the setup section was deduplicated out of _data (v17+)
 ---@field displayName string|nil Pre-computed display name for encounter list UI
 ---@field location string|nil Location within the zone
 ---@field timestampS number Absolute timestamp when encounter started
@@ -80,8 +84,12 @@ BattleScrolls = BattleScrolls or {}
 ---@field deaths EncounterDeaths|nil Death recap data (nil if player never died)
 ---@field bossTagSeqByUnitId table<number, string>|nil Maps boss unitId to "tag:seq" key for local player boss damage mapping
 ---@field gameVersion string|nil Game patch version at time of encounter (e.g. "11.3.5")
+---@field playerUnitId number|nil The player's own source unit id in this encounter's damage maps (nil on encounters recorded before it was captured)
+---@field customName string|nil User-set name override (plain field, editable without re-encoding)
 
 ---@class Encounter
+---@field isPlayerFight boolean|nil True when a player/duel fight
+---@field isDummyFight boolean|nil True when the target is a target dummy
 ---@field displayName string|nil Pre-computed display name for encounter list UI (avoids decoding entire encounter)
 ---@field location string|nil Location within the zone (e.g., "Courtyard", "Faceted Gallery") if defined and different from zone name
 ---@field timestampS number Absolute timestamp when encounter started
@@ -106,6 +114,13 @@ BattleScrolls = BattleScrolls or {}
 ---@field setup PlayerSetup|nil  -- Player build snapshot (v9+)
 ---@field weaving WeavingData|nil Weaving/rotation activity data (v12+)
 ---@field gameVersion string|nil Game patch version at time of encounter (e.g. "11.3.5")
+---@field playerUnitId number|nil The player's own source unit id in this encounter's damage maps (nil on encounters recorded before it was captured)
+---@field customName string|nil User-set name override (plain field on the compact encounter)
+---@field ultimate UltimateData|nil Ultimate generation/usage data (v19+)
+---@field crux CruxData|nil Arcanist Crux economy data (v19+)
+---@field resurrections number|nil Successful resurrection casts by the player (v19+)
+---@field resurrectionLog ResurrectionEvent[]|nil Who was resurrected and when (v20+)
+---@field zen ZenData|nil Per-boss DoT-count/Z'en time buckets (v19+)
 
 -- Instance types distinguish between live state (during combat) and storage format.
 -- InstanceState: Live instance with uncompressed abilityInfo and unitNames
@@ -121,6 +136,12 @@ BattleScrolls = BattleScrolls or {}
 ---@field encounters Encounter[] Array of encounters in this instance
 
 ---@class InstanceStorage
+---@field isHouse boolean|nil True when the zone is a player house
+---@field isPvP boolean|nil True when an AvA/battleground zone
+---@field isAdventureZone boolean|nil True when an adventure zone (night market)
+---@field _estimatedSize number|nil Cached chunk bytes (BattleScrolls.sizeModel)
+---@field _estimatedSizeV number|nil Model version the cache was computed with
+---@field index number|nil Position in history (set by the journal list)
 ---@field zone string Zone or instance name
 ---@field isOverland boolean True if this is an overland zone
 ---@field left boolean True if player left this zone
@@ -130,6 +151,8 @@ BattleScrolls = BattleScrolls or {}
 ---@field unitNames table<number, string>|nil Uncompressed unit names (nil if compressed)
 ---@field _instanceData string[]|nil Compressed abilityInfo (base64 chunks)
 ---@field _instanceDataVersion number|nil Schema version for _instanceData
+---@field _migrationFailed boolean|nil True when v17 migration failed verification for this instance (left in old format, not retried)
+---@field customName string|nil User-set name override for the instance
 ---@field encounters CompactEncounter[] Array of encounters in this instance
 
 ---@alias Instance InstanceState|InstanceStorage
@@ -144,6 +167,7 @@ BattleScrolls = BattleScrolls or {}
 ---@alias RecordFightType "boss"|"trash"|"player"|"dummy"
 
 ---@class StorageSettings
+---@field logLevel number|nil Minimum level for chat log output
 ---@field dpsMeterLingerMs number Linger duration (0 = no linger, -1 = always show)
 ---@field dpsMeterPersonalEnabled boolean
 ---@field dpsMeterPersonalMode "auto"|"damage"|"healing"
@@ -174,18 +198,27 @@ BattleScrolls = BattleScrolls or {}
 ---@field favoriteEffects table<number, boolean>
 ---@field pivotQueries table<string, PivotQuery>|nil Saved pivot queries
 ---@field hasCompletedOnboarding boolean
+---@field groupBarColor string|nil Own bar color for the colorful group bars design ("RRGGBB" hex; nil = per-name default)
+
+---@class OwnSetupPoolEntry
+---@field v number Schema version the setup was encoded with
+---@field c string[] Base64 chunks of the binary-encoded PlayerSetup
+---@field _estimatedSize number|nil Cached chunk bytes (BattleScrolls.sizeModel)
+---@field _estimatedSizeV number|nil Model version the cache was computed with
 
 ---@class StorageData
 ---@field version number Version of the saved variables structure
 ---@field history InstanceWithIndex[] Flat array of all instances/locations visited
 ---@field nextInstanceIndex number|nil High-water mark for instance.index assignment (auto-initialized from history)
 ---@field settings StorageSettings User settings
----@field sharedSetups table<string, table<number, CompactSetup>>|nil Shared player setups from group members
+---@field sharedSetups table<string, table<number, StoredSharedSetup>>|nil Encoded shared builds by player and hash; plain entries remain readable until migration
+---@field ownSetups table<number, OwnSetupPoolEntry>|nil Player's own full setups deduplicated by 16-bit setup hash (v17+; referenced by CompactEncounter._setupHash)
+---@field migrationDoneV20Setups boolean|nil True once encounters and shared setups are migrated (failed entries excluded). Never in defaults: ZO_SavedVars would apply it to existing installations
 
 ---@class SizePreset
 ---@field key string Preset key
 ---@field labelStringId string Localization string ID
----@field memoryMB number Maximum memory in megabytes
+---@field memoryMiB number History limit in MiB, the unit of the game's memory display
 
 ---@class AsyncSpeedPreset
 ---@field key string Preset key
@@ -209,17 +242,25 @@ BattleScrolls = BattleScrolls or {}
 ---@class Storage
 ---@field savedVariables StorageData
 ---@field defaults StorageData
----@field cleanupTask Effect|nil Currently running cleanup task (nil if none)
+---@field cleanupTask Fiber|nil Currently running cleanup fiber (nil if none)
+---@field writeMutex Semaphore Serializes structural writes to the history and the setup pools; see the field's initializer
 ---@field sizePresets table<string, SizePreset> Available memory size presets
 ---@field sizePresetOrder string[] Ordered list of size preset keys
 ---@field asyncSpeedPresets table<string, AsyncSpeedPreset> Available async speed presets
 ---@field asyncSpeedPresetOrder string[] Ordered list of async speed preset keys
 ---@field meterPresets table<string, MeterPreset> Available meter configuration presets
 ---@field meterPresetOrder string[] Ordered list of meter preset keys
-
----@type Storage
 local storage = {
     cleanupTask = nil,
+    -- Held by every multi-frame write to the history and the setup pools: the
+    -- finalize (intern -> encode -> insert -> push), a migration instance
+    -- commit, the cleanup task's eviction and the orphan prune. Overlapping
+    -- finalizes would share an instance's append-only registry and could
+    -- persist a registry snapshot missing entries a stored encounter needs;
+    -- a prune between an intern and its insert would drop the pool entry the
+    -- encounter is about to reference. Everything here is CPU-bound, so a
+    -- queued fiber is reordered behind the holder rather than stalled.
+    writeMutex = LibEffect.Semaphore.New(1),
 }
 
 BattleScrolls.storage = storage
@@ -264,17 +305,17 @@ storage.defaults = {
     }
 }
 
--- Memory size presets
--- Reference sizes: dungeon ~0.25-0.5 MB, trial ~0.5-1 MB
--- ESO addon pool limit: 100 MB total (warning at 70 MB)
+-- History size presets, in MiB of estimated gauge cost (storage/sizemodel.lua).
+-- Reference sizes: dungeon ~0.15 MiB, trial run ~0.3 MiB, a night of prog ~1 MiB.
+-- ESO addon pool: 100 MiB for all addons together, warning popup at 70.
 storage.sizePresets = {
-    xs = { key = "xs", labelStringId = "BATTLESCROLLS_SETTINGS_STORAGE_SIZE_XS", memoryMB = 5 },
-    small = { key = "small", labelStringId = "BATTLESCROLLS_SETTINGS_STORAGE_SIZE_SMALL", memoryMB = 8 },
-    medium = { key = "medium", labelStringId = "BATTLESCROLLS_SETTINGS_STORAGE_SIZE_MEDIUM", memoryMB = 12 },
-    large = { key = "large", labelStringId = "BATTLESCROLLS_SETTINGS_STORAGE_SIZE_LARGE", memoryMB = 18 },
-    xl = { key = "xl", labelStringId = "BATTLESCROLLS_SETTINGS_STORAGE_SIZE_XL", memoryMB = 25 },
-    caution = { key = "caution", labelStringId = "BATTLESCROLLS_SETTINGS_STORAGE_SIZE_CAUTION", memoryMB = 40 },
-    yolo = { key = "yolo", labelStringId = "BATTLESCROLLS_SETTINGS_STORAGE_SIZE_YOLO", memoryMB = 60 },
+    xs = { key = "xs", labelStringId = "BATTLESCROLLS_SETTINGS_STORAGE_SIZE_XS", memoryMiB = 5 },
+    small = { key = "small", labelStringId = "BATTLESCROLLS_SETTINGS_STORAGE_SIZE_SMALL", memoryMiB = 8 },
+    medium = { key = "medium", labelStringId = "BATTLESCROLLS_SETTINGS_STORAGE_SIZE_MEDIUM", memoryMiB = 12 },
+    large = { key = "large", labelStringId = "BATTLESCROLLS_SETTINGS_STORAGE_SIZE_LARGE", memoryMiB = 18 },
+    xl = { key = "xl", labelStringId = "BATTLESCROLLS_SETTINGS_STORAGE_SIZE_XL", memoryMiB = 25 },
+    caution = { key = "caution", labelStringId = "BATTLESCROLLS_SETTINGS_STORAGE_SIZE_CAUTION", memoryMiB = 35 },
+    yolo = { key = "yolo", labelStringId = "BATTLESCROLLS_SETTINGS_STORAGE_SIZE_YOLO", memoryMiB = 50 },
 }
 
 -- Ordered list of preset keys for UI
@@ -416,6 +457,11 @@ end
 ---Sets the LibAsync stall threshold (applied immediately)
 ---@param fps number The FPS threshold value
 function storage:SetAsyncStallThreshold(fps)
+    -- No-op when unchanged: LibAsync's slash handler prints to chat, so it
+    -- must only run on an actual change
+    if self:GetAsyncStallThreshold() == fps then
+        return
+    end
     -- Use LibAsync's slash command handler to apply the change immediately
     -- This updates both the saved var and the internal threshold
     if LibAsync and LibAsync.Slash then
@@ -433,121 +479,101 @@ function storage:GetCurrentSizePreset()
     return self.sizePresets[presetKey] or self.sizePresets.medium
 end
 
----Rounds up to the next power of 2 (Lua allocates array/hash in powers of 2)
----@param n number
----@return number
-local function nextPow2(n)
-    if n <= 0 then return 0 end
-    local p = 1
-    while p < n do p = p * 2 end
-    return p
+---History limit of the current preset in bytes
+---@return number bytes
+function storage:GetSizeLimitBytes()
+    return self:GetCurrentSizePreset().memoryMiB * BattleScrolls.sizeModel.MIB
 end
 
----Estimates memory usage of a value in bytes (Lua 5.1 64-bit layout)
----Based on actual Lua 5.1 memory structures:
---- - TValue: 16 bytes (8-byte Value union + 4-byte type tag + 4 padding)
---- - TString: 32 bytes header (CommonHeader + reserved + hash + len) + string length + 1 null
---- - Table: 72 bytes header, plus (allocated in powers of 2):
----   - Array part (keys 1..n): 16 bytes per slot
----   - Hash part: 40 bytes per Node (key TValue + value TValue + next ptr)
---- - Short strings (<=40 chars) are interned, long strings are separate allocations
----@param value any Value to estimate size of
----@param visited table<any, boolean>|nil Table to track visited tables/strings to avoid counting duplicates
----@return number bytes Estimated memory in bytes
-local function estimateValueSize(value, visited)
-    local valueType = type(value)
-
-    if valueType == "nil" then
-        return 0
-    elseif valueType == "boolean" or valueType == "number" then
-        -- These are stored directly in TValue, no separate heap allocation
-        -- The table slot (counted in table overhead) provides the TValue space
-        return 0
-    elseif valueType == "string" then
-        local len = #value
-        -- Lua 5.1 interns short strings (≤40 chars), long strings are separate allocations
-        if len <= 40 then
-            visited = visited or {}
-            if visited[value] then
-                return 0 -- Already counted this interned string
-            end
-            visited[value] = true
-        end
-        -- TString: CommonHeader(16) + reserved(1) + padding(3) + hash(4) + len(8) = 32 bytes
-        -- Plus string content + null terminator
-        return 32 + len + 1
-    elseif valueType == "table" then
-        visited = visited or {}
-        if visited[value] then
-            return 0 -- Already counted this table reference
-        end
-        visited[value] = true
-
-        -- Table struct header: ~72 bytes
-        local size = 72
-
-        -- Check if this is a pure array (consecutive integers 1..n)
-        local arrayLen = #value
-        local totalKeys = 0
-        local isPureArray = arrayLen > 0
-        local stringKeyBytes = 0
-
-        for k, v in pairs(value) do
-            totalKeys = totalKeys + 1
-
-            -- Check if key breaks pure array pattern
-            if isPureArray then
-                local kType = type(k)
-                if kType ~= "number" or k < 1 or k > arrayLen or k % 1 ~= 0 then
-                    isPureArray = false
-                end
-            end
-
-            -- Track string key overhead (short strings interned, long strings always counted)
-            if type(k) == "string" then
-                local kLen = #k
-                if kLen > 40 or not visited[k] then
-                    if kLen <= 40 then visited[k] = true end
-                    stringKeyBytes = stringKeyBytes + 32 + kLen + 1
-                end
-            end
-
-            -- Recursively count value
-            size = size + estimateValueSize(v, visited)
-        end
-
-        if isPureArray and totalKeys == arrayLen then
-            -- Pure array: 16 bytes per TValue slot (allocated in powers of 2)
-            size = size + nextPow2(arrayLen) * 16
-        else
-            -- Hash table: 40 bytes per node + string key overhead (allocated in powers of 2)
-            size = size + nextPow2(totalKeys) * 40 + stringKeyBytes
-        end
-
-        return size
-    else
-        -- function, userdata, thread - shouldn't appear in saved data
-        return 0
-    end
-end
-
--- Correction factor for memory estimates.
--- Our Lua 5.1 memory model underestimates actual ESO memory usage by ~50% god knows why
-local MEMORY_ESTIMATE_CORRECTION_FACTOR = 1.5
-
----Gets the estimated size of an instance in bytes, using cached value if available
----Calculates and caches the size on first access
+---Gets the estimated gauge cost of an instance in bytes. The chunk bytes are
+---cached on the instance; normal reads accept older model estimates.
+-- FIXME: Temporary migration-dependent cache policy. Restoring version-based
+-- invalidation here lets synchronous EstimateSavedSize/GetLockedInstancesSize
+-- walk the whole history and exceed ESO's 1000ms continuous-run allowance,
+-- shutting off the addon. Migration refreshes estimates with per-instance
+-- yields, but its completion flag means future model changes need an explicit
+-- paced refresh. Missing instance caches, setup pools and other saved roots
+-- still need bounded async measurement; this is not a general stall fix.
 ---@param instance Instance
----@return number bytes Estimated memory in bytes
-local function getInstanceSize(instance)
-    if instance._estimatedSize then
-        return instance._estimatedSize
+---@param forceRefresh boolean|nil Recompute now; bulk callers must yield between instances
+---@return number bytes Estimated gauge bytes
+local function getInstanceSize(instance, forceRefresh)
+    local sizeModel = BattleScrolls.sizeModel
+    if forceRefresh or not instance._estimatedSize then
+        instance._estimatedSize = sizeModel.measure(instance)
+        instance._estimatedSizeV = sizeModel.VERSION
+        BattleScrolls.gc:RequestGC() -- the walk generates a lot of garbage
     end
-    -- Calculate and cache for future use (with correction factor applied)
-    local size = estimateValueSize(instance) * MEMORY_ESTIMATE_CORRECTION_FACTOR
-    BattleScrolls.gc:RequestGC() -- estimateValueSize generates a lot of garbage
-    instance._estimatedSize = size
-    return size
+    return instance._estimatedSize * sizeModel.GAUGE_PER_CHUNK_BYTE
+end
+
+---Model bytes of a setup pool payload, cached on the payload with the model
+---version; unlike instances, older payload caches are recomputed on access.
+---Strings shared between payloads count once per payload, a small
+---overstatement.
+---@param payload OwnSetupPoolEntry|StoredSharedSetup
+---@return number modelBytes
+local function payloadModelBytes(payload)
+    local sizeModel = BattleScrolls.sizeModel
+    if not payload._estimatedSize or payload._estimatedSizeV ~= sizeModel.VERSION then
+        payload._estimatedSize = sizeModel.measure(payload)
+        payload._estimatedSizeV = sizeModel.VERSION
+    end
+    return payload._estimatedSize
+end
+
+---Model bytes of both setup pools, containers included
+---@param sv StorageData
+---@return number modelBytes
+local function setupPoolsModelBytes(sv)
+    local sizeModel = BattleScrolls.sizeModel
+    local bytes = 0
+    if sv.ownSetups then
+        local count = 0
+        for _, payload in pairs(sv.ownSetups) do
+            bytes = bytes + payloadModelBytes(payload)
+            count = count + 1
+        end
+        bytes = bytes + sizeModel.tableShell(count)
+    end
+    if sv.sharedSetups then
+        local players = 0
+        for _, byHash in pairs(sv.sharedSetups) do
+            local count = 0
+            for _, payload in pairs(byHash) do
+                bytes = bytes + payloadModelBytes(payload)
+                count = count + 1
+            end
+            bytes = bytes + sizeModel.tableShell(count)
+            players = players + 1
+        end
+        bytes = bytes + sizeModel.tableShell(players)
+    end
+    return bytes
+end
+
+-- Model bytes of everything else the saved global loads, measured once per
+-- session: settings, indexes and flags of this world, and any other world's
+-- data in the same file. Only settings change it during a session.
+local otherModelBytes = nil
+
+---@param sv StorageData
+---@return number modelBytes
+local function otherRootsModelBytes(sv)
+    if otherModelBytes then
+        return otherModelBytes
+    end
+    local root = rawget(_G, "BattleScrollsSavedVariables")
+    if type(root) ~= "table" then
+        otherModelBytes = 0
+        return 0
+    end
+    -- Exclude what history and the pools count for themselves
+    local visited = { [sv.history] = true }
+    if sv.ownSetups then visited[sv.ownSetups] = true end
+    if sv.sharedSetups then visited[sv.sharedSetups] = true end
+    otherModelBytes = BattleScrolls.sizeModel.measure(root, visited)
+    return otherModelBytes
 end
 
 function storage:Initialize()
@@ -574,6 +600,139 @@ function storage:PushInstance(instance)
     table.insert(self.savedVariables.history, instance)
 end
 
+---@class SetupReferences
+---@field own table<number, boolean> Own-pool hashes referenced
+---@field shared table<string, table<number, boolean>> Shared-pool hashes referenced, by display name
+
+---Adds the setup pool references an encounter holds: its own setup hash and
+---the (display name, hash) pairs of its shared entries, binary (v17+) or plain.
+---@param encounter CompactEncounter
+---@param refs SetupReferences
+local function collectSetupReferences(encounter, refs)
+    if encounter._setupHash then
+        refs.own[encounter._setupHash] = true
+    end
+    if encounter.sharedData then
+        for _, entry in ipairs(encounter.sharedData) do
+            local hash = entry.data and entry.data.setupHash
+            if hash then
+                refs.shared[entry.displayName] = refs.shared[entry.displayName] or {}
+                refs.shared[entry.displayName][hash] = true
+            end
+        end
+    end
+    if encounter._shared then
+        for _, entry in ipairs(encounter._shared) do
+            if entry.h then
+                refs.shared[entry.d] = refs.shared[entry.d] or {}
+                refs.shared[entry.d][entry.h] = true
+            end
+        end
+    end
+end
+
+---References held by every encounter in the history except the excluded ones
+---@param history Instance[]|nil
+---@param excluded table<CompactEncounter, boolean>|nil Encounters about to be removed
+---@return SetupReferences
+local function remainingSetupReferences(history, excluded)
+    ---@type SetupReferences
+    local refs = { own = {}, shared = {} }
+    for _, instance in ipairs(history or {}) do
+        for _, enc in ipairs(instance.encounters) do
+            if not (excluded and excluded[enc]) then
+                collectSetupReferences(enc, refs)
+            end
+        end
+    end
+    return refs
+end
+
+---Removes the setup pool entries no remaining encounter references. Runs
+---after every deletion, manual or by the limit, so a delete frees what the
+---dialog promised. Callers hold writeMutex (the cleanup task directly, manual
+---deletes through PruneOrphanedSetupsAsync): an encounter still encoding has
+---interned its setup but does not reference it from the history yet.
+function storage:PruneOrphanedSetups()
+    local sv = self.savedVariables
+    local refs = remainingSetupReferences(sv.history)
+    local shared = sv.sharedSetups
+    if shared then
+        for displayName, hashMap in pairs(shared) do
+            local refHashes = refs.shared[displayName]
+            if not refHashes then
+                shared[displayName] = nil
+            else
+                for hash in pairs(hashMap) do
+                    if not refHashes[hash] then
+                        hashMap[hash] = nil
+                    end
+                end
+                if not next(hashMap) then
+                    shared[displayName] = nil
+                end
+            end
+        end
+    end
+    local own = sv.ownSetups
+    if own then
+        for hash in pairs(own) do
+            if not refs.own[hash] then
+                own[hash] = nil
+            end
+        end
+    end
+end
+
+---Prunes once the write mutex is free: at once when nothing is encoding,
+---otherwise after the in-flight finalize or migration commit has put its
+---encounters in the history
+function storage:PruneOrphanedSetupsAsync()
+    self.writeMutex:WithPermit(LibEffect.Async(function()
+        self:PruneOrphanedSetups()
+    end)):Run()
+end
+
+---Gauge bytes of the setup pool entries that only the given encounters
+---reference, which deleting them lets PruneOrphanedSetups release
+---@param encounters CompactEncounter[]
+---@return number bytes
+function storage:EstimateOrphanedSetupBytes(encounters)
+    local sv = self.savedVariables
+    ---@type table<CompactEncounter, boolean>
+    local excluded = {}
+    ---@type SetupReferences
+    local wanted = { own = {}, shared = {} }
+    for _, enc in ipairs(encounters) do
+        excluded[enc] = true
+        collectSetupReferences(enc, wanted)
+    end
+    local kept = remainingSetupReferences(sv.history, excluded)
+    local bytes = 0
+    local own = sv.ownSetups
+    if own then
+        for hash in pairs(wanted.own) do
+            if own[hash] and not kept.own[hash] then
+                bytes = bytes + payloadModelBytes(own[hash])
+            end
+        end
+    end
+    local shared = sv.sharedSetups
+    if shared then
+        for displayName, hashes in pairs(wanted.shared) do
+            local pool, keptHashes = shared[displayName], kept.shared[displayName]
+            if pool then
+                for hash in pairs(hashes) do
+                    if pool[hash] and not (keptHashes and keptHashes[hash]) then
+                        bytes = bytes + payloadModelBytes(pool[hash])
+                    end
+                end
+            end
+        end
+    end
+    return bytes * BattleScrolls.sizeModel.GAUGE_PER_CHUNK_BYTE
+end
+
 ---Async version of CleanupIfNecessary
 ---Cancels any previous cleanup task and starts a new one
 function storage:CleanupIfNecessaryAsync()
@@ -582,25 +741,28 @@ function storage:CleanupIfNecessaryAsync()
         self.cleanupTask = nil
     end
 
-    local preset = self:GetCurrentSizePreset()
-    local byteLimit = preset.memoryMB * 1000000
+    local byteLimit = self:GetSizeLimitBytes()
     local history = self.savedVariables.history
 
     if #history == 0 then
         return
     end
 
-    self.cleanupTask = LibEffect.Async(function()
-        -- Sum sizes (yields per instance)
-        local currentBytes = 0
+    self.cleanupTask = self.writeMutex:WithPermit(LibEffect.Async(function()
+        -- Sum sizes (yields per instance); the setup pools and the other saved
+        -- roots count against the limit too, but only instances are evicted.
+        -- Setups orphaned by an eviction are pruned below, a bonus the
+        -- selection does not rely on.
         local instanceSizes = {}
-
+        local currentBytes = 0
         for i, instance in ipairs(history) do
             local size = getInstanceSize(instance)
             instanceSizes[i] = size
             currentBytes = currentBytes + size
             LibEffect.YieldWithGC():Await()
         end
+        local factor = BattleScrolls.sizeModel.GAUGE_PER_CHUNK_BYTE
+        currentBytes = currentBytes + (setupPoolsModelBytes(self.savedVariables) + otherRootsModelBytes(self.savedVariables)) * factor
         LibEffect.YieldWithGC():Await()
 
         -- Check if cleanup needed
@@ -633,84 +795,77 @@ function storage:CleanupIfNecessaryAsync()
             -- BattleScrolls.log.Info(string.format("Cleaned up %d old instance(s)",
             --     #indicesToRemove))
 
-            -- Prune orphaned shared setups: scan remaining encounters for referenced (displayName, setupHash) pairs
-            local storedSetups = self.savedVariables.sharedSetups
-            if storedSetups and next(storedSetups) then
-                ---@type table<string, table<number, boolean>>
-                local referenced = {}
-                for _, instance in ipairs(history) do
-                    for _, enc in ipairs(instance.encounters) do
-                        if enc.sharedData then
-                            for _, entry in ipairs(enc.sharedData) do
-                                local hash = entry.data and entry.data.setupHash
-                                if hash then
-                                    if not referenced[entry.displayName] then
-                                        referenced[entry.displayName] = {}
-                                    end
-                                    referenced[entry.displayName][hash] = true
-                                end
-                            end
-                        end
-                    end
-                end
-                -- Remove unreferenced entries
-                for displayName, hashMap in pairs(storedSetups) do
-                    local refHashes = referenced[displayName]
-                    if not refHashes then
-                        storedSetups[displayName] = nil
-                    else
-                        for hash in pairs(hashMap) do
-                            if not refHashes[hash] then
-                                hashMap[hash] = nil
-                            end
-                        end
-                        if not next(hashMap) then
-                            storedSetups[displayName] = nil
-                        end
-                    end
-                end
-            end
+            self:PruneOrphanedSetups()
         end
-    end):Ensure(function()
+    end)):Ensure(function()
         self.cleanupTask = nil
     end):Run()
 end
 
----Estimates total memory usage of the combat history in bytes
----Based on Lua 5.1 64-bit memory layout
----Uses cached per-instance sizes for efficiency
----@return number bytes Total estimated memory in bytes
----@return number encounterCount Total number of encounters
----@return number instanceCount Total number of instances
-function storage:EstimateHistorySize()
-    local history = self.savedVariables.history
-    if not history then
-        return 0, 0, 0
+---@class SavedSizeEstimate
+---@field totalBytes number Gauge bytes of everything the saved file loads: history, setup pools and the other roots
+---@field historyBytes number History instances
+---@field lockedBytes number The locked instances' share of historyBytes
+---@field setupBytes number Own and shared setup pools
+---@field otherBytes number Everything else in the saved global: settings, indexes, other worlds' data
+---@field encounterCount number
+---@field instanceCount number
+
+---Estimates the gauge cost of everything the saved file loads
+---(storage/sizemodel.lua): history from cached per-instance sizes, the setup
+---pools from a session cache per payload, and the other saved roots measured
+---once per session. The history limit compares against totalBytes.
+---@return SavedSizeEstimate
+function storage:EstimateSavedSize()
+    ---@type SavedSizeEstimate
+    local estimate = {
+        totalBytes = 0, historyBytes = 0, lockedBytes = 0, setupBytes = 0, otherBytes = 0,
+        encounterCount = 0, instanceCount = 0,
+    }
+    local sv = self.savedVariables
+    if not sv then
+        return estimate
     end
-
-    local totalBytes = 0
-    local encounterCount = 0
-
-    for _, instance in ipairs(history) do
-        totalBytes = totalBytes + getInstanceSize(instance)
-        encounterCount = encounterCount + #instance.encounters
+    local history = sv.history
+    if history then
+        for _, instance in ipairs(history) do
+            local bytes = getInstanceSize(instance)
+            estimate.historyBytes = estimate.historyBytes + bytes
+            if instance.locked then
+                estimate.lockedBytes = estimate.lockedBytes + bytes
+            end
+            estimate.encounterCount = estimate.encounterCount + #instance.encounters
+        end
+        estimate.instanceCount = #history
     end
-
-    return totalBytes, encounterCount, #history
+    local factor = BattleScrolls.sizeModel.GAUGE_PER_CHUNK_BYTE
+    estimate.setupBytes = setupPoolsModelBytes(sv) * factor
+    estimate.otherBytes = otherRootsModelBytes(sv) * factor
+    estimate.totalBytes = estimate.historyBytes + estimate.setupBytes + estimate.otherBytes
+    return estimate
 end
 
----Estimates the size of an encounter in bytes
+---Estimates the gauge cost of an encounter in bytes
 ---@param encounter CompactEncounter|Encounter
 ---@return number bytes Estimated memory in bytes
 function storage:EstimateEncounterSize(encounter)
-    return estimateValueSize(encounter) * MEMORY_ESTIMATE_CORRECTION_FACTOR
+    return BattleScrolls.sizeModel.gaugeBytes(encounter)
+end
+
+---Estimates the gauge cost of an arbitrary stored value in bytes
+---(pool entries, individual fields; same model as EstimateEncounterSize)
+---@param value any
+---@return number bytes Estimated memory in bytes
+function storage:EstimateValueMemory(value)
+    return BattleScrolls.sizeModel.gaugeBytes(value)
 end
 
 ---Gets the estimated size of an instance in bytes
 ---@param instance Instance
+---@param forceRefresh boolean|nil Recompute now; bulk callers must yield between instances
 ---@return number bytes Estimated memory in bytes
-function storage:EstimateInstanceSize(instance)
-    return getInstanceSize(instance)
+function storage:EstimateInstanceSize(instance, forceRefresh)
+    return getInstanceSize(instance, forceRefresh)
 end
 
 ---Gets the total size of all locked instances
@@ -735,8 +890,7 @@ function storage:CanLockInstance(instanceIndex)
         return false
     end
 
-    local preset = self:GetCurrentSizePreset()
-    local byteLimit = preset.memoryMB * 1000000
+    local byteLimit = self:GetSizeLimitBytes()
 
     -- Find the instance
     local targetInstance = nil
@@ -804,6 +958,7 @@ function storage:DeleteInstance(instanceIndex)
                 BattleScrolls.scribe:OnInstanceRemoved(instance)
             end
             table.remove(history, i)
+            self:PruneOrphanedSetupsAsync()
             BattleScrolls.gc:RequestGC(2)
             return true
         end
@@ -835,8 +990,10 @@ function storage:DeleteEncounter(instance, encounter)
                         break
                     end
                 end
+                self:PruneOrphanedSetupsAsync()
                 return true, true
             end
+            self:PruneOrphanedSetupsAsync()
             return true, false
         end
     end
@@ -850,9 +1007,69 @@ end
 ---Encodes an encounter to binary format for storage asynchronously
 ---Returns an Effect that resolves to the encoded encounter.
 ---@param encounter Encounter
+---@param setupPooled boolean|nil When true the setup build is pool-referenced (caller sets _setupHash on the result); the encounter keeps only the food uptime overlay
+---@param registry EncounterRegistry The instance's ability/name registry
 ---@return Effect
-function storage.EncodeEncounterAsync(encounter)
-    return BattleScrolls.binaryStorage.encodeEncounterAsync(encounter)
+function storage.EncodeEncounterAsync(encounter, setupPooled, registry)
+    return BattleScrolls.binaryStorage.encodeEncounterAsync(encounter, setupPooled, registry)
+end
+
+---Interns the player's own setup in the ownSetups pool, keyed by the 16-bit
+---setup hash. Returns true when the encounter can reference the pool entry;
+---false on a hash collision with a different setup (caller keeps it inline).
+---
+---Called under writeMutex, which the caller keeps until the referencing
+---encounter is in the history; the prune takes the same mutex, so the entry
+---cannot be removed while the encode yields in between.
+---@param hash number
+---@param setup PlayerSetup
+---@return boolean pooled
+function storage:InternOwnSetup(hash, setup)
+    local pool = self.savedVariables.ownSetups
+    if not pool then
+        pool = {}
+        self.savedVariables.ownSetups = pool
+    end
+    local chunks, version = BattleScrolls.binaryStorage.encodeSetupStandalone(
+        BattleScrolls.binaryStorage.buildPoolableSetup(setup))
+    local existing = pool[hash]
+    if existing then
+        if #existing.c ~= #chunks then
+            return false
+        end
+        for i = 1, #chunks do
+            if existing.c[i] ~= chunks[i] then
+                return false
+            end
+        end
+        return true
+    end
+    pool[hash] = { v = version, c = chunks }
+    return true
+end
+
+---Whether the instance table is currently in the history (by reference)
+---@param instance Instance
+---@return boolean
+function storage:IsInHistory(instance)
+    for _, inst in ipairs(self.savedVariables.history) do
+        if inst == instance then
+            return true
+        end
+    end
+    return false
+end
+
+---Resolves a pooled own setup by hash.
+---@param hash number
+---@return PlayerSetup|nil
+function storage:GetOwnSetup(hash)
+    local pool = self.savedVariables and self.savedVariables.ownSetups
+    local entry = pool and pool[hash]
+    if not entry then
+        return nil
+    end
+    return BattleScrolls.binaryStorage.decodeSetupStandalone(entry.c, entry.v)
 end
 
 ---Tab visibility flags computed from encounter data
@@ -866,22 +1083,68 @@ end
 ---@field hasEffects boolean Encounter has any effect tracking data
 ---@field hasGroupData boolean Encounter has shared group member data
 
+---Per-instance decoded registry cache. Weak keys: entries die with their
+---instances. The live instance's entry is registered by scribe and shares the
+---append-only arrays by reference, so it stays current across finalizes.
+---@type table<Instance, RegistryArrays>
+local registryCache = setmetatable({}, { __mode = "k" })
+
+---@type RegistryArrays
+local EMPTY_REGISTRY = { abilityIds = {}, names = {} }
+
+---Registers the live registry arrays for an instance (called by scribe after
+---finalize so decodes of the active instance skip the _instanceData decode).
+---@param instance Instance
+---@param registry RegistryArrays
+function storage:CacheInstanceRegistry(instance, registry)
+    registryCache[instance] = registry
+end
+
+---Resolves the ability/name registry arrays for an instance's encounters.
+---@param instance Instance
+---@return Effect Effect that resolves to RegistryArrays
+function storage:GetInstanceRegistryAsync(instance)
+    return LibEffect.Async(function()
+        local cached = registryCache[instance]
+        if cached then
+            return cached
+        end
+        if (instance._instanceDataVersion or 0) >= 17 and instance._instanceData then
+            local fields = BattleScrolls.binaryStorage.decodeInstanceFieldsAsync(instance):Await()
+            ---@type RegistryArrays
+            local registry = { abilityIds = fields[3] or {}, names = fields[4] or {} }
+            registryCache[instance] = registry
+            return registry
+        end
+        return EMPTY_REGISTRY
+    end)
+end
+
 ---Decodes a binary encounter to verbose format asynchronously.
 ---Returns an Effect that resolves to the decoded encounter.
 ---Yields per major section to prevent frame spikes.
 ---Caching is managed by the caller (UI stores in self.decodedEncounter).
 ---@param encounter CompactEncounter The binary-encoded encounter
+---@param instance Instance The instance owning the encounter (registry source for v17+)
 ---@return Effect Effect that resolves to Encounter
-function storage.DecodeEncounterAsync(encounter)
-    return BattleScrolls.binaryStorage.decodeEncounterAsync(encounter)
+function storage.DecodeEncounterAsync(encounter, instance)
+    return LibEffect.Async(function()
+        ---@type RegistryArrays|nil
+        local registry
+        if (encounter._v or 0) >= 17 then
+            registry = storage:GetInstanceRegistryAsync(instance):Await()
+        end
+        return BattleScrolls.binaryStorage.decodeEncounterAsync(encounter, registry):Await()
+    end)
 end
 
 -- =============================================================================
 -- INSTANCE-LEVEL FIELD ENCODING/DECODING
 -- =============================================================================
 
----Decoded instance fields tuple: [1] = abilityInfo, [2] = unitNames (empty, stored at encounter level)
----@alias DecodedInstanceFields { [1]: table<number, AbilityInfo>, [2]: table<number, string> }
+---Decoded instance fields tuple: [1] = abilityInfo, [2] = unitNames (empty,
+---stored at encounter level), [3] = ability id registry, [4] = name registry
+---@alias DecodedInstanceFields { [1]: table<number, AbilityInfo>, [2]: table<number, string>, [3]: number[], [4]: string[] }
 
 ---Decodes abilityInfo for an instance asynchronously.
 ---Returns an Effect that resolves to { abilityInfo, {} }.

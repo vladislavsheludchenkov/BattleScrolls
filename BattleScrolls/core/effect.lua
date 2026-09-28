@@ -189,7 +189,8 @@ function Fiber:OnComplete(fn)
     self:_OnCompleteInternal(fn)
 end
 
----Cancel this fiber
+---Cancel this fiber. The interpreter unwinds synchronously: Ensure handlers
+---(innermost first) have run by the time Cancel returns.
 function Fiber:Cancel()
     if self._status ~= "running" then return end
 
@@ -235,12 +236,12 @@ end
 
 ---@generic T
 ---@class Effect<T>
----@field _tag "succeed"|"fail"|"sync"|"async"|"sleep"|"yield"|"yieldGC"|"map"|"flatMap"|"tapError"|"mapError"|"recover"|"recoverWith"|"ensure"|"fork"|"all"|"race"|"allSettled"
+---@field _tag "succeed"|"fail"|"sync"|"async"|"fromCallback"|"sleep"|"yield"|"yieldGC"|"map"|"flatMap"|"tapError"|"mapError"|"recover"|"recoverWith"|"ensure"|"fork"|"all"|"race"|"allSettled"
 ---@field _isEffect boolean
 ---@diagnostic disable-next-line: undefined-doc-name -- LuaLS limitation with generic type parameters
 ---@field _value T|nil For succeed
 ---@field _error any For fail
----@field _fn function|nil For sync/async/map/flatMap/tapError/mapError/recover/recoverWith/ensure
+---@field _fn function|nil For sync/async/fromCallback/map/flatMap/tapError/mapError/recover/recoverWith/ensure
 ---@field _ms number|nil For sleep
 ---@field _source Effect<any>|nil For map/flatMap/tapError/mapError/recover/recoverWith/ensure/fork
 ---@field _effects Effect<any>[]|nil For all/race/allSettled
@@ -304,6 +305,27 @@ end
 ---@return Effect<T>
 function Effect.Async(fn)
     return setmetatable({ _tag = "async", _isEffect = true, _fn = fn }, Effect)
+end
+
+---Create an Effect from a callback-style computation - a JS-Promise-like
+---executor with cancellation support. The register function runs when the
+---effect is interpreted, receives resolve/reject, and may call either
+---synchronously or from any later callback. The first settle wins; every
+---later call is ignored. An optional canceler returned by register runs if
+---the fiber is cancelled before settling (resolve/reject are ignored from
+---then on). An error thrown inside register becomes a rejection.
+---
+---Use this to bridge callback APIs (game events, timers, library callbacks)
+---into the Effect world:
+---  Effect.FromCallback(function(resolve)
+---      someLibrary:RequestData(function(data) resolve(data) end)
+---      return function() someLibrary:AbortRequest() end
+---  end)
+---@generic T
+---@param register fun(resolve: fun(value: T|nil), reject: fun(err: any)): (fun()|nil)
+---@return Effect<T>
+function Effect.FromCallback(register)
+    return setmetatable({ _tag = "fromCallback", _isEffect = true, _fn = register }, Effect)
 end
 
 ---Create an Effect that sleeps for a duration
@@ -549,47 +571,68 @@ end
 local function runAsync(effect, fiber, onDone)
     local co = coroutine.create(effect._fn)
     local cancelled = false
+    local done = false
     local nextSuccess, nextValue  -- arguments for next resume
     local task = getTask(fiber)
 
-    -- Set up cancellation
+    -- Exactly-once onDone. Cancellation unwinds the chain (running Ensure
+    -- handlers) directly from within Cancel(), so a late child completion or
+    -- a straggler step must become a no-op.
+    local function finish(success, value)
+        if done then return end
+        done = true
+        onDone(success, value)
+    end
+
+    -- Cancellation drives the unwind itself instead of relying on a scheduled
+    -- step: pending task calls are cleared by task:Cancel() (and again when
+    -- the task returns to the pool), so a cancelled fiber would otherwise
+    -- never reach onDone and Ensure handlers up the chain would be skipped.
     fiber._cancelFn = function()
         cancelled = true
         task:Cancel()
+        finish(false, CancelledError.New())
     end
 
     local function step()
         if cancelled then
-            onDone(false, CancelledError.New())
+            finish(false, CancelledError.New())
             return
         end
 
         if coroutine.status(co) == "dead" then
-            onDone(false, "coroutine died unexpectedly (engine frame budget exceeded?)")
+            finish(false, "coroutine died unexpectedly (engine frame budget exceeded?)")
             return
         end
 
         -- Resume with success/value arguments
         local ok, yielded = coroutine.resume(co, nextSuccess, nextValue)
+        -- The coroutine has consumed these values. Keeping the previous
+        -- result here would pin it throughout the next awaited operation,
+        -- including GC intended to reclaim a discarded decoded encounter.
+        nextSuccess, nextValue = nil, nil
+
+        -- The body may have cancelled its own fiber during the resume; the
+        -- chain already unwound, so drop whatever it yielded
+        if done then return end
 
         if not ok then
-            onDone(false, yielded)
+            finish(false, yielded)
             return
         end
 
         if coroutine.status(co) == "dead" then
-            onDone(true, yielded)
+            finish(true, yielded)
             return
         end
 
         -- Check what was yielded - directly yield Effect or Fiber
         if Effect.IsFiber(yielded) then
-            -- Awaiting a Fiber
+            -- Awaiting a Fiber. Not owned: cancelling this fiber does not
+            -- cancel the awaited one, the continuation is simply dropped
+            -- (cancelFn already unwound the chain).
             yielded:OnComplete(function(f)
-                if cancelled then
-                    onDone(false, CancelledError.New())
-                    return
-                end
+                if cancelled then return end
                 nextSuccess = f:IsSucceeded()
                 nextValue = f:IsSucceeded() and f._value or f._error
                 task:Call(step)
@@ -599,20 +642,25 @@ local function runAsync(effect, fiber, onDone)
             -- Awaiting an Effect - run it and continue
             local childFiber = Fiber.New()
 
-            -- Cancel child if parent is cancelled
-            local oldCancelFn = fiber._cancelFn
+            -- Cancel the child before finishing so inner Ensure handlers
+            -- unwind before outer ones. No oldCancelFn chaining: each wrapper
+            -- closes over the same upvalues and fully supersedes the last.
             fiber._cancelFn = function()
                 cancelled = true
                 childFiber:Cancel()
                 task:Cancel()
-                if oldCancelFn then oldCancelFn() end
+                finish(false, CancelledError.New())
             end
 
             runEffect(yielded, childFiber, function(success, value)
-                if cancelled then
-                    onDone(false, CancelledError.New())
-                    return
+                -- Complete the child for real: returns its pooled task and
+                -- makes any later Cancel() of it a no-op
+                if success then
+                    childFiber:_Succeed(value)
+                else
+                    childFiber:_Fail(value)
                 end
+                if cancelled then return end
                 nextSuccess = success
                 nextValue = value
                 task:Call(step)
@@ -674,6 +722,47 @@ runEffect = function(effect, fiber, onDone)
             BattleScrolls.gc:RequestGC()
             onDone(true, nil)
         end)
+
+    elseif tag == "fromCallback" then
+        local settled = false
+        local cancelled = false
+        ---@type fun()|nil
+        local canceler
+        local function resolve(value)
+            if settled then return end
+            settled = true
+            onDone(true, value)
+        end
+        local function reject(err)
+            if settled then return end
+            settled = true
+            onDone(false, err)
+        end
+        fiber._cancelFn = function()
+            if settled then return end
+            settled = true
+            cancelled = true
+            if canceler then
+                pcall(canceler)
+            end
+            onDone(false, CancelledError.New())
+        end
+        local ok, result = pcall(effect._fn, resolve, reject)
+        if not ok then
+            -- Executor threw: becomes a rejection unless already settled
+            if not settled then
+                settled = true
+                onDone(false, result)
+            end
+        elseif type(result) == "function" then
+            if cancelled then
+                -- Cancelled from within the executor, before the canceler
+                -- existed: run it now so external resources are cleaned up
+                pcall(result)
+            else
+                canceler = result
+            end
+        end
 
     elseif tag == "map" then
         runEffect(effect._source, fiber, function(success, value)
@@ -795,6 +884,13 @@ runEffect = function(effect, fiber, onDone)
             childFibers[i] = childFiber
 
             runEffect(eff, childFiber, function(success, value)
+                -- Complete the child for real: returns its pooled task and
+                -- makes any later Cancel() of it a no-op
+                if success then
+                    childFiber:_Succeed(value)
+                else
+                    childFiber:_Fail(value)
+                end
                 if failed then return end
 
                 if not success then
@@ -837,6 +933,11 @@ runEffect = function(effect, fiber, onDone)
             childFibers[i] = childFiber
 
             runEffect(eff, childFiber, function(success, value)
+                if success then
+                    childFiber:_Succeed(value)
+                else
+                    childFiber:_Fail(value)
+                end
                 if settled then return end
                 settled = true
                 -- Cancel all other fibers
@@ -872,8 +973,10 @@ runEffect = function(effect, fiber, onDone)
 
             runEffect(eff, childFiber, function(success, value)
                 if success then
+                    childFiber:_Succeed(value)
                     results[i] = { status = "succeeded", value = value }
                 else
+                    childFiber:_Fail(value)
                     results[i] = { status = "failed", error = value }
                 end
                 remaining = remaining - 1
@@ -886,6 +989,107 @@ runEffect = function(effect, fiber, onDone)
     else
         onDone(false, "Unknown effect tag: " .. tostring(tag))
     end
+end
+
+-----------------------------------------------------------
+-- Semaphore
+-- Bounded concurrency for Effects (permits = 1 is a mutex)
+--
+-- Example:
+--   local mutex = Effect.Semaphore.New(1)
+--   mutex:WithPermit(Effect.Async(function()
+--       -- critical section, one fiber at a time
+--   end)):Run()
+-----------------------------------------------------------
+
+---@class SemaphoreWaiter
+---@field resolve fun(value: nil) Settles the waiter's Acquire effect
+---@field cancelled boolean Fiber cancelled; skip in queue or recycle the permit
+
+---@class Semaphore
+---@field _permits number Currently free permits
+---@field _maxPermits number Total permits (over-release guard)
+---@field _waiters SemaphoreWaiter[] FIFO queue of pending acquires
+local Semaphore = {}
+Semaphore.__index = Semaphore
+
+---@param permits number Number of concurrent permits (1 = mutex)
+---@return Semaphore
+function Semaphore.New(permits)
+    assert(type(permits) == "number" and permits >= 1, "Semaphore.New: permits must be >= 1")
+    return setmetatable({
+        _permits = permits,
+        _maxPermits = permits,
+        _waiters = {},
+    }, Semaphore)
+end
+
+---Effect that resolves once a permit is held: a free permit is taken
+---synchronously, otherwise the fiber queues FIFO. Cancellation abandons the
+---spot (or, if the permit was already committed, recycles it in _Deliver).
+---Prefer WithPermit: a manual Acquire must be paired with exactly one Release
+---on every path (success, error, and cancellation) or the permit is lost.
+---@return Effect<nil>
+function Semaphore:Acquire()
+    return Effect.FromCallback(function(resolve)
+        if self._permits > 0 then
+            self._permits = self._permits - 1
+            resolve(nil)
+            return
+        end
+        ---@type SemaphoreWaiter
+        local waiter = { resolve = resolve, cancelled = false }
+        table.insert(self._waiters, waiter)
+        return function()
+            waiter.cancelled = true
+        end
+    end)
+end
+
+---Delivery callback for a granted waiter, dispatched on the shared callback
+---task so a Release inside an Ensure never runs waiter code within its pcall.
+---@param waiter SemaphoreWaiter
+function Semaphore:_Deliver(waiter)
+    if waiter.cancelled then
+        -- Cancelled between grant and delivery (the fiber already unwound):
+        -- recycle the permit
+        self:Release()
+    else
+        waiter.resolve(nil)
+    end
+end
+
+---Releases one permit, waking the oldest live waiter. Plain function (not an
+---Effect) so it is callable from Ensure cleanup callbacks.
+function Semaphore:Release()
+    local waiters = self._waiters
+    while #waiters > 0 do
+        local waiter = table.remove(waiters, 1)
+        if not waiter.cancelled then
+            getCallbackDispatcher():Call(function()
+                self:_Deliver(waiter)
+            end)
+            return
+        end
+    end
+    if self._permits >= self._maxPermits then
+        error("Semaphore:Release() without matching Acquire()", 2)
+    end
+    self._permits = self._permits + 1
+end
+
+---Runs the effect while holding a permit; the permit is released on success,
+---error, or cancellation. With permits = 1 this serializes critical sections
+---in FIFO order.
+---@generic T
+---@param effect Effect<T>
+---@return Effect<T>
+function Semaphore:WithPermit(effect)
+    return self:Acquire():FlatMap(function()
+        return effect:Ensure(function()
+            self:Release()
+        end)
+    end)
 end
 
 -----------------------------------------------------------
@@ -969,6 +1173,7 @@ end
 -- Export CancelledError for external use
 Effect.CancelledError = CancelledError
 Effect.Fiber = Fiber
+Effect.Semaphore = Semaphore
 
 -- Make globally available
 _G.LibEffect = Effect

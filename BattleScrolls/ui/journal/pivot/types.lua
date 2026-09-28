@@ -18,6 +18,7 @@ local pivot = BattleScrolls.journal.pivot
 -------------------------
 pivot.Domain = {
     DAMAGE = "damage",
+    DAMAGE_GROUP = "damageGroup",  -- personal + observed group damage, everyone else one pool
     DAMAGE_IN = "damageIn",
     HEALING_OUT = "healingOut",
     HEALING_IN = "healingIn",
@@ -119,7 +120,7 @@ pivot.ColumnMode = {
 }
 
 -------------------------
--- Target Filter Modes (Damage domain only)
+-- Target Filter Modes (Damage and Group Damage domains)
 -------------------------
 pivot.TargetMode = {
     ALL = "all",
@@ -197,7 +198,7 @@ pivot.SubState = {
 ---@class PivotQuery
 ---@field scope PivotScope
 ---@field domain string                   -- pivot.Domain value
----@field targetMode string|nil           -- pivot.TargetMode value (DAMAGE domain only, nil = ALL)
+---@field targetMode string|nil           -- pivot.TargetMode value (DAMAGE / DAMAGE_GROUP domains, nil = ALL)
 ---@field rowDimension string             -- pivot.Dimension value
 ---@field columnMode string               -- "metrics" or a pivot.Dimension value
 ---@field metrics string[]                -- pivot.Metric values (1+ if metrics mode, 1 if dimension mode)
@@ -275,6 +276,18 @@ pivot.DomainDimensions = {
         pivot.Dimension.ENCOUNTER,
         pivot.Dimension.INSTANCE,
     },
+    -- No SOURCE: the game reports no unit id for other players, so the
+    -- observed side cannot be split by who dealt it
+    [pivot.Domain.DAMAGE_GROUP] = {
+        pivot.Dimension.ABILITY,
+        pivot.Dimension.TARGET,
+        pivot.Dimension.BOSS,
+        pivot.Dimension.DAMAGE_TYPE,
+        pivot.Dimension.DELIVERY,
+        pivot.Dimension.AOE_ST,
+        pivot.Dimension.ENCOUNTER,
+        pivot.Dimension.INSTANCE,
+    },
     [pivot.Domain.DAMAGE_IN] = {
         pivot.Dimension.ABILITY,
         pivot.Dimension.SOURCE,
@@ -329,6 +342,15 @@ pivot.DomainDimensions = {
 ---@type table<string, string[]>
 pivot.DomainMetrics = {
     [pivot.Domain.DAMAGE] = {
+        pivot.Metric.DPS,
+        pivot.Metric.TOTAL_DAMAGE,
+        pivot.Metric.CRIT_PERCENT,
+        pivot.Metric.HIT_COUNT,
+        pivot.Metric.AVG_HIT,
+        pivot.Metric.MAX_HIT,
+        pivot.Metric.MIN_HIT,
+    },
+    [pivot.Domain.DAMAGE_GROUP] = {
         pivot.Metric.DPS,
         pivot.Metric.TOTAL_DAMAGE,
         pivot.Metric.CRIT_PERCENT,

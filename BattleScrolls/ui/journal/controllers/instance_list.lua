@@ -1,3 +1,4 @@
+---@diagnostic disable: undefined-field, inject-field -- the ESO Control/ZO_* API stubs are too incomplete for field checking in UI code
 -----------------------------------------------------------
 -- Instance List Controller
 -- Handles instance list population and tab bar entries
@@ -149,7 +150,15 @@ function InstanceListController.refresh(journalUI)
     end
     list:Clear()
 
-    -- Add Settings entry at the top
+    -- Release history is available without taking focus from normal navigation.
+    local whatsNewEntry = ZO_GamepadEntryData:New(GetString(BATTLESCROLLS_WHATS_NEW), "EsoUI/Art/MenuBar/Gamepad/gp_playerMenu_icon_journal.dds")
+    whatsNewEntry.isWhatsNew = true
+    whatsNewEntry.tooltip = { type = "text", title = GetString(BATTLESCROLLS_WHATS_NEW), text = GetString(BATTLESCROLLS_WHATS_NEW_DESC) }
+    whatsNewEntry:SetIconTintOnSelection(true)
+    whatsNewEntry:SetIconDisabledTintOnSelection(true)
+    list:AddEntry("ZO_GamepadItemSubEntryTemplate", whatsNewEntry)
+
+    -- Settings stays immediately above Aggregate.
     local settingsEntry = ZO_GamepadEntryData:New(GetString(BATTLESCROLLS_UI_SETTINGS), "EsoUI/Art/MenuBar/Gamepad/gp_playerMenu_icon_settings.dds")
     settingsEntry.isSettings = true
     settingsEntry:SetIconTintOnSelection(true)
@@ -175,7 +184,7 @@ function InstanceListController.refresh(journalUI)
             if instancePassesFilter(instance, selectedTab) then
                 local encounterCount = instance.encounters and #instance.encounters or 0
 
-                local displayName = string.format("%s (%d)", instance.zone, encounterCount)
+                local displayName = string.format("%s (%d)", instance.customName or instance.zone, encounterCount)
                 local icon = utils.getInstanceIcon(instance)
 
                 local entryData = ZO_GamepadEntryData:New(displayName, icon)
@@ -202,10 +211,13 @@ function InstanceListController.refresh(journalUI)
 
     list:Commit()
 
-    -- Set default selection to second item (first actual instance) if available
-    if journalUI.defaultInstancePosition and journalUI.defaultInstancePosition <= list:GetNumEntries() then
-        list:SetSelectedIndexWithoutAnimation(journalUI.defaultInstancePosition)
-        journalUI.defaultInstancePosition = nil
+    -- Prefer the newest real instance. With no matching history yet, select
+    -- Aggregate and keep the initial position pending for the first instance.
+    if journalUI.defaultInstancePosition then
+        list:SetSelectedIndexWithoutAnimation(math.min(journalUI.defaultInstancePosition, list:GetNumEntries()))
+        if journalUI.defaultInstancePosition <= list:GetNumEntries() then
+            journalUI.defaultInstancePosition = nil
+        end
     elseif initialTimestampS and list:GetNumEntries() > 0 then
         -- Try to restore previous selection
         local newIndex = utils.findMatchingIndex(initialTimestampS, list.dataList, list:GetSelectedIndex(), function(item)

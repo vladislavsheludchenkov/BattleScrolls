@@ -1,3 +1,4 @@
+---@diagnostic disable: undefined-field, inject-field -- the ESO Control/ZO_* API stubs are too incomplete for field checking in UI code
 -----------------------------------------------------------
 -- Encounter List Controller
 -- Handles encounter list population and tab bar entries
@@ -167,7 +168,7 @@ function EncounterListController.refresh(journalUI)
         for _, rawEncounter in ipairs(encounters) do
             -- Use raw encounter for filtering - bossesUnits is stored unencoded
             if encounterPassesFilter(rawEncounter, selectedTab) then
-                local displayName = rawEncounter.displayName
+                local displayName = rawEncounter.customName or rawEncounter.displayName
                 local icon = utils.getEncounterIcon(rawEncounter)
 
                 local entryData = ZO_GamepadEntryData:New(displayName, icon)
@@ -181,7 +182,7 @@ function EncounterListController.refresh(journalUI)
 
                 -- First encounter gets a header so LT from list bottom jumps here (not to Aggregate)
                 if isFirst then
-                    entryData:SetHeader(instance.zone or "")
+                    entryData:SetHeader(instance.customName or instance.zone or "")
                     list:AddEntryWithHeader("ZO_GamepadItemSubEntryTemplate", entryData)
                     isFirst = false
                 else

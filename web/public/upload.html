@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Battle Scrolls</title>
+<link rel="stylesheet" href="/fonts.css">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0b0b0c; --edge: #222224; --line: #1e1e20;
+    --ink: #e4e2dc; --ink-bright: #f4f2ea; --ink-dim: #8b887e;
+    --ink-faint: #6f6b60; --ink-ghost: #55534c;
+    --gold: #c9b473; --gold-bright: #e8d9a8; --gold-ghost: #3a3423;
+    --danger: #d98383;
+    --cond: 'Barlow Condensed', 'Fira Sans Condensed', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: #060607; color: var(--ink);
+    font-family: 'Barlow Semi Condensed', 'Fira Sans Condensed', sans-serif; font-size: 15px; overflow-wrap: anywhere;
+  }
+  .frame {
+    max-width: 1440px; min-height: 100vh; margin: 0 auto;
+    background: var(--bg); border-left: 1px solid var(--edge); border-right: 1px solid var(--edge);
+    display: flex; flex-direction: column;
+  }
+  main {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; padding: 90px 24px; text-align: center;
+  }
+  .brand { display: inline-flex; align-items: center; gap: 10px; }
+  .brand i { width: 8px; height: 8px; background: var(--gold); transform: rotate(45deg); }
+  .brand b {
+    font-family: var(--cond); font-size: 13px; font-weight: 600;
+    letter-spacing: 0.22em; color: var(--gold); text-transform: uppercase;
+  }
+  h1 {
+    font-family: var(--cond); font-size: 46px; font-weight: 700; color: var(--ink-bright);
+    text-transform: uppercase; letter-spacing: 0.04em; margin: 22px 0 0; line-height: 1.1;
+  }
+  #status { font-size: 15px; color: var(--ink-dim); margin: 10px 0 0; }
+  #status.error { color: var(--danger); }
+  .hint { color: var(--ink-faint); font-size: 14px; margin: 6px 0 0; }
+  .spinner {
+    margin-top: 28px; width: 26px; height: 26px; border-radius: 50%;
+    border: 2px solid var(--gold-ghost); border-top-color: var(--gold);
+    animation: spin 0.9s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .qr-card {
+    display: none; margin-top: 34px; padding: 12px; max-width: 100%;
+    background: #fff; border: 1px solid #2a2a2e; line-height: 0;
+  }
+  .qr-card svg { max-width: 100%; height: auto; }
+  .qr-label {
+    display: none; font-family: var(--cond); font-size: 12px; letter-spacing: 0.14em;
+    color: var(--ink-faint); text-transform: uppercase; margin-top: 12px;
+  }
+  .share-link { display: inline-block; margin-top: 26px; font-size: 15px; color: #b39c5f; word-break: break-all; }
+  .share-link:hover { color: var(--gold-bright); }
+  .open-btn {
+    display: inline-block; margin-top: 18px; border: 1px solid var(--gold); border-radius: 3px;
+    padding: 9px 46px; font-family: var(--cond); font-size: 15px; font-weight: 600;
+    letter-spacing: 0.18em; color: var(--gold-bright); text-transform: uppercase;
+    text-decoration: none;
+  }
+  .open-btn:hover { background: rgba(201, 180, 115, 0.12); }
+  footer {
+    display: flex; justify-content: space-between; align-items: center; gap: 6px 24px; flex-wrap: wrap;
+    min-height: 44px; padding: 6px 32px; border-top: 1px solid var(--line);
+    font-family: var(--cond); font-size: 11.5px; letter-spacing: 0.14em;
+    color: var(--ink-ghost); text-transform: uppercase;
+  }
+  footer a { color: #85826f; text-decoration: none; }
+  footer a:hover { color: var(--gold); }
+</style>
+</head>
+<body>
+<div class="frame">
+<main>
+  <span class="brand"><i></i><b id="brand-name">Battle Scrolls</b></span>
+  <h1 id="title">Receiving your share</h1>
+  <p id="status">Hold tight…</p>
+  <p class="hint" id="hint"></p>
+  <p class="hint" id="auto-close" role="status" hidden></p>
+  <div class="spinner" id="spinner"></div>
+  <div class="qr-card" id="qr"></div>
+  <div class="qr-label" id="qr-label">Scan to open on another device</div>
+  <div id="ready"></div>
+</main>
+<footer>
+  <span>Shares are unlisted — only people with the link can see them</span>
+  <span id="icon-credit"></span>
+  <span id="privacy-link"></span>
+</footer>
+</div>
+<script src="/upload.js" defer></script>
+</body>
+</html>

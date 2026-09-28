@@ -60,7 +60,7 @@ local strings = {
     [BATTLESCROLLS_STAT_TIME_LOST] = "Потерянное время",
     [BATTLESCROLLS_STAT_LIGHT_ATTACKS] = "Обычные атаки",
     [BATTLESCROLLS_STAT_HEAVY_ATTACKS] = "Силовые атаки",
-    [BATTLESCROLLS_STAT_SKILL_ACTIVATIONS] = "Навыки",
+    [BATTLESCROLLS_STAT_SKILL_ACTIVATIONS] = "Касты навыков",
     [BATTLESCROLLS_STAT_CASTS] = "Касты",
     [BATTLESCROLLS_STAT_WEAVING_ERRORS] = "Ошибки вивинга",
     [BATTLESCROLLS_STAT_MISSED_LA] = "Пропущенные обычные атаки",
@@ -69,9 +69,9 @@ local strings = {
     [BATTLESCROLLS_TOOLTIP_DELAY_BEFORE] = "Задержка до каста",
     [BATTLESCROLLS_FORMAT_SECONDS] = "<<1>>с",
     [BATTLESCROLLS_FORMAT_MILLISECONDS] = "<<1>>мс",
-    [BATTLESCROLLS_TOOLTIP_INTER_CAST_DESC] = "Средняя задержка между кастами. Измеряется от окончания ГКД или времени каста навыка до начала следующего действия. Также известна как Weaving Average в CMX.",
-    [BATTLESCROLLS_TOOLTIP_TIME_LOST_DESC] = "Суммарное время простоя между кастами за бой. Также известно как Weaving Total в CMX.",
-    [BATTLESCROLLS_TOOLTIP_MISSED_LA_DESC] = "Навык активирован сразу после другого навыка, без обычной атаки между ними.",
+    [BATTLESCROLLS_TOOLTIP_INTER_CAST_DESC] = "Средний промежуток между кастами: от конца глобального отката или времени каста навыка до вашего следующего действия. В Combat Metrics это называется Weaving Average.",
+    [BATTLESCROLLS_TOOLTIP_TIME_LOST_DESC] = "Сумма коротких задержек между умениями за бой, без пауз от 3 секунд (простой). В Combat Metrics это Weaving Total.",
+    [BATTLESCROLLS_TOOLTIP_MISSED_LA_DESC] = "Навыки, применённые сразу после другого навыка, без обычной атаки между ними.",
     [BATTLESCROLLS_TOOLTIP_DOUBLE_LA_DESC] = "Две обычные атаки подряд, без навыка между ними.",
 
     -------------------------
@@ -94,7 +94,7 @@ local strings = {
 
     [BATTLESCROLLS_SETTINGS_PERSONAL_METER] = "Личный счётчик",
     [BATTLESCROLLS_SETTINGS_GROUP_METER] = "Групповой счётчик",
-    [BATTLESCROLLS_SETTINGS_GROUP_METER_TEXT] = "Даже если выключено, участники группы всё равно смогут видеть ваш DPS, если у них установлен аддон.",
+    [BATTLESCROLLS_SETTINGS_GROUP_METER_TEXT] = "Даже если выключено, члены группы всё равно смогут видеть ваш DPS, если у них установлена модификация.",
     [BATTLESCROLLS_SETTINGS_ENABLED] = "Включено",
     [BATTLESCROLLS_SETTINGS_MODE] = "Режим",
     [BATTLESCROLLS_SETTINGS_DESIGN] = "Оформление",
@@ -127,7 +127,7 @@ local strings = {
 
     -- Group tracker tooltips
     [BATTLESCROLLS_SETTINGS_SHOW_WITHOUT_GROUP_DATA] = "Показывать без данных группы",
-    [BATTLESCROLLS_SETTINGS_SHOW_WITHOUT_GROUP_DATA_TEXT] = "Если включено, групповой счётчик отображается даже когда другие участники не делятся данными. Вы увидите только свою статистику.",
+    [BATTLESCROLLS_SETTINGS_SHOW_WITHOUT_GROUP_DATA_TEXT] = "Если включено, групповой счётчик отображается даже когда другие члены группы не делятся данными. Вы увидите только свою статистику.",
     [BATTLESCROLLS_SETTINGS_GROUP_TRACKER_DESIGN] = "Оформление группового счётчика",
     [BATTLESCROLLS_SETTINGS_GROUP_TRACKER_POSITION] = "Позиция группового счётчика",
     [BATTLESCROLLS_SETTINGS_GROUP_TRACKER_POSITION_TEXT] = "Под/Над: Прикрепляет групповой счётчик к личному.\nОтдельно: Размещает групповой счётчик независимо с настраиваемой позицией.",
@@ -147,7 +147,7 @@ local strings = {
     [BATTLESCROLLS_SETTINGS_RECORD_PLAYER_FIGHTS] = "Записывать PvP-сражения",
     [BATTLESCROLLS_SETTINGS_RECORD_PLAYER_FIGHTS_TEXT] = "PvP-сражения против других игроков.",
     [BATTLESCROLLS_SETTINGS_RECORD_DUMMY_FIGHTS] = "Записывать сражения с манекеном",
-    [BATTLESCROLLS_SETTINGS_RECORD_IN_ADVENTURE_ZONE_TEXT] = "Если включено, игнорирует настройки для открытого мира и инстансов и записывает все сражения в этой зоне. Если выключено, ни на что не влияет.",
+    [BATTLESCROLLS_SETTINGS_RECORD_IN_ADVENTURE_ZONE_TEXT] = "Если включено, записывает все сражения в этой области независимо от настроек записи в открытом мире и инстансах. Если выключено, действуют обычные настройки.",
     [BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TITLE] = "Фильтры записи",
     [BATTLESCROLLS_SETTINGS_RECORDING_FILTERS_TEXT] = "Фильтры областей и типов сражений комбинируются: сражение должно соответствовать хотя бы одной области И одному типу для записи.",
 
@@ -164,17 +164,18 @@ local strings = {
     [BATTLESCROLLS_SETTINGS_STORAGE_SIZE_YOLO] = "Что может пойти не так?",
     -- Storage tooltip
     [BATTLESCROLLS_SETTINGS_STORAGE_TT_DESC] = "Сколько истории боёв хранить. При превышении лимита старые незаблокированные области удаляются автоматически. Вы можете заблокировать отдельные области, чтобы защитить их от очистки.",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_NOTE] = "Этот лимит относится только к сохранённой истории. Аддон также использует память для отслеживания текущего боя и отрисовки интерфейса, поэтому общее потребление будет выше.",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_NOTE] = "Этот лимит относится только к сохранённым данным: боям, сборкам и настройкам. Модификация также использует память для отслеживания текущего боя и отрисовки интерфейса, поэтому общее потребление будет выше.",
     [BATTLESCROLLS_SETTINGS_STORAGE_TT_CURRENT] = "История: <<1>> МБ из <<2>> МБ (<<3>>%)",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_PRESETS] = "Пресеты (испытание ~0.5-1 МБ, подземелье ~0.25-0.5 МБ):",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_XS] = "  Минимум: 5 МБ - несколько последних забегов",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_SMALL] = "  Мало: 8 МБ - вечер прогресса",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_MEDIUM] = "  Средне: 12 МБ - неделя казуальной игры",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_LARGE] = "  Много: 18 МБ - пара недель",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_XL] = "  Очень много: 25 МБ - месяц воспоминаний",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_CAUTION] = "  Осторожно: 40 МБ - вы правда любите данные",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_YOLO] = "  Что может пойти не так?: 60 МБ - живём опасно",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_WARNING] = "О лимитах памяти ESO: все аддоны делят пул в 100 МБ. При 70 МБ ESO показывает предупреждение. При 100 МБ интерфейс перезагружается и всё отключается. Если у вас много аддонов, выберите меньший пресет. Совет: введите /addonmemdisplay в чат для отслеживания памяти в реальном времени.",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_PROTECTED] = "Одни только закреплённые бои, сборки и настройки превышают лимит: очистка не сможет опуститься ниже него.",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_PRESETS] = "Пресеты (полное испытание ~0.3 МБ, подземелье ~0.15 МБ, вечер прогресса ~1 МБ):",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_XS] = "  Минимум: 5 МБ - только свежие свитки",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_SMALL] = "  Мало: 8 МБ - добрая стопка свитков",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_MEDIUM] = "  Средне: 12 МБ - аккуратный журнал",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_LARGE] = "  Много: 18 МБ - личная библиотека",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_XL] = "  Очень много: 25 МБ - целый архив",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_CAUTION] = "  Осторожно: 35 МБ - вы правда любите данные",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_YOLO] = "  Что может пойти не так?: 50 МБ - вы сами себе это устроили",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_WARNING] = "О лимитах памяти ESO: все модификации делят пул в 100 МБ. При 70 МБ ESO показывает предупреждение. При 100 МБ интерфейс перезагружается и всё отключается. Если у вас много модификаций, выберите меньший пресет. Совет: введите /addonmemdisplay в чат для отслеживания памяти в реальном времени.",
 
     -------------------------
     -- Effect Tracking Settings
@@ -240,7 +241,6 @@ local strings = {
     -- Proc Tracking
     [BATTLESCROLLS_HEADER_PROC_TRACKING] = "Отслеживание активаций",
     [BATTLESCROLLS_STAT_TOTAL_PROCS] = "<<1[$d активация/$d активации/$d активаций]>>",
-    [BATTLESCROLLS_STAT_MEDIAN_INTERVAL] = "медиана",
 
     -------------------------
     -- Damage Stats Details
@@ -252,6 +252,8 @@ local strings = {
     [BATTLESCROLLS_STAT_DPS] = "DPS",
 
     [BATTLESCROLLS_HEADER_BY_ABILITY] = "По способности",
+
+    [BATTLESCROLLS_HEADER_CASTS] = "Касты",
     [BATTLESCROLLS_HEADER_BY_DAMAGE_TYPE] = "По типу урона",
     [BATTLESCROLLS_HEADER_DIRECT_VS_DOT] = "Прямой / Периодический",
     [BATTLESCROLLS_HEADER_DAMAGE_DELIVERY] = "Способ урона",
@@ -284,7 +286,7 @@ local strings = {
 
     [BATTLESCROLLS_STAT_DIRECT_HEALING] = "Прямое исцеление",
     [BATTLESCROLLS_STAT_HEALING_OVER_TIME] = "Периодическое исцеление",
-    [BATTLESCROLLS_STAT_SHIELD_HEALING] = "Щиты урона",
+    [BATTLESCROLLS_STAT_SHIELD_HEALING] = "Защитные щиты",
     [BATTLESCROLLS_STAT_REGEN_HEALING] = "Восстановление здоровья",
     [BATTLESCROLLS_DAMAGE_UNKNOWN_SHIELDED] = "Неизвестно (поглощено щитом)",
     [BATTLESCROLLS_HEALING_UNKNOWN_ABSORBED] = "Неизвестно (поглощено)",
@@ -301,7 +303,7 @@ local strings = {
     [BATTLESCROLLS_EFFECT_UPTIME] = "активность",
     [BATTLESCROLLS_EFFECT_YOURS] = "ваш",
     [BATTLESCROLLS_EFFECT_AVG] = "средн.",
-    [BATTLESCROLLS_EFFECT_MEMBERS] = "<<1[$d участник/$d участника/$d участников]>>",
+    [BATTLESCROLLS_EFFECT_MEMBERS] = "<<1[$d член группы/$d члена группы/$d членов группы]>>",
 
     -------------------------
     -- Effect Tooltips
@@ -314,15 +316,15 @@ local strings = {
     [BATTLESCROLLS_TOOLTIP_MAX_STACKS] = "Максимум зарядов",
     [BATTLESCROLLS_TOOLTIP_TIME_AT_MAX_STACKS] = "Время на максимальных зарядах",
     [BATTLESCROLLS_TOOLTIP_YOUR_TIME_AT_MAX] = "Ваше время на максимальных зарядах",
-    [BATTLESCROLLS_TOOLTIP_AVG_UPTIME_PER_MEMBER] = "Средняя активность на участника",
-    [BATTLESCROLLS_TOOLTIP_MEMBERS_AFFECTED] = "Затронуто участников",
+    [BATTLESCROLLS_TOOLTIP_AVG_UPTIME_PER_MEMBER] = "Среднее время действия на члена группы",
+    [BATTLESCROLLS_TOOLTIP_MEMBERS_AFFECTED] = "Затронуто членов группы",
     [BATTLESCROLLS_TOOLTIP_AVG_UPTIME] = "Средняя активность",
     [BATTLESCROLLS_TOOLTIP_MAX_STACKS_OBSERVED] = "Максимум наблюдаемых зарядов",
     [BATTLESCROLLS_TOOLTIP_AVG_TIME_AT_MAX] = "Среднее время на максимальных зарядах",
     [BATTLESCROLLS_TOOLTIP_YOUR_AVG_TIME_AT_MAX] = "Ваше среднее время на максимальных зарядах",
     [BATTLESCROLLS_TOOLTIP_PEAK_INSTANCES] = "Максимум одновременных источников",
     [BATTLESCROLLS_TOOLTIP_AVG_UPTIME_PER_INSTANCE] = "Средняя активность на источник",
-    [BATTLESCROLLS_TOOLTIP_PER_MEMBER] = "По участникам",
+    [BATTLESCROLLS_TOOLTIP_PER_MEMBER] = "По членам группы",
     [BATTLESCROLLS_TOOLTIP_YOU] = "Вы",
 
     -------------------------
@@ -335,6 +337,7 @@ local strings = {
     [BATTLESCROLLS_TOOLTIP_AVG_TICK] = "Средний тик",
     [BATTLESCROLLS_TOOLTIP_MIN_TICK] = "Минимальный тик",
     [BATTLESCROLLS_TOOLTIP_MAX_TICK] = "Максимальный тик",
+    [BATTLESCROLLS_TOOLTIP_TICKS] = "Тиков",
 
     [BATTLESCROLLS_TOOLTIP_BY_TARGET] = "По цели",
     [BATTLESCROLLS_TOOLTIP_MEAN_INTERVAL] = "Средний интервал",
@@ -369,7 +372,7 @@ local strings = {
     [BATTLESCROLLS_DELIVERY_HOT] = "Периодическое",
     [BATTLESCROLLS_DELIVERY_SHIELD] = "Щит",
     [BATTLESCROLLS_DELIVERY_REGEN] = "Регенерация",
-    [BATTLESCROLLS_DELIVERY_HEAL_ABSORPTION] = "Поглощение лечения",
+    [BATTLESCROLLS_DELIVERY_HEAL_ABSORPTION] = "Поглощение исцеления",
 
     -------------------------
     -- Filter Dialog
@@ -442,7 +445,7 @@ local strings = {
     -- Text design settings
     [BATTLESCROLLS_DESIGN_TEXT_COLUMNS] = "Столбцы",
     [BATTLESCROLLS_DESIGN_TEXT_COLUMNS_TITLE] = "Расположение столбцов",
-    [BATTLESCROLLS_DESIGN_TEXT_COLUMNS_TEXT] = "Группы из 4 или менее участников всегда используют 1 столбец.",
+    [BATTLESCROLLS_DESIGN_TEXT_COLUMNS_TEXT] = "Для групп из 4 или менее игроков всегда используется 1 столбец.",
 
     -------------------------
     -- DPS Meter Display Strings
@@ -520,7 +523,7 @@ local strings = {
     [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_SMOOTH] = "Плавность",
     [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_CUSTOM] = "Другое (<<1>> FPS)",
     [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_TITLE] = "Скорость обработки",
-    [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_TEXT] = "Настройка скорости обработки фоновых задач. Влияет в основном на интерфейс Журнала и время между окончанием боя и появлением записи в списке.\n\nПроизводительность: Быстрая обработка. Возможны кратковременные подлагивания.\nПлавность: Более плавный геймплей, медленная обработка. Записи могут зависать при загрузке или не появляться в Журнале.\n\nВлияет на ВСЕ аддоны, использующие LibAsync.",
+    [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_TEXT] = "Настройка скорости обработки фоновых задач. Влияет в основном на интерфейс Журнала и время между окончанием боя и появлением записи в списке.\n\nПроизводительность: Быстрая обработка. Возможны кратковременные подлагивания.\nПлавность: Более плавный геймплей, медленная обработка. Записи могут зависать при загрузке или не появляться в Журнале.\n\nВлияет на ВСЕ модификации, использующие LibAsync.",
 
     -------------------------
     -- Onboarding
@@ -548,15 +551,15 @@ local strings = {
     -- Storage options
     [BATTLESCROLLS_ONBOARDING_STORAGE_QUESTION] = "Сколько истории сохранять?",
     [BATTLESCROLLS_ONBOARDING_STORAGE_MINIMAL] = "Минимум (5 МБ)",
-    [BATTLESCROLLS_ONBOARDING_STORAGE_MINIMAL_DESC] = "Примерно 6 испытаний",
+    [BATTLESCROLLS_ONBOARDING_STORAGE_MINIMAL_DESC] = "Примерно 15 испытаний",
     [BATTLESCROLLS_ONBOARDING_STORAGE_MODERATE] = "Умеренно (12 МБ)",
-    [BATTLESCROLLS_ONBOARDING_STORAGE_MODERATE_DESC] = "Примерно 16 испытаний",
+    [BATTLESCROLLS_ONBOARDING_STORAGE_MODERATE_DESC] = "Примерно 40 испытаний",
     [BATTLESCROLLS_ONBOARDING_STORAGE_GENEROUS] = "Много (25 МБ)",
-    [BATTLESCROLLS_ONBOARDING_STORAGE_GENEROUS_DESC] = "Примерно 36 испытаний",
+    [BATTLESCROLLS_ONBOARDING_STORAGE_GENEROUS_DESC] = "Примерно 80 испытаний",
     -- Effects tracking
     [BATTLESCROLLS_ONBOARDING_EFFECTS_QUESTION] = "Сколько баффов/дебаффов отслеживать?",
     [BATTLESCROLLS_ONBOARDING_EFFECTS_FULL] = "Полное отслеживание",
-    [BATTLESCROLLS_ONBOARDING_EFFECTS_FULL_DESC] = "Ваши баффы, дебаффы на боссах И аптайм баффов группы (напр. аптайм Великой храбрости у всех участников группы)",
+    [BATTLESCROLLS_ONBOARDING_EFFECTS_FULL_DESC] = "Ваши баффы, дебаффы на боссах И аптайм баффов группы (напр. аптайм Великой храбрости у всех членов группы)",
     [BATTLESCROLLS_ONBOARDING_EFFECTS_ESSENTIAL] = "Только основное",
     [BATTLESCROLLS_ONBOARDING_EFFECTS_ESSENTIAL_DESC] = "Только ваши баффы и дебаффы на боссах. Без групповых для снижения потребления памяти.",
     [BATTLESCROLLS_ONBOARDING_EFFECTS_DISABLED] = "Отключено",
@@ -752,8 +755,8 @@ local strings = {
     [BATTLESCROLLS_PIVOT_SCOPE_OVERLAND] = "Весь открытый мир",
     [BATTLESCROLLS_PIVOT_SCOPE_HOUSES] = "Все дома",
     [BATTLESCROLLS_PIVOT_SCOPE_PVP] = "Весь PvP",
-    [BATTLESCROLLS_PIVOT_SCOPE_ZONES] = "По названию зоны",
-    [BATTLESCROLLS_PIVOT_SCOPE_SPECIFIC] = "Конкретные инстансы",
+    [BATTLESCROLLS_PIVOT_SCOPE_ZONES] = "По названию области",
+    [BATTLESCROLLS_PIVOT_SCOPE_SPECIFIC] = "Конкретные области",
 
     -- Time filter options
     [BATTLESCROLLS_PIVOT_TIME_ALL] = "Всё время",
@@ -791,7 +794,7 @@ local strings = {
     -- Domain names
     [BATTLESCROLLS_PIVOT_DOMAIN_DAMAGE] = "Урон",
     [BATTLESCROLLS_PIVOT_DOMAIN_HEALING_OUT] = "Исходящее исцеление",
-    [BATTLESCROLLS_PIVOT_DOMAIN_HEALING_IN] = "Входящее исцеление",
+    [BATTLESCROLLS_PIVOT_DOMAIN_HEALING_IN] = "Полученное исцеление",
     -- Effects domain labels reuse BATTLESCROLLS_TAB_EFFECTS_* strings
     [BATTLESCROLLS_PIVOT_DOMAIN_GROUP] = "Группа",
     [BATTLESCROLLS_PIVOT_DOMAIN_OVERVIEW] = "Обзор",
@@ -805,10 +808,10 @@ local strings = {
     [BATTLESCROLLS_PIVOT_DIM_DELIVERY] = "Способ нанесения",
     [BATTLESCROLLS_PIVOT_DIM_AOE_ST] = "По площади / По цели",
     [BATTLESCROLLS_PIVOT_DIM_BUFF_DEBUFF] = "Бафф / Дебафф",
-    [BATTLESCROLLS_PIVOT_DIM_GROUP_MEMBER] = "Участник группы",
+    [BATTLESCROLLS_PIVOT_DIM_GROUP_MEMBER] = "Член группы",
     [BATTLESCROLLS_PIVOT_DIM_ROLE] = "Роль",
     [BATTLESCROLLS_PIVOT_DIM_ENCOUNTER] = "Сражение",
-    [BATTLESCROLLS_PIVOT_DIM_INSTANCE] = "Инстанс",
+    [BATTLESCROLLS_PIVOT_DIM_INSTANCE] = "Область",
     [BATTLESCROLLS_PIVOT_COL_METRICS] = "Метрики",
 
     -- Metric names
@@ -840,12 +843,12 @@ local strings = {
     [BATTLESCROLLS_PIVOT_METRIC_GROUP_AOE_PERCENT] = "AoE %",
     [BATTLESCROLLS_PIVOT_METRIC_GROUP_MAX_HIT] = "Макс. удар",
     [BATTLESCROLLS_PIVOT_METRIC_GROUP_DTPS] = "DTPS",
-    [BATTLESCROLLS_PIVOT_METRIC_GROUP_RAW_HPS] = "Общий HPS",
+    [BATTLESCROLLS_PIVOT_METRIC_GROUP_RAW_HPS] = "Полный HPS",
     [BATTLESCROLLS_PIVOT_METRIC_GROUP_EFFECTIVE_HPS] = "Эффективный HPS",
     [BATTLESCROLLS_PIVOT_METRIC_EFFECTIVE_HPS_OUT] = "Эффективный HPS (исх.)",
-    [BATTLESCROLLS_PIVOT_METRIC_RAW_HPS_OUT] = "Общий HPS (исх.)",
+    [BATTLESCROLLS_PIVOT_METRIC_RAW_HPS_OUT] = "Полный HPS (исх.)",
     [BATTLESCROLLS_PIVOT_METRIC_EFFECTIVE_HPS_IN] = "Эффективный HPS (вх.)",
-    [BATTLESCROLLS_PIVOT_METRIC_RAW_HPS_IN] = "Общий HPS (вх.)",
+    [BATTLESCROLLS_PIVOT_METRIC_RAW_HPS_IN] = "Полный HPS (вх.)",
     [BATTLESCROLLS_PIVOT_METRIC_BOSS_DPS] = "DPS по боссу",
     [BATTLESCROLLS_PIVOT_METRIC_BOSS_DAMAGE] = "Урон по боссу",
     [BATTLESCROLLS_PIVOT_METRIC_DTPS] = "DTPS",
@@ -882,9 +885,9 @@ local strings = {
     [BATTLESCROLLS_PIVOT_COLUMNS_CAPPED] = "Результаты ограничены <<1>> столбцами",
     [BATTLESCROLLS_PIVOT_TIP_DOMAIN_OVERVIEW] = "Сводка по всем данным: урон, исцеление и эффекты. Показывает общие итоги вместо отдельных разбивок.",
     [BATTLESCROLLS_PIVOT_TIP_ENC_BOSS_NAMES] = "Показывает только сражения с выбранными боссами. Имена боссов выбираются на следующем шаге.",
-    [BATTLESCROLLS_PIVOT_TIP_DIM_DELIVERY] = "Разделяет данные по способу: Прямой, DoT (урон с течением времени), Поглощение лечения, HoT (исцеление с течением времени), Регенерация, Щит или Смешанный.",
+    [BATTLESCROLLS_PIVOT_TIP_DIM_DELIVERY] = "Разделяет данные по типу: прямой урон, периодический урон (DoT), поглощение исцеления, периодическое исцеление (HoT), восстановление здоровья, щит или смешанный тип.",
     [BATTLESCROLLS_PIVOT_TIP_DIM_DAMAGE_TYPE] = "Разделяет данные по типу урона: физический, огонь, молния, лёд, магия, яд, болезнь, кровотечение, Обливион и другие.",
-    [BATTLESCROLLS_PIVOT_TIP_DOMAIN_GROUP] = "Боевые показатели каждого участника группы: DPS, общий урон, процент критов. Для времени действия баффов/дебаффов используйте Эффекты группы.",
+    [BATTLESCROLLS_PIVOT_TIP_DOMAIN_GROUP] = "Боевые показатели каждого члена группы: DPS, общий урон, процент критов. Для времени действия баффов/дебаффов используйте Эффекты группы.",
     [BATTLESCROLLS_PIVOT_TIP_AGGREGATION] = "Как объединяются значения, когда несколько сражений попадают в одну ячейку. Например, средний DPS показывает среднее значение по сражениям, а максимум — лучший бой.",
 
     -- Save dialog
@@ -898,8 +901,8 @@ local strings = {
     [BATTLESCROLLS_PIVOT_DELETE_CONFIRM] = "Удалить запрос \"<<1>>\"?",
 
     -- Selector dialogs
-    [BATTLESCROLLS_PIVOT_SELECT_ZONES] = "Выбрать зоны",
-    [BATTLESCROLLS_PIVOT_SELECT_INSTANCES] = "Выбрать инстансы",
+    [BATTLESCROLLS_PIVOT_SELECT_ZONES] = "Выбрать области",
+    [BATTLESCROLLS_PIVOT_SELECT_INSTANCES] = "Выбрать области",
     [BATTLESCROLLS_PIVOT_SELECT_ENCOUNTERS] = "Выбрать сражения",
     [BATTLESCROLLS_PIVOT_SELECT_BOSSES] = "Выбрать имена боссов",
     [BATTLESCROLLS_PIVOT_SELECT_METRICS] = "Выбрать метрики",
@@ -926,3 +929,468 @@ BS_STRINGS = strings
 for stringId, stringValue in pairs(strings) do
     SafeAddString(stringId, stringValue, 1)
 end
+
+-- v17 storage migration
+local migrationStrings = {
+    [BATTLESCROLLS_MIGRATION_START] = "Идёт разовое обновление хранилища - в ближайшие минуты возможны подтормаживания",
+    [BATTLESCROLLS_MIGRATION_DONE] = "Обновление хранилища завершено! Перекодировано боёв: <<1>>, освобождено <<2>> МБ",
+    [BATTLESCROLLS_MIGRATION_TIP] = "Теперь можно уменьшить пресет памяти в настройках - новый формат вмещает куда больше истории в каждый МБ.",
+}
+for stringId, stringValue in pairs(migrationStrings) do
+    SafeAddString(stringId, stringValue, 1)
+end
+
+-- Online sharing
+local shareStrings = {
+    [BATTLESCROLLS_SHARE_FIGHT] = "Поделиться боем",
+    [BATTLESCROLLS_SHARE_INSTANCE] = "Загрузить все бои",
+    [BATTLESCROLLS_SHARE_PREPARING] = "Подготовка к отправке...",
+    [BATTLESCROLLS_SHARE_TITLE] = "Отправка",
+    [BATTLESCROLLS_SHARE_PROGRESS_HEADER] = "Части",
+    [BATTLESCROLLS_SHARE_PART_SENT] = "Часть <<1>> — отправлена",
+    [BATTLESCROLLS_SHARE_PART_READY] = "Часть <<1>> — готова к отправке",
+    [BATTLESCROLLS_SHARE_PART_PENDING] = "Часть <<1>>",
+    [BATTLESCROLLS_SHARE_SEND_PART] = "Отправить часть <<1>> из <<2>>",
+    [BATTLESCROLLS_SHARE_HINT_HEADER] = "Как это работает",
+    [BATTLESCROLLS_SHARE_PRIVACY_TITLE] = "Имена игроков и данные боя будут храниться на сайте",
+    [BATTLESCROLLS_SHARE_PRIVACY_NOTICE] = "Будут загружены ваши и чужие игровые имена, платформа, сервер, боевая статистика и сборки. Отчёты не удаляются автоматически; любой получивший ссылку сможет открыть или скачать их. Перед загрузкой сообщите об этом затронутым игрокам. Конфиденциальность и запросы на удаление: <<1>>",
+    [BATTLESCROLLS_SHARE_TT_READY] = "Подтвердите запрос игры на открытие сайта — открывшаяся страница браузера передаст эту часть боевых данных на сайт, после чего браузер можно закрыть. Вернитесь в игру и отправьте следующую часть; прогресс сохранится, даже если выйти с этого экрана. Когда дойдут все части, страница покажет непубличную ссылку на ваш бой и QR-код.",
+    [BATTLESCROLLS_SHARE_TT_SENT] = "Эта часть уже передана браузеру. Если страница в браузере сообщит, что её не хватает (упавшая вкладка теряет свою часть), выберите эту строку и нажмите кнопку повторной отправки.",
+    [BATTLESCROLLS_SHARE_TT_PENDING] = "Части отправляются по одной, по порядку — эта станет доступна, когда придёт её черёд.",
+    [BATTLESCROLLS_SHARE_TT_DONE] = "Страница в браузере теперь показывает непубличную ссылку и QR-код — открыть бой смогут только те, у кого есть ссылка. Если страница сообщает о недостающих частях, выберите их выше и отправьте ещё раз. «Завершить отправку» — забыть эту загрузку на стороне игры.",
+    [BATTLESCROLLS_SHARE_CHOICE_HEADER] = "Что отправить",
+    [BATTLESCROLLS_SHARE_CHOICE_FULL] = "Все бои (<<1>>)",
+    [BATTLESCROLLS_SHARE_CHOICE_BOSSES] = "Только боссы (<<1>>)",
+    [BATTLESCROLLS_SHARE_CHOICE_PARTS] = "Частей к отправке: <<1>>",
+    [BATTLESCROLLS_SHARE_TT_CHOICE_FULL] = "Все записанные бои этой вылазки, включая трэш. Больше данных — больше частей для отправки через браузер.",
+    [BATTLESCROLLS_SHARE_TT_CHOICE_BOSSES] = "Только бои с боссами. Обычно именно трэш занимает большую часть объёма, поэтому частей будет заметно меньше.",
+    [BATTLESCROLLS_SHARE_DONE_HEADER] = "Все части отправлены",
+    [BATTLESCROLLS_SHARE_DONE_HINT] = "Ссылка и QR-код ждут на странице браузера.",
+    [BATTLESCROLLS_SHARE_CONTINUE] = "Продолжить отправку",
+    [BATTLESCROLLS_SHARE_CANCEL] = "Отменить отправку",
+    [BATTLESCROLLS_SHARE_FAILED] = "Не удалось подготовить отправку.",
+    [BATTLESCROLLS_SHARE_RESEND_PART] = "Отправить часть <<1>> ещё раз",
+    [BATTLESCROLLS_SHARE_PART_RESENDING] = "Часть <<1>> — повторная отправка…",
+    [BATTLESCROLLS_SHARE_FINISH] = "Завершить отправку",
+}
+for id, str in pairs(shareStrings) do
+    SafeAddString(id, str, 1)
+end
+
+-- Новые функции: переименование, урон группы, воскрешения, цвет шкалы, суперспособность, Знаки, З'ен
+local featureStrings = {
+    [BATTLESCROLLS_RENAME] = "Переименовать",
+    [BATTLESCROLLS_RENAME_TEXT] = "Введите новое имя. Чтобы сбросить, введите исходное имя (<<1>>).",
+
+    [BATTLESCROLLS_TAB_GROUP_DAMAGE] = "Урон группы",
+    [BATTLESCROLLS_FILTER_GROUP_DAMAGE] = "Фильтр урона группы",
+    [BATTLESCROLLS_FILTER_OTHERS] = "Остальные",
+    [BATTLESCROLLS_TOOLTIP_GROUP_DAMAGE_SCOPE] = "Весь урон, который зарегистрировала ваша игра: ваш собственный, включая питомцев и спутников, и урон других игроков поблизости. ESO не сообщает, кто из них нанёс этот урон, поэтому он объединён в категорию «Остальные».",
+
+    [BATTLESCROLLS_GROUP_COL_RES] = "Воскр",
+
+    [BATTLESCROLLS_SETTINGS_BAR_COLOR] = "Цвет вашей шкалы",
+    [BATTLESCROLLS_SETTINGS_BAR_COLOR_TEXT] = "Члены группы с дизайном «Шкалы» в «Боевых Свитках» видят вашу шкалу в этом цвете, даже если вы используете другой дизайн или отключили свой групповой счётчик.",
+    [BATTLESCROLLS_COLOR_DEFAULT] = "По умолчанию",
+    [BATTLESCROLLS_COLOR_WHEEL] = "Тон и насыщенность",
+    [BATTLESCROLLS_COLOR_BRIGHTNESS] = "Яркость",
+    [BATTLESCROLLS_COLOR_HEX] = "HEX-код",
+    [BATTLESCROLLS_COLOR_HEX_INVALID] = "Введите шесть HEX-цифр, например #3EB6FF.",
+    [BATTLESCROLLS_COLOR_SAVE] = "Сохранить",
+    [BATTLESCROLLS_COLOR_SAVE_HINT] = "Ваша шкала будет этого цвета у всех, кто использует «Шкалы» в «Боевых Свитках», независимо от вашего дизайна.",
+
+    [BATTLESCROLLS_HEADER_ULTIMATE] = "Суперспособность",
+    [BATTLESCROLLS_STAT_ULT_AT_ENTRY] = "Заряд при входе в бой",
+    [BATTLESCROLLS_STAT_ULT_GENERATED] = "Накоплено заряда",
+    [BATTLESCROLLS_STAT_ULT_SPENT_DRAINED] = "Потрачено и поглощено",
+    [BATTLESCROLLS_STAT_ULT_SPENT] = "Потрачено заряда",
+    [BATTLESCROLLS_STAT_ULT_LOST] = "Потеряно при касте",
+    [BATTLESCROLLS_STAT_ULT_LOST_TT] = "Применение суперспособности опустошает всю шкалу, поэтому всё сверх её стоимости теряется.",
+    [BATTLESCROLLS_STAT_ULT_DRAINED] = "Поглощено заряда",
+    [BATTLESCROLLS_HEADER_ULT_SOURCES] = "Источники накопления",
+    [BATTLESCROLLS_ULT_BASE_GENERATION] = "Базовое накопление",
+    [BATTLESCROLLS_ULT_HEROISM_LINE] = "Включая <<C:1>>: аптайм <<2>>%, примерно <<3>>",
+    [BATTLESCROLLS_HEADER_ULT_CASTS] = "Применённые суперспособности",
+
+    [BATTLESCROLLS_HEADER_CRUX] = "Знаки",
+    [BATTLESCROLLS_STAT_CRUX_GENERATORS] = "Касты, дающие Знаки",
+    [BATTLESCROLLS_STAT_CRUX_AT_FULL] = "Касты при 3 Знаках",
+    [BATTLESCROLLS_STAT_CRUX_SPENDERS] = "Касты, тратящие Знаки",
+    [BATTLESCROLLS_STAT_CRUX_UNDER] = "Касты при неполных Знаках",
+    [BATTLESCROLLS_CRUX_AT_N] = "Знаков: <<1>> — <<2>>",
+    [BATTLESCROLLS_HEADER_CRUX_BY_ABILITY] = "Использование Знаков по способностям",
+
+    [BATTLESCROLLS_HEADER_ZEN] = "Наложение DoT (З'ен)",
+    [BATTLESCROLLS_ZEN_AVG_DOTS] = "Среднее число DoT",
+    [BATTLESCROLLS_ZEN_UPTIME] = "Время действия вашего З’ена",
+    [BATTLESCROLLS_ZEN_PEAK_TIME] = "Время при <<1>>",
+    [BATTLESCROLLS_ZEN_DOTS_LABEL] = "<<1>> DoT",
+    [BATTLESCROLLS_ZEN_SHARE_LINE] = "в среднем <<1>> — <<2>> с 5 DoT",
+    [BATTLESCROLLS_ZEN_SHORT] = "З'ен",
+    [BATTLESCROLLS_ZEN_NOTE] = "Ваши DoT отслеживаются, даже если вы не носите набор З’ена. Они показывают, какой бонус вы могли бы давать, если бы на цели действовал ваш дебафф З’ена. Время без вашего З’ена показывает лишь этот потенциал.",
+    [BATTLESCROLLS_ZEN_DISTRIBUTION_NOTE] = "Каждая строка DoT показывает долю отслеживаемого времени. Процент З’ена — это доля времени этой строки, когда действовал именно ваш дебафф.",
+
+    [BATTLESCROLLS_HEADER_SUPPORT] = "Поддержка",
+    [BATTLESCROLLS_STAT_RESURRECTIONS] = "Воскрешения",
+}
+for id, str in pairs(featureStrings) do
+    SafeAddString(id, str, 1)
+end
+
+local cruxPassiveStrings = {
+    [BATTLESCROLLS_STAT_CRUX_PASSIVE] = "Потеряно вне кастов",
+    [BATTLESCROLLS_STAT_CRUX_PASSIVE_TT] = "Знаки, пропавшие сами по себе, без траты и без смерти рядом. Знак истекает через 30 секунд.",
+    [BATTLESCROLLS_STAT_CRUX_DEATH] = "Потеряно из-за смерти",
+    [BATTLESCROLLS_STAT_CRUX_PROC_WASTED] = "Пассивные приросты при 3 Знаках",
+    [BATTLESCROLLS_STAT_CRUX_PROC_WASTED_TT] = "Пассивные приросты, сработавшие, когда у вас уже было 3 Знака, — они ничего не дали. «<<1>>» и его морфы, а также <<2>> дают Знак только когда у вас нет ни одного, поэтому здесь они не учитываются.",
+    [BATTLESCROLLS_STAT_CRUX_CONDITIONAL_TT] = "Знаки, которые этот источник создал пассивно, без каста.",
+    [BATTLESCROLLS_STAT_CRUX_OTHER] = "Прочие приросты Знаков",
+    [BATTLESCROLLS_STAT_CRUX_OTHER_TT] = "Знаки, полученные без срабатывания какого-либо отслеживаемого источника в этот момент.",
+    [BATTLESCROLLS_HEADER_CRUX_GAINED] = "Получено Знаков по способностям",
+}
+for id, str in pairs(cruxPassiveStrings) do
+    SafeAddString(id, str, 1)
+end
+
+local activityOverviewStrings = {
+    [BATTLESCROLLS_STAT_DOWNTIME] = "Простой",
+    [BATTLESCROLLS_TOOLTIP_DOWNTIME_DESC] = "Промежутки в 3 секунды и больше между кастами — например, механики, воскрешение или смерть. В задержку каста не входят.",
+    [BATTLESCROLLS_STAT_PER_MINUTE] = "<<1>>/мин",
+    [BATTLESCROLLS_DETAIL_MEDIAN] = "медиана <<1>>",
+    [BATTLESCROLLS_DETAIL_DELAY] = "задержка <<1>>",
+    [BATTLESCROLLS_DETAIL_AT_FULL] = "<<1>> при полных",
+    [BATTLESCROLLS_DETAIL_LOST] = "<<1>> потеряно",
+    [BATTLESCROLLS_DETAIL_AVG_DOTS] = "в средн. <<1>> DoT",
+    [BATTLESCROLLS_DETAIL_AT_DOTS] = "<<1>> при <<2>>",
+}
+for id, str in pairs(activityOverviewStrings) do
+    SafeAddString(id, str, 1)
+end
+
+-- Release history
+SafeAddString(BATTLESCROLLS_WHATS_NEW, "Что нового", 1)
+SafeAddString(BATTLESCROLLS_WHATS_NEW_DESC, "История изменений «Боевых Свитков»: от последнего обновления до первого публичного выпуска.", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_6_0_0, [=[
+|cD4AF37Новые возможности:|r
+
+- |cD4AF37Теперь свитки могут покинуть Тамриэль!|r Создайте в журнале ссылку на бой или целое прохождение и откройте её в браузере. Отсканируйте QR-код с телевизора, чтобы получить ссылку на телефоне. Затем изучите бой сами или поделитесь им где угодно
+
+- Изучайте те же данные о бое и сборке, что и в модификации, и экспортируйте их в |cFFFFFFCSV или JSON|r для собственного анализа
+
+- На вкладке «|cFFFFFFАктивность|r» появились накопление и расход |cFFFFFFзаряда суперспособности|r, использование Знаков мастера рун, число одновременно действующих DoT для «Касания З’ена» и воскрешения. Число DoT помогает оценить возможный бонус З’ена, даже если вы не носите этот набор. Короткие задержки между применениями способностей отделены от длительного простоя
+
+- В причинах вашей смерти теперь указаны |cFFFFFFимена нападавших|r, если они известны
+
+- «|cFFFFFFУрон группы|r» показывает весь урон, замеченный вашим клиентом, включая игроков без «Боевых Свитков». Игра не сообщает, кто нанёс чужой урон, поэтому он объединён в категорию «|cFFFFFFОстальные|r»
+
+- Задайте |cFFFFFFцвет своей шкалы|r — его увидят все члены группы с индикатором «Шкалы». Прохождения и бои в истории теперь можно переименовывать
+
+- В журнале появился раздел «|cFFFFFFЧто нового|r» с датами и описаниями всех выпусков на семи языках. На случай, если пара свитков прошла мимо
+
+|cD4AF37Основные изменения:|r
+
+- Новый формат истории вмещает гораздо |cFFFFFFбольше боёв|r в тот же объём памяти. Он также должен уменьшить |cFFFFFFподтормаживания|r после крупных сражений и |cFFFFFFзначительно ускорить|r открытие боёв в журнале. После входа история |cFFFFFFавтоматически|r обновляется в фоне; во время однократного переноса возможны краткие подтормаживания. Перед заменой каждый бой сверяется с оригиналом
+
+|cD4AF37Исправления:|r
+
+- Запись боя должна |cFFFFFFгораздо реже завершаться раньше времени|r, если вы погибаете, а группа продолжает сражаться. Особенно часто это происходило в последнем бою в Цитадели Люцентов
+
+- |cFFFFFFРасчёты исцеления|r теперь учитывают все фильтры, а в сборках других членов группы отображаются яды. Исправлен ряд ошибок обмена данными и очистки истории
+
+- Данные о боях и сборках |cFFFFFFнадёжнее передаются|r между членами группы: меньше пропусков после переходов через двери и экранов загрузки
+
+|cE6B566Известные проблемы:|r
+
+- Чтобы индикатор памяти дополнений ESO отразил место, освобождённое при обновлении истории, может потребоваться |cFFFFFFперезагрузка интерфейса|r
+
+- После |cFFFFFFизменений алхимии в обновлении 51|r названия эффектов ядов в сборках могут отсутствовать или отображаться неверно. В веб-версии эффекты созданных ядов не отображаются
+
+- Возможность делиться боями через браузер не тестировалась на |cFFFFFFPlayStation|r. Пожалуйста, сообщайте о любых проблемах, в том числе если функция у вас совсем не работает]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_5_3_1, [=[|cD4AF37Исправления:|r
+
+- Пассивные способности |cFFFFFFмастерства класса|r и классовые навыки других игроков теперь правильно отображаются в их сборках на вкладке «|cFFFFFFГруппа|r»]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_5_3_0, [=[|cD4AF37Новые возможности:|r
+
+- Добавлена поддержка |cFFFFFFмастерства класса|r: если изучена хотя бы одна такая пассивная способность, этот раздел появляется вместо списка классовых навыков
+
+- Добавлена поддержка «|cFFFFFFМести|r»: в обзоре |cFFFFFFсборки|r видны выбранный комплект и умения, а сведения, которые не действуют в этом режиме, скрыты
+
+|cD4AF37Небольшие изменения:|r
+
+- В английской версии обычные группы врагов теперь называются basepop вместо trash, как у разработчиков]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_5_2_0, [=[|cD4AF37Новые возможности:|r
+
+- |cFFFFFFВосстановление здоровья|r учитывается как отдельный вид исцеления. Полное исцеление оценивается по боевому показателю восстановления, эффективное исцеление и переисцеление — по фактическим изменениям здоровья
+
+- |cFFFFFFПоглощение исцеления|r, наложенное на игрока, учитывается как отдельный вид полученного урона
+
+- Урон, поглощённый щитами, учитывается в суммарном нанесённом и полученном уроне, а также в DPS и DTPS, но не в разбивках по способностям и типам урона
+
+- |cFFFFFFПоглощённое исцеление|r теперь входит в итоговые значения исцеления других, самоисцеления и полученного исцеления, а также в HPS
+
+|cD4AF37Небольшие изменения:|r
+
+- Подробные списки всегда показывают до 50 способностей и 20 целей/источников вместо прежних 25/15/10 в зависимости от раздела
+
+|cD4AF37Исправления:|r
+
+- Агрегация исходящего исцеления по типу теперь включает самоисцеление, как и остальные представления
+
+|cE6B566Известные проблемы:|r
+
+- Полное исцеление от |cFFFFFFвосстановления здоровья|r оценивается по времени жизни: ESO не сообщает точное время каждого тика. Если одновременно с восстановлением вы теряете здоровье, часть эффективного исцеления может остаться неучтённой]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_5_1_0, [=[|cD4AF37Новые возможности:|r
+
+- |cFFFFFFЩиты|r, наложенные на вас и членов группы, учитываются как исцеление. Наложение щита — полное исцеление, реально поглощённый урон — эффективное
+
+- |cFFFFFFЩиты|r выделены в отдельный вид исцеления рядом с прямым и периодическим на вкладках, в обзорах и агрегациях исходящего исцеления
+
+|cE6B566Известные проблемы:|r
+
+- Если несколько щитов накладываются на одну цель с интервалом менее 50 мс, тик щита изредка может быть приписан не той способности
+
+|cD4AF37Небольшие изменения:|r
+
+- Подсказки показывают ID способностей ESO в разделах урона, исцеления, эффектов, активаций, |cFFFFFFвивинга|r и |cFFFFFFсборки|r
+
+- Исправлены неверные и общие значки: «Прагматичный резчик судеб», «Блистательная слава», «Бич цефалиарха», зелья, «Поглощение сущности», «Сила Неустрашимых», синергии «Искупление» и «Кровавый пир», «Защитная руна тихих вод», «Очищающий свет», «Испытанный ритуал» и особенность «Гармония»
+
+- Для заполнения шкалы личного индикатора теперь нужно больше HPS
+
+- Состав исцеления подписан «Исцеление по типу»; разбивки, в которых есть лишь одна категория, скрыты
+
+|cD4AF37Исправления:|r
+
+- Меньше ложных пропущенных и двойных обычных атак при вивинге
+
+- Враги надёжнее определяются как боссы при отключённом отслеживании эффектов
+
+- Средний тик в подсказках исцеления больше не бывает ниже минимального]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_5_0_0, [=[|cD4AF37Новые возможности:|r
+
+- Появилась |cFFFFFFстатистика вивинга|r: среднее и суммарное потерянное время между применениями способностей, пропущенные обычные атаки и способности — как в целом, так и по каждой способности
+
+- Новая вкладка «|cFFFFFFАктивность|r» для этих данных
+
+- Данные |cFFFFFFвивинга|r доступны в агрегациях с выбранной областью «|cFFFFFFОбзор|r»
+
+|cD4AF37Небольшие изменения:|r
+
+- Отслеживание активаций переехало из «Обзора» в «|cFFFFFFАктивность|r». Вы ведь знали, что оно там было?
+
+- Улучшены производительность и расход памяти в бою и вне его, особенно при частично или полностью отключённых эффектах
+
+|cD4AF37Исправления:|r
+
+- При отключённом отслеживании эффектов процент времени жизни на вкладке «|cFFFFFFГруппа|r» больше не всегда равен 100%]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_4_0_0, [=[|cD4AF37Новые возможности:|r
+
+- Хотелось |cFFFFFFэлектронных таблиц|r прямо в фэнтезийной MMORPG? Наверное, нет. Но теперь можно агрегировать нужные данные по любому количеству боёв, в том числе в |cFFFFFFсводных таблицах|r
+
+|cD4AF37Небольшие изменения:|r
+
+- Для каждого боя показывается версия игры, например 11.3.5
+
+- Другие игроки видят, как вы читаете свиток, пока открыты «Боевые Свитки». А что ещё?
+
+- Название области отображается в заголовке списка боёв
+
+|cD4AF37Исправления:|r
+
+- Призматическое зачарование, снижающее стоимость способностей, теперь правильно отображается в сборках других членов группы
+
+- Расположение элементов |cFFFFFFсборки|r согласовано между вкладками «|cFFFFFFГруппа|r» и «Сборка»]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_3_1_0, [=[|cD4AF37Новые возможности:|r
+
+- |cFFFFFFПоиск|r на вкладке «|cFFFFFFЭффекты|r», работающий подобно поиску в инвентаре
+
+|cD4AF37Исправления:|r
+
+- В сборках других членов группы, играющих мастерами рун, больше не пропадает строка с расой, классом и камнем Мундуса
+
+- Снова уменьшено |cFFFFFFмерцание|r меню группы]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_3_0_2, "|cFFFFFFУменьшено мерцание в меню группы|r", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_3_0_1, [=[|cD4AF37Исправления:|r
+
+- При наличии пустых ячеек |cFFFFFFочки героя|r других членов группы больше не отображаются в неверных созвездиях. Исправление на стороне отправителя: ему тоже нужна новая версия
+
+- При переходе от игрока с доступной сборкой к игроку без неё интерфейс больше не пытается показать отсутствующие данные]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_3_0_0, [=[|cD4AF37Запись сборок|r
+
+- Каждый бой сохраняет |cFFFFFFсборку|r и показывает её на новой вкладке, чтобы вы могли точно узнать, в чём сражались
+
+- Большая часть |cFFFFFFсборки|r отображается и в «Обзоре», чтобы хвастаться результатом было проще
+
+- Краткий обзор |cFFFFFFсборки|r появился в меню |cFFFFFFперсонажа|r
+
+- На вкладке «|cFFFFFFГруппа|r» записываются |cFFFFFFсборки|r других членов группы с «Боевыми Свитками»]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_2_1_2, "|cFFFFFFБез видимых изменений: подготовка к версии 3|r", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_2_1_1, "|cFFFFFFРасчёты урона по площади и по одной цели обновлены для изменений рыцаря-дракона. Применяется и к старым боям.|r", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_2_1_0, [=[- Добавлены |cFFFFFFподразделы|r: связанные представления объединены на одной вкладке, переключение — влево/вправо на крестовине или левом стике
+  - Исходящий урон и урон боссам объединены во вкладку «Урон»
+  - Исцеление других, себя и полученное исцеление объединены во вкладку «Исцеление»
+  - |cFFFFFFЭффекты|r на игроке, боссах и группе разделены на |cFFFFFFподразделы|r вместо единого длинного списка
+
+- Подавлены ошибки «Attempt to read past end of buffer». После экрана загрузки в конце боя данные группы всё ещё могут быть неверны, но хотя бы ошибка не выскакивает прямо в лицо]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_2_0_1, [=[|cD4AF37Группа в журнале|r
+
+Новая вкладка для боёв с другими членами группы, у которых установлены «Боевые Свитки».
+
+|cD4AF37Обзор:|r
+
+- Сортируемая таблица: каждый босс, DPS, критические удары, DTPS, HPS, доля времени в живых и число смертей
+
+|cD4AF37Подробности игрока:|r
+
+- Урон: DPS, общий урон, критические удары, максимальный удар, прямой урон, урон по площади, типы урона, место по DPS и сравнение со средним у бойцов
+
+- Выживаемость: DTPS, время жизни, смерти, способности, нанёсшие больше всего урона и причины смерти
+
+- Исцеление: полный и эффективный HPS, переисцеление, самоисцеление
+
+- Урон каждому боссу, его состав и полученный урон
+
+|cD4AF37Групповые сведения в подсказках существующих вкладок, когда доступны:|r
+
+- Цели-боссы: DPS и доля каждого игрока; строки DPS и DPS боссам: вклад членов группы
+
+- DTPS и источники входящего урона: DTPS членов группы
+
+- Состав урона: средние значения бойцов
+
+- Полный HPS и переисцеление в исцелении других и себя: разбивка по членам группы
+
+|cD4AF37Смерти|r
+
+|cD4AF37Причины смерти сохраняются с боем:|r
+
+- «|cFFFFFFОбзор|r»: число смертей в разделе входящего урона
+
+- «Полученный урон»: время смертей с подробностями в подсказке
+
+- «|cFFFFFFГруппа|r»: первая и последняя смерть с полным списком атак
+
+|cD4AF37Небольшие изменения:|r
+
+- В обзоре показывается доля прямого урона вместо периодического
+
+- В настройках можно включить запись всех боёв на |cFFFFFFНочном рынке|r независимо от обычных фильтров областей
+
+- Индикаторы DPS располагаются за прочими элементами, например историей добычи
+
+- «|cFFFFFFОбзор|r» выбран по умолчанию на всех вкладках. Это стоит немного памяти, но ведь она вам всё равно не нужна?
+
+- Имена игроков без символа @
+
+- Индикаторы Hodor и «Шкалы» показывают длительность боя в заголовке
+
+- Изменены звуки диалогов фильтров и областей
+
+|cD4AF37Локализация:|r
+
+- Исправлены формы множественного числа
+
+- Термин «стаки» согласован с описаниями наборов снаряжения: «заряды» по-русски и Kumulation по-немецки]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_3_6, "|cFFFFFFИсправлена ошибка интерфейса при входе без LibGroupBroadcast|r", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_3_5, "|cFFFFFFLibGroupBroadcast временно сделан необязательным на время консольного апокалипсиса дополнений|r", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_3_4, "|cFFFFFFБез видимых изменений: подготовка к просмотру DPS членов группы в журнале|r", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_3_3, "|cFFFFFFБез видимых изменений: подготовка к просмотру DPS членов группы в журнале|r", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_3_2, [=[|cD4AF37Исправления:|r
+
+- Дополнение больше не пытается отправлять DPS группе, когда вы не в группе. Спасибо DakJaniels]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_3_1, [=[|cD4AF37Исправления:|r
+
+- Надёжнее определяются боссы в последнем бою Цитадели Люцентов и боях, где вы временно отдаляетесь от босса, например уходя в портал
+
+- После сложных боёв, например последнего в Цитадели Люцентов или первого в Костяной Клетке, больше не должна появляться ошибка «|cFFFFFF1000ms limit hit|r»]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_3_0, [=[|cD4AF37Новые возможности:|r
+
+- Избранные |cFFFFFFэффекты закрепляются|r вверху всех списков, где встречаются
+
+|cD4AF37Исправления:|r
+
+- Для членов группы, присоединившихся в середине боя, |cFFFFFFвремя действия|r эффектов считается только за время присутствия
+
+- Убраны пустые элементы некоторых групповых индикаторов в левом верхнем углу при первом входе в бой
+
+|cD4AF37Небольшие изменения:|r
+
+- Строка общего DPS показывается, даже если в разделе бойцов только один игрок]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_2_0, [=[|cD4AF37Новые возможности:|r
+
+- Закрепляйте области кнопкой |cFFFFFFX/квадрат|r в списке: они |cFFFFFFзащищены|r от автоматической очистки при превышении лимита памяти. Последняя область тоже всегда защищена
+
+|cD4AF37Локализация:|r
+
+- Согласованы названия областей в немецком и русском переводах
+
+|cD4AF37Исправления:|r
+
+- Режим «Плавность» больше не застревает на загрузке и не мешает новым боям появляться в журнале. После обновления пользователи этого режима будут возвращены к стандартному режиму «Производительность»]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_1_0, [=[|cD4AF37Новые возможности:|r
+
+- |cFFFFFFУдаление|r отдельных областей и боёв из истории
+
+|cD4AF37Исправления:|r
+
+- Устранены бесконечная загрузка и отсутствие «Боевых Свитков» в меню при сочетании режима «Плавность» с графическим режимом «Качество». Если ошибка уже возникла, после обновления может потребоваться ещё один |cFFFFFF/reloadui|r
+
+- Игровые диалоги, например уничтожение предметов, больше не ломаются после использования фильтров
+
+- Исправлено обратное направление анимации при выходе из «Боевых Свитков» в Журнал]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_0_3, "|cFFFFFFПопытка вслепую исправить повреждение сохранений на PS5|r", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_0_2, [=[|cD4AF37Улучшения хранения и отслеживания эффектов|r
+
+|cD4AF37Хранение:|r
+
+- Ускорены кодирование и декодирование для загрузки журнала
+
+- Снижен расход памяти при обработке боёв
+
+|cD4AF37Эффекты:|r
+
+- Исправлено |cFFFFFFвремя действия|r эффектов при отключении членов группы во время боя
+
+- Улучшена обработка возвращения членов группы в середине боя]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_0_1, "|cFFFFFFИсправление ошибки|r", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_0_0, [=[|cD4AF37Первый публичный выпуск|r
+
+|cD4AF37Индикатор DPS:|r
+
+- Урон в реальном времени
+
+- Личные варианты: стандартный, минимальный, «Шкала»
+
+- Групповые варианты: текст, стиль Hodor, «Шкалы»
+
+- Настройка позиции, масштаба и времени показа после боя
+
+|cD4AF37Боевой журнал:|r
+
+- История: область -> бой -> показатели
+
+- Фильтры по типам областей и боёв
+
+- Настраиваемые лимиты хранения
+
+|cD4AF37Урон:|r
+
+- Разбивки по целям и способностям
+
+- Прямой и периодический урон, критические удары
+
+- Урон по одной цели и по площади
+
+|cD4AF37Исцеление:|r
+
+- Исходящее и входящее, по источникам и целям
+
+|cD4AF37Эффекты:|r
+
+- Время действия усилений и ослаблений на игроке и группе, ослаблений на боссах
+
+- Отслеживание срабатываний
+
+Обмен DPS в группе через |cFFFFFFLibGroupBroadcast|r
+
+|cD4AF37Языки:|r английский, немецкий, французский, испанский, русский, японский, китайский]=], 1)

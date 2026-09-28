@@ -1,56 +1,14 @@
+---@diagnostic disable: undefined-field, inject-field -- the ESO Control/ZO_* API stubs are too incomplete for field checking in UI code
 if not SemisPlaygroundCheckAccess() then
     return
 end
 
 BattleScrolls = BattleScrolls or {}
 
--------------------------
--- Navigation & Tab Constants (defined here, loaded first)
--------------------------
-BattleScrolls_Journal_NavigationMode = {
-    INSTANCES = 1,
-    ENCOUNTERS = 2,
-    STATS = 3,
-    SETTINGS = 4,
-    PIVOT = 5,
-}
-
-BattleScrolls_Journal_StatsTab = {
-    OVERVIEW = 1,
-    BOSS_DAMAGE_DONE = 2,
-    DAMAGE_DONE = 3,
-    DAMAGE_TAKEN = 4,
-    HEALING_OUT = 5,
-    SELF_HEALING = 6,
-    HEALING_IN = 7,
-    EFFECTS_PLAYER = 8,
-    EFFECTS_BOSS = 9,
-    EFFECTS_GROUP = 10,
-    GROUP = 11,
-    SETUP = 12,
-    ACTIVITY = 13,
-}
-
-BattleScrolls_Journal_InstanceTab = {
-    ALL = 1,
-    INSTANCED = 2,
-    OVERLAND = 3,
-    HOUSE = 4,
-    PVP = 5,
-}
-
-BattleScrolls_Journal_EncounterTab = {
-    ALL = 1,
-    BOSS = 2,
-    TRASH = 3,
-    PLAYER = 4,
-    DUMMY = 5,
-}
-
-local NAVIGATION_MODE = BattleScrolls_Journal_NavigationMode
-local STATS_TAB = BattleScrolls_Journal_StatsTab
-local INSTANCE_TAB = BattleScrolls_Journal_InstanceTab
-local ENCOUNTER_TAB = BattleScrolls_Journal_EncounterTab
+local NAVIGATION_MODE = BattleScrolls.journal.NavigationMode
+local STATS_TAB = BattleScrolls.journal.StatsTab
+local INSTANCE_TAB = BattleScrolls.journal.InstanceTab
+local ENCOUNTER_TAB = BattleScrolls.journal.EncounterTab
 
 local function isEffectsTab(tab)
     return tab == STATS_TAB.EFFECTS_PLAYER or tab == STATS_TAB.EFFECTS_BOSS or tab == STATS_TAB.EFFECTS_GROUP
@@ -82,6 +40,7 @@ local canAddToMainMenu = false
 ---@field encounterList ZO_ParametricScrollList Encounter list control
 ---@field statsList ZO_ParametricScrollList Stats list control
 ---@field settingsList ZO_ParametricScrollList Settings list control
+---@field whatsNewList ZO_ParametricScrollList Release history list
 ---@field pivotConfigList ZO_ParametricScrollList Pivot config list control
 ---@field pivotQuery PivotQuery|nil Current pivot query being configured
 ---@field pivotResult PivotResult|nil Current pivot result
@@ -94,6 +53,7 @@ local canAddToMainMenu = false
 ---@field encounterKeybindStripDescriptor table Encounter list keybinds
 ---@field statsKeybindStripDescriptor table Stats view keybinds
 ---@field settingsKeybindStripDescriptor table Settings view keybinds
+---@field whatsNewKeybindStripDescriptor table Release history keybinds
 ---@field pivotConfigKeybindStripDescriptor table Pivot config keybinds
 ---@field pivotResultKeybindStripDescriptor table Pivot result keybinds
 ---@field textSearchKeybindStripDescriptor table Search header keybinds
@@ -152,7 +112,7 @@ end
 
 function BattleScrolls_Journal_Gamepad:Initialize(control)
     self.control = control
-    self.defaultInstancePosition = 3  -- Skip Settings and Aggregate entries
+    self.defaultInstancePosition = 4  -- First instance, after What's New, Settings and Aggregate
     self.defaultEncounterPosition = 2  -- Skip Aggregate entry
 
     LibEffect.Async(function()
@@ -198,9 +158,19 @@ function BattleScrolls_Journal_Gamepad:Initialize(control)
                 self.selectedEncounterTab = ENCOUNTER_TAB.ALL
                 self.pendingTabIndex = 1  -- Start at first tab
                 self:ResetAllFilters()
-                self:SetCurrentList(self.instanceList)
-                self:RefreshList()
-                self:SetActiveKeybinds(self.instanceKeybindStripDescriptor)
+                if BattleScrolls.shareUrl.isBusy() then
+                    -- An upload chain survived a hide/re-show round-trip
+                    -- (URL confirm, browser switch): land back on the stepper
+                    self.mode = NAVIGATION_MODE.SHARE
+                    self.shareSourceMode = nil
+                    self:SetCurrentList(self.shareList)
+                    self:RefreshList()
+                    self:SetActiveKeybinds(self.shareKeybindStripDescriptor)
+                else
+                    self:SetCurrentList(self.instanceList)
+                    self:RefreshList()
+                    self:SetActiveKeybinds(self.instanceKeybindStripDescriptor)
+                end
             elseif newState == SCENE_FRAGMENT_HIDDEN then
                 self:ClearSearchText()
                 self:ResetTooltips()
@@ -243,11 +213,31 @@ function BattleScrolls_Journal_Gamepad:Initialize(control)
         BATTLESCROLLS_JOURNAL_GAMEPAD_SCENE = ZO_Scene:New("battleScrollsJournalGamepad", SCENE_MANAGER)
         BATTLESCROLLS_JOURNAL_GAMEPAD_SCENE:AddFragmentGroup(FRAGMENT_GROUP.GAMEPAD_DRIVEN_UI_WINDOW)
         BATTLESCROLLS_JOURNAL_GAMEPAD_SCENE:AddFragmentGroup(FRAGMENT_GROUP.FRAME_TARGET_GAMEPAD)
+        BATTLESCROLLS_JOURNAL_GAMEPAD_SCENE:AddFragment(FRAME_TARGET_DISTANCE_GAMEPAD_FAR_FRAGMENT)
         BATTLESCROLLS_JOURNAL_GAMEPAD_SCENE:AddFragment(GAMEPAD_NAV_QUADRANT_1_BACKGROUND_FRAGMENT)
         BATTLESCROLLS_JOURNAL_GAMEPAD_SCENE:AddFragment(GAMEPAD_GENERIC_FOOTER_FRAGMENT)
         BATTLESCROLLS_JOURNAL_GAMEPAD_SCENE:AddFragment(GAMEPAD_MENU_SOUND_FRAGMENT)
         BATTLESCROLLS_JOURNAL_GAMEPAD_SCENE:AddFragment(FRAME_EMOTE_FRAGMENT_SOCIAL)
         BATTLESCROLLS_JOURNAL_GAMEPAD_SCENE:AddFragment(BATTLESCROLLS_JOURNAL_GAMEPAD_FRAGMENT)
+
+        -- Cancelling the cross-environment URL confirm with B forces the
+        -- ingame scene manager to the base scene (see network/shareurl.lua
+        -- header), tearing the journal down mid-share. Bring the stepper
+        -- back so the chain is not stranded on the HUD.
+        EVENT_MANAGER:RegisterForEvent("BattleScrolls_JournalShareKick", EVENT_REMOTE_SCENE_REQUEST,
+            function(_, messageOrigin, requestType)
+                if messageOrigin == SCENE_MANAGER_MESSAGE_ORIGIN_INTERNAL
+                    and requestType == REMOTE_SCENE_REQUEST_TYPE_SHOW_BASE_SCENE
+                    and self.mode == NAVIGATION_MODE.SHARE
+                    and BattleScrolls.shareUrl.isBusy() then
+                    zo_callLater(function()
+                        if BattleScrolls.shareUrl.isBusy()
+                            and not SCENE_MANAGER:IsShowing("battleScrollsJournalGamepad") then
+                            SCENE_MANAGER:Show("battleScrollsJournalGamepad")
+                        end
+                    end, 400)
+                end
+            end)
         LibEffect.YieldWithGC():Await()
 
         -- Initialize base class
@@ -305,6 +295,12 @@ function BattleScrolls_Journal_Gamepad:RefreshHeader()
     elseif self.mode == NAVIGATION_MODE.SETTINGS then
         self.headerData.titleText = GetString(BATTLESCROLLS_UI_NAME)
         self.headerData.subtitleText = GetString(BATTLESCROLLS_UI_SETTINGS)
+    elseif self.mode == NAVIGATION_MODE.WHATS_NEW then
+        self.headerData.titleText = GetString(BATTLESCROLLS_UI_NAME)
+        self.headerData.subtitleText = GetString(BATTLESCROLLS_WHATS_NEW)
+    elseif self.mode == NAVIGATION_MODE.SHARE then
+        self.headerData.titleText = GetString(BATTLESCROLLS_UI_NAME)
+        self.headerData.subtitleText = GetString(BATTLESCROLLS_SHARE_TITLE)
     elseif self.mode == NAVIGATION_MODE.PIVOT then
         self.headerData.titleText = GetString(BATTLESCROLLS_UI_NAME)
         local pivotSubState = self.pivotSubState or BattleScrolls.journal.pivot.SubState.CONFIG
@@ -321,6 +317,7 @@ function BattleScrolls_Journal_Gamepad:RefreshHeader()
 
     ZO_GamepadGenericHeader_Refresh(self.header, self.headerData, true)
     self:applyStatsHeaderLayout()
+    self:refreshFooter()
 
     if self.headerData.tabBarEntries then
         if self.pendingTabIndex then
@@ -345,37 +342,23 @@ function BattleScrolls_Journal_Gamepad:RefreshHeader()
     end
 end
 
----Builds header data pairs for the current stats tab. Compact single-line on effects tabs,
----full label/value pairs on others.
+---Builds header data pairs for the current stats tab.
 function BattleScrolls_Journal_Gamepad:buildStatsHeaderData()
-    self.headerData.data1HeaderText = nil
-    self.headerData.data1Text = nil
-    self.headerData.data2HeaderText = nil
-    self.headerData.data2Text = nil
+    self.headerData.data1HeaderText = GetString(BATTLESCROLLS_STAT_DURATION)
+    self.headerData.data1Text = BattleScrolls.journal.utils.formatPreciseDuration(self.selectedEncounter.durationMs)
+    if self.selectedEncounter.gameVersion then
+        self.headerData.data2HeaderText = GetString(BATTLESCROLLS_STAT_PATCH)
+        self.headerData.data2Text = self.selectedEncounter.gameVersion
+    else
+        self.headerData.data2HeaderText = nil
+        self.headerData.data2Text = nil
+    end
     self.headerData.data3HeaderText = nil
     self.headerData.data3Text = nil
-
-    if isEffectsTab(self.selectedTab) then
-        self.headerData.data1HeaderText = BattleScrolls.utils.GetUndecoratedDisplayName()
-        local value = BattleScrolls.journal.utils.formatPreciseDuration(self.selectedEncounter.durationMs)
-        if self.selectedEncounter.gameVersion then
-            value = value .. "  —  " .. self.selectedEncounter.gameVersion
-        end
-        self.headerData.data1Text = value
-    else
-        self.headerData.data1HeaderText = GetString(BATTLESCROLLS_GROUP_COL_NAME)
-        self.headerData.data1Text = BattleScrolls.utils.GetUndecoratedDisplayName()
-        self.headerData.data2HeaderText = GetString(BATTLESCROLLS_STAT_DURATION)
-        self.headerData.data2Text = BattleScrolls.journal.utils.formatPreciseDuration(self.selectedEncounter.durationMs)
-        if self.selectedEncounter.gameVersion then
-            self.headerData.data3HeaderText = GetString(BATTLESCROLLS_STAT_PATCH)
-            self.headerData.data3Text = self.selectedEncounter.gameVersion
-        end
-    end
 end
 
----Re-anchors data pairs below the subheader when it is visible, and applies
----the stacked (compact) layout on effects tabs. Must be called after
+---Re-anchors data pairs below the subheader when it is visible, and keeps the
+---effects search box below the data pairs. Must be called after
 ---RefreshData / RefreshData since reflow resets DATA1HEADER anchors.
 function BattleScrolls_Journal_Gamepad:applyStatsHeaderLayout()
     if self.mode ~= NAVIGATION_MODE.STATS then return end
@@ -392,28 +375,35 @@ function BattleScrolls_Journal_Gamepad:applyStatsHeaderLayout()
 
     if not isEffectsTab(self.selectedTab) then return end
 
-    local controls = self.header.controls
-    local data1 = controls[ZO_GAMEPAD_HEADER_CONTROLS.DATA1]
-    local data1Header = controls[ZO_GAMEPAD_HEADER_CONTROLS.DATA1HEADER]
-    if not data1 or not data1Header then return end
-
-    -- Force stacked layout: full-width value below header label (matches ESO's overlap anchors)
-    data1:ClearAnchors()
-    data1:SetAnchor(BOTTOMLEFT, data1Header, BOTTOMLEFT, 0, 40)
-    data1:SetAnchor(BOTTOMRIGHT, data1Header, BOTTOMRIGHT, 0, 40)
-    data1:SetHorizontalAlignment(TEXT_ALIGN_LEFT)
-
-    -- RefreshData anchored search to DATA1HEADER (first match in anchor targets),
-    -- but DATA1 is now 40px below — re-anchor search below DATA1
-    if self.textSearchHeaderControl then
+    -- RefreshData anchored search to DATA1HEADER (first match in anchor
+    -- targets), which would overlap the value row — re-anchor below DATA1
+    local data1 = self.header.controls[ZO_GAMEPAD_HEADER_CONTROLS.DATA1]
+    if self.textSearchHeaderControl and data1 then
         self.textSearchHeaderControl:ClearAnchors()
         self.textSearchHeaderControl:SetAnchor(TOPLEFT, data1, BOTTOMLEFT, 0, 0)
+    end
+end
+
+---Shows the account name in the generic footer (bottom right, like the main
+---menu) while in stats mode; clears it elsewhere. Account only - history is
+---account-wide and the recording character is not stored, so the current
+---character's name would be wrong for encounters recorded on another one.
+function BattleScrolls_Journal_Gamepad:refreshFooter()
+    if self.mode == NAVIGATION_MODE.STATS then
+        GAMEPAD_GENERIC_FOOTER:Refresh({
+            data1HeaderText = GetString(BATTLESCROLLS_GROUP_COL_NAME),
+            data1Text = BattleScrolls.utils.GetUndecoratedDisplayName(),
+        })
+    else
+        GAMEPAD_GENERIC_FOOTER:Refresh({})
     end
 end
 
 function BattleScrolls_Journal_Gamepad:OnHiding()
     ZO_GamepadGenericHeader_Deactivate(self.header)
     BattleScrolls.journal.subheader.deactivate(self)
+    -- The generic footer is shared with other scenes — leave it clean
+    GAMEPAD_GENERIC_FOOTER:Refresh({})
 end
 
 -------------------------
@@ -515,9 +505,43 @@ function BattleScrolls_Journal_Gamepad:InitializeLists()
     self.settingsList = self:AddList("Settings", function(list)
         BattleScrolls.journal.settingsTemplates.setupSettingsList(list)
     end)
+    self.whatsNewList = self:AddList("WhatsNew", function(list)
+        SetupList(list, GetString(BATTLESCROLLS_LIST_NO_DATA))
+    end)
     self.pivotConfigList = self:AddList("PivotConfig", function(list)
         SetupList(list, GetString(BATTLESCROLLS_PIVOT_NO_RESULTS))
     end)
+    self.shareList = self:AddList("Share", function(list)
+        SetupList(list, GetString(BATTLESCROLLS_LIST_NO_DATA))
+    end)
+
+    -- Header layout can change the viewport after Commit has culled its rows.
+    -- Let ESO refresh visible controls and fade gradients when that happens,
+    -- so entries above the selection appear without waiting for a scroll.
+    for _, list in pairs(self.lists) do
+        list:SetHandleDynamicViewProperties(true)
+    end
+
+    -- The share stepper re-renders on every transport transition (part fired,
+    -- part settled, build finished/failed). It also restores the real keybind
+    -- strip that the send keybind swaps for the in-flight B sink while a
+    -- part's URL confirm is in flight.
+    BattleScrolls.shareUrl.onStateChanged = function()
+        if self.mode ~= NAVIGATION_MODE.SHARE
+            or not SCENE_MANAGER:IsShowing("battleScrollsJournalGamepad") then
+            return
+        end
+        self:RefreshList()
+        if BattleScrolls.shareUrl.isSendBlocked() then
+            -- Part still in flight (or a dialog owns input): keep the sink
+            return
+        end
+        if self.keybindStripDescriptor ~= self.shareKeybindStripDescriptor then
+            self:SetActiveKeybinds(self.shareKeybindStripDescriptor)
+        else
+            KEYBIND_STRIP:UpdateKeybindButtonGroup(self.keybindStripDescriptor)
+        end
+    end
 
     self.mode = NAVIGATION_MODE.INSTANCES
 end
@@ -615,14 +639,14 @@ function BattleScrolls_Journal_Gamepad:ShowDeleteInstanceDialog()
     local storage = BattleScrolls.storage
     local utils = BattleScrolls.journal.utils
 
-    local instanceSize = storage:EstimateInstanceSize(instance)
-    local totalBytes, _, _ = storage:EstimateHistorySize()
-    local preset = storage:GetCurrentSizePreset()
-    local limitBytes = preset.memoryMB * 1000000
+    -- Own and shared setups referenced by nothing else go with the instance
+    local instanceSize = storage:EstimateInstanceSize(instance) + storage:EstimateOrphanedSetupBytes(instance.encounters)
+    local totalBytes = storage:EstimateSavedSize().totalBytes
+    local limitBytes = storage:GetSizeLimitBytes()
     local usagePercent = limitBytes > 0 and (totalBytes / limitBytes * 100) or 0
 
     local encounterCount = #instance.encounters
-    local instanceName = string.format("%s (%d)", instance.zone, encounterCount)
+    local instanceName = string.format("%s (%d)", instance.customName or instance.zone, encounterCount)
 
     local mainText = table.concat({
         zo_strformat(GetString(BATTLESCROLLS_DELETE_INSTANCE_TEXT), instanceName),
@@ -653,13 +677,15 @@ function BattleScrolls_Journal_Gamepad:ShowDeleteEncounterDialog()
     local storage = BattleScrolls.storage
     local utils = BattleScrolls.journal.utils
 
-    local encounterSize = storage:EstimateEncounterSize(encounter)
-    local totalBytes, _, _ = storage:EstimateHistorySize()
-    local preset = storage:GetCurrentSizePreset()
-    local limitBytes = preset.memoryMB * 1000000
+    -- The last encounter takes its instance with it; setups referenced by
+    -- nothing else go too
+    local encounterSize = (#instance.encounters == 1 and storage:EstimateInstanceSize(instance)
+        or storage:EstimateEncounterSize(encounter)) + storage:EstimateOrphanedSetupBytes({ encounter })
+    local totalBytes = storage:EstimateSavedSize().totalBytes
+    local limitBytes = storage:GetSizeLimitBytes()
     local usagePercent = limitBytes > 0 and (totalBytes / limitBytes * 100) or 0
 
-    local encounterName = encounter.displayName
+    local encounterName = encounter.customName or encounter.displayName
 
     local mainText = table.concat({
         zo_strformat(GetString(BATTLESCROLLS_DELETE_ENCOUNTER_TEXT), encounterName),
@@ -680,6 +706,60 @@ function BattleScrolls_Journal_Gamepad:ShowDeleteEncounterDialog()
             else
                 self:RefreshList()
             end
+        end,
+    })
+end
+
+-------------------------
+-- Rename Dialogs
+-------------------------
+
+---Shows rename dialog for the targeted instance. Entering the original zone
+---name (or the same text) clears the custom name back to the default.
+function BattleScrolls_Journal_Gamepad:ShowRenameInstanceDialog()
+    local targetData = self.instanceList:GetTargetData()
+    if not targetData or not targetData.data then return end
+
+    local instance = targetData.data
+    local defaultName = instance.zone or ""
+
+    BattleScrolls.journal.dialogs.showTextInputDialog({
+        title = GetString(BATTLESCROLLS_RENAME),
+        mainText = zo_strformat(GetString(BATTLESCROLLS_RENAME_TEXT), defaultName),
+        defaultText = instance.customName or defaultName,
+        onConfirm = function(text)
+            text = zo_strtrim(text)
+            if text == "" or text == defaultName then
+                instance.customName = nil
+            else
+                instance.customName = text
+            end
+            self:RefreshList()
+        end,
+    })
+end
+
+---Shows rename dialog for the targeted encounter. Entering the original
+---display name (or the same text) clears the custom name back to the default.
+function BattleScrolls_Journal_Gamepad:ShowRenameEncounterDialog()
+    local targetData = self.encounterList:GetTargetData()
+    if not targetData or not targetData.data then return end
+
+    local encounter = targetData.data
+    local defaultName = encounter.displayName or ""
+
+    BattleScrolls.journal.dialogs.showTextInputDialog({
+        title = GetString(BATTLESCROLLS_RENAME),
+        mainText = zo_strformat(GetString(BATTLESCROLLS_RENAME_TEXT), defaultName),
+        defaultText = encounter.customName or defaultName,
+        onConfirm = function(text)
+            text = zo_strtrim(text)
+            if text == "" or text == defaultName then
+                encounter.customName = nil
+            else
+                encounter.customName = text
+            end
+            self:RefreshList()
         end,
     })
 end
@@ -723,8 +803,7 @@ function BattleScrolls_Journal_Gamepad:ShowLockErrorDialog(instance)
 
     local instanceSize = storage:EstimateInstanceSize(instance)
     local lockedSize = storage:GetLockedInstancesSize()
-    local preset = storage:GetCurrentSizePreset()
-    local limitBytes = preset.memoryMB * 1000000
+    local limitBytes = storage:GetSizeLimitBytes()
 
     local mainText = table.concat({
         GetString(BATTLESCROLLS_LOCK_ERROR_TEXT),
@@ -841,6 +920,18 @@ EVENT_MANAGER:RegisterForEvent("BattleScrolls_JournalUI", EVENT_PLAYER_ACTIVATED
     end
 
     EVENT_MANAGER:UnregisterForEvent("BattleScrolls_JournalUI", EVENT_PLAYER_ACTIVATED)
+end)
+
+-- Label widths are measured at render time; a resize changes glyph metrics
+EVENT_MANAGER:RegisterForEvent("BattleScrolls_JournalUI_Resize", EVENT_SCREEN_RESIZED, function()
+    local journalUI = BattleScrolls.journalUI
+    if not journalUI or not SCENE_MANAGER:IsShowing("battleScrollsJournalGamepad") then
+        return
+    end
+    local list = journalUI:GetCurrentList()
+    if list then
+        journalUI:RefreshTargetTooltip(list:GetTargetData())
+    end
 end)
 
 -------------------------

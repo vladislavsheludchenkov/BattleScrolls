@@ -1,0 +1,61 @@
+-- Chunk model behind the history limit (storage/sizemodel.lua).
+
+dofile("BattleScrolls/storage/sizemodel.lua")
+local sizeModel = BattleScrolls.sizeModel
+
+describe("SizeModel", function()
+    it("rounds every allocation to a dlmalloc chunk of at least 32 bytes", function()
+        assert_eq(sizeModel.chunk(1), 32)
+        assert_eq(sizeModel.chunk(24), 32)
+        assert_eq(sizeModel.chunk(25), 40)
+        assert_eq(sizeModel.chunk(64), 72)
+        assert_eq(sizeModel.chunk(320), 328)
+        assert_eq(sizeModel.chunk(727), 736)
+        assert_eq(sizeModel.chunk(2027), 2040)
+    end)
+
+    it("charges a table header chunk plus a node chunk in powers of two", function()
+        assert_eq(sizeModel.measure({}), 72)
+        assert_eq(sizeModel.measure({ 1 }), 72 + 48)
+        assert_eq(sizeModel.measure({ 1, 2, 3 }), 72 + 168)
+        assert_eq(sizeModel.measure({ 1, 2, 3, 4 }), 72 + 168)
+        assert_eq(sizeModel.measure({ 1, 2, 3, 4, 5 }), 72 + 328)
+        assert_eq(sizeModel.measure({ 1, 2, 3, 4, 5, 6, 7, 8 }), 400, "the calibration's N8 record")
+        assert_eq(sizeModel.measure({ a = true, b = false }), 72 + 88 + 48 * 2)
+        assert_eq(sizeModel.tableShell(0), 72)
+        assert_eq(sizeModel.tableShell(16), 72 + 648)
+    end)
+
+    it("stores numbers and booleans inline and strings once per distinct value with an interning slot", function()
+        assert_eq(sizeModel.measure(12.5), 0)
+        assert_eq(sizeModel.measure(true), 0)
+        assert_eq(sizeModel.measure(""), 40 + 8)
+        assert_eq(sizeModel.measure("abc"), 40 + 8)
+        assert_eq(sizeModel.measure(string.rep("x", 240)), 280 + 8, "a stored base64 chunk")
+        assert_eq(sizeModel.measure(string.rep("x", 2000)), 2040 + 8)
+        assert_eq(sizeModel.measure({ "abc", "abc", "abcd" }), 72 + 168 + 48 + 48)
+        assert_eq(sizeModel.measure({ abc = "abc" }), 72 + 48 + 48, "a key and an equal value intern to one string")
+    end)
+
+    it("counts shared tables once and measures several roots as one graph with a shared visited set", function()
+        local shared = { "x" }
+        local graph = { first = shared, second = shared }
+        assert_eq(sizeModel.measure(graph), (72 + 88) + 48 + 56 + (72 + 48 + 48))
+        local visited = {}
+        local a = sizeModel.measure({ "same" }, visited)
+        local b = sizeModel.measure({ "same" }, visited)
+        assert_eq(a, 72 + 48 + 48)
+        assert_eq(b, 72 + 48, "the string was already counted by the first root")
+    end)
+
+    it("converts to gauge bytes with the segment foot and packing waste and exposes the units", function()
+        assert_eq(sizeModel.SEGMENT, 4096)
+        assert_eq(sizeModel.SEGMENT_FOOT, 72)
+        assert_eq(sizeModel.PACKING_WASTE, 0.015)
+        assert_true(math.abs(sizeModel.GAUGE_PER_CHUNK_BYTE - 4096 / 4024 * 1.015) < 1e-12)
+        assert_true(math.abs(sizeModel.GAUGE_PER_CHUNK_BYTE - 1.0332) < 0.0001)
+        assert_eq(sizeModel.MIB, 1048576)
+        assert_eq(sizeModel.VERSION, 3)
+        assert_eq(sizeModel.gaugeBytes({ 1 }), 120 * sizeModel.GAUGE_PER_CHUNK_BYTE)
+    end)
+end)

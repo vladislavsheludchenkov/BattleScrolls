@@ -1,3 +1,4 @@
+---@diagnostic disable: undefined-field, inject-field -- the ESO Control/ZO_* API stubs are too incomplete for field checking in UI code
 -----------------------------------------------------------
 -- DPSMeter
 -- Real-time DPS/HPS display controller for Battle Scrolls
@@ -595,11 +596,13 @@ function dpsMeter:ShowPreview()
 
             for i = 1, 12 do
                 local previewEntry = PREVIEW_DATA[i]
+                -- Include the player so previews use their chosen color and highlight.
+                local displayName = i == 1 and BattleScrolls.utils.GetUndecoratedDisplayName() or previewEntry.name
                 if previewEntry.isHealer then
                     healerRank = healerRank + 1
                     local rawHPS = 60000 - (healerRank - 1) * 8000
                     local effectiveHPS = rawHPS * (0.90 - (healerRank - 1) * 0.05)
-                    self.groupMetrics[previewEntry.name] = {
+                    self.groupMetrics[displayName] = {
                         messageType = "healing",
                         rawHPS = rawHPS,
                         effectiveHPS = effectiveHPS,
@@ -608,7 +611,7 @@ function dpsMeter:ShowPreview()
                 elseif previewEntry.role == LFG_ROLE_TANK then
                     tankRank = tankRank + 1
                     local dps = 8000 - (tankRank - 1) * 2000
-                    self.groupMetrics[previewEntry.name] = {
+                    self.groupMetrics[displayName] = {
                         messageType = "damage",
                         allTargetsDPS = dps,
                         bossDPS = dps * 0.85,
@@ -617,7 +620,7 @@ function dpsMeter:ShowPreview()
                 else
                     ddRank = ddRank + 1
                     local dps = 80000 - (ddRank - 1) * 5000
-                    self.groupMetrics[previewEntry.name] = {
+                    self.groupMetrics[displayName] = {
                         messageType = "damage",
                         allTargetsDPS = dps,
                         bossDPS = dps * 0.85,

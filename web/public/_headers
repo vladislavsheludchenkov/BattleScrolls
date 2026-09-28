@@ -1,0 +1,6 @@
+# Applies to direct asset requests and responses from the ASSETS binding.
+# Keep share URLs out of third-party referrers; all page resources are local.
+/*
+  Referrer-Policy: same-origin
+  X-Content-Type-Options: nosniff
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'

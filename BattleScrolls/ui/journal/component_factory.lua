@@ -1,3 +1,4 @@
+---@diagnostic disable: undefined-field, inject-field -- the ESO Control/ZO_* API stubs are too incomplete for field checking in UI code
 -----------------------------------------------------------
 -- Component Factory
 -- Factory functions that build real ESO Controls.
@@ -24,7 +25,10 @@ local ROW_CONTENT = {
     EFFECT_BAR = 54,
     EFFECT_ROW = 54,
     STAT_ROW = 36,
+    ICON_DETAIL_ROW = 50,
 }
+
+local SECTION_TITLE_BOTTOM_INSET = 5
 
 -- Default gap between children inside a Section
 local DEFAULT_CHILD_GAP = 10
@@ -47,6 +51,7 @@ local ICON_TEXT_ICON_SIZE = 28
 local ICON_TEXT_FRAME_INSET = 2
 local ICON_TEXT_LABEL_OFFSET = 38
 local ICON_TEXT_ROW_HEIGHT = 32
+local ICON_DETAIL_NAME_HEIGHT = 28
 
 -- Champion row sizing
 local CHAMP_ROW_HEIGHT = 40
@@ -79,6 +84,9 @@ local SIDE_BY_SIDE_GAP = 40
 
 -- Label-value row sizing
 local LABEL_VALUE_PADDING = 10
+-- Value labels are sized to their text; a little slack keeps a glyph from
+-- wrapping or clipping when the measured width lands under the drawn width
+local VALUE_WIDTH_SLACK = 4
 local MAX_VALUE_WIDTH_RATIO = 0.5
 
 -------------------------
@@ -149,10 +157,9 @@ local function setupLabelValueRow(row, headerText, valueText, containerWidth)
     local headerLabel = row:GetNamedChild("Header")
     local valueLabel = row:GetNamedChild("Value")
 
-    valueLabel:SetWidth(containerWidth)
     valueLabel:SetText(valueText)
     local maxValueWidth = math.floor(containerWidth * MAX_VALUE_WIDTH_RATIO)
-    local valueWidth = math.min(valueLabel:GetTextWidth(), maxValueWidth)
+    local valueWidth = math.min(math.ceil(valueLabel:GetStringWidth(valueText)) + VALUE_WIDTH_SLACK, maxValueWidth)
     valueLabel:SetWidth(valueWidth)
 
     local headerWidth = containerWidth - valueWidth - LABEL_VALUE_PADDING
@@ -297,6 +304,8 @@ function ComponentFactory:Initialize(panel)
         championRow2Col = ControlPool.new(nil, parent, "Champ2Col"),
         vengeancePerkRow2Col = ControlPool.new(nil, parent, "VengPerk2Col"),
         iconTextRow     = ControlPool.new(nil, parent, "IconText"),
+        iconStatRow     = ControlPool.new(nil, parent, "IconStat"),
+        iconDetailRow   = ControlPool.new(nil, parent, "IconDetail"),
         plainTextRow    = ControlPool.new(nil, parent, "PlainText"),
         horizontalStack = ControlPool.new(nil, parent, "HStack"),
         iconTextRow3Col = ControlPool.new(nil, parent, "IconText3Col"),
@@ -387,6 +396,149 @@ function ColumnBuilder:PlainTextRow(text, color, indent)
     return row
 end
 
+---Creates the small framed icon shared by the icon rows
+---@param row Control
+local function initRowIcon(row)
+    row.iconCtrl = CreateControl(row:GetName() .. "Icon", row, CT_TEXTURE)
+    row.iconCtrl:SetDimensions(ICON_TEXT_ICON_SIZE, ICON_TEXT_ICON_SIZE)
+    row.iconCtrl:SetAnchor(LEFT, row, LEFT, ICON_TEXT_FRAME_INSET, 0)
+
+    row.frame = CreateControl(row:GetName() .. "Frame", row, CT_BACKDROP)
+    row.frame:SetEdgeTexture("EsoUI/Art/Miscellaneous/Gamepad/edgeframeGamepadBorder.dds", 128, 8)
+    row.frame:SetCenterColor(0, 0, 0, 0)
+    row.frame:SetEdgeColor(ZO_NORMAL_TEXT:UnpackRGBA())
+    row.frame:SetDrawLevel(1)
+    row.frame:SetAnchor(TOPLEFT, row.iconCtrl, TOPLEFT, -ICON_TEXT_FRAME_INSET, -ICON_TEXT_FRAME_INSET)
+    row.frame:SetAnchor(BOTTOMRIGHT, row.iconCtrl, BOTTOMRIGHT, ICON_TEXT_FRAME_INSET, ICON_TEXT_FRAME_INSET)
+
+    row.circleFrame = CreateControl(row:GetName() .. "CircleFrame", row, CT_TEXTURE)
+    row.circleFrame:SetTexture("EsoUI/Art/Miscellaneous/Gamepad/gp_passiveFrame_64.dds")
+    row.circleFrame:SetColor(ZO_NORMAL_TEXT:UnpackRGBA())
+    row.circleFrame:SetDrawLevel(1)
+    row.circleFrame:SetAnchor(TOPLEFT, row.iconCtrl, TOPLEFT, -ICON_TEXT_FRAME_INSET, -ICON_TEXT_FRAME_INSET)
+    row.circleFrame:SetAnchor(BOTTOMRIGHT, row.iconCtrl, BOTTOMRIGHT, ICON_TEXT_FRAME_INSET, ICON_TEXT_FRAME_INSET)
+end
+
+---@param row Control
+---@param icon string
+---@param showFrame boolean|nil
+local function setRowIcon(row, icon, showFrame)
+    row.iconCtrl:SetTexture(icon)
+    row.iconCtrl:SetHidden(false)
+    local frameVisible = showFrame ~= false
+    local isPassive = frameVisible and journal.utils.isPassiveIcon(icon)
+    row.frame:SetHidden(not frameVisible or isPassive)
+    row.circleFrame:SetHidden(not frameVisible or not isPassive)
+end
+
+---Creates an icon + name + right-aligned value row. The name ellipsizes;
+---the value never does (up to MAX_VALUE_WIDTH_RATIO of the width).
+---@param icon string
+---@param name string
+---@param value string
+---@param showFrame boolean|nil
+---@return Control
+function ColumnBuilder:IconStatRow(icon, name, value, showFrame)
+    local row = self.pools.iconStatRow:Acquire()
+
+    if not row.iconCtrl then
+        initRowIcon(row)
+
+        row.label = CreateControl(row:GetName() .. "Label", row, CT_LABEL)
+        row.label:SetFont("ZoFontGamepad27")
+        row.label:SetColor(ZO_NORMAL_TEXT:UnpackRGBA())
+        row.label:SetAnchor(LEFT, row, LEFT, ICON_TEXT_LABEL_OFFSET, 0)
+        row.label:SetMaxLineCount(1)
+        row.label:SetWrapMode(TEXT_WRAP_MODE_ELLIPSIS)
+        row.label:SetVerticalAlignment(TEXT_ALIGN_CENTER)
+
+        row.value = CreateControl(row:GetName() .. "Value", row, CT_LABEL)
+        row.value:SetFont("ZoFontGamepad27")
+        row.value:SetColor(ZO_SELECTED_TEXT:UnpackRGBA())
+        row.value:SetAnchor(RIGHT, row, RIGHT, 0, 0)
+        row.value:SetMaxLineCount(1)
+        row.value:SetHorizontalAlignment(TEXT_ALIGN_RIGHT)
+        row.value:SetVerticalAlignment(TEXT_ALIGN_CENTER)
+
+        row._layoutWidth = function(control, width)
+            control:SetWidth(width)
+            local maxValueWidth = math.floor(width * MAX_VALUE_WIDTH_RATIO)
+            local textWidth = math.ceil(control.value:GetStringWidth(control.value:GetText())) + VALUE_WIDTH_SLACK
+            local valueWidth = math.min(textWidth, maxValueWidth)
+            control.value:SetWidth(valueWidth)
+            control.value:SetHeight(ICON_TEXT_ROW_HEIGHT)
+            control.label:SetWidth(math.max(0, width - ICON_TEXT_LABEL_OFFSET - valueWidth - LABEL_VALUE_PADDING))
+            control.label:SetHeight(ICON_TEXT_ROW_HEIGHT)
+        end
+        row._measureWidth = function(control)
+            return ICON_TEXT_LABEL_OFFSET + control.label:GetStringWidth(control.label:GetText()) + LABEL_VALUE_PADDING
+                + control.value:GetStringWidth(control.value:GetText()) + VALUE_WIDTH_SLACK
+        end
+    end
+
+    row:SetHeight(ICON_TEXT_ROW_HEIGHT)
+    setRowIcon(row, icon, showFrame)
+    row.label:SetText(name)
+    row.value:SetText(value)
+    row._layoutWidth(row, self.width)
+    row.label:SetHidden(false)
+    row.value:SetHidden(false)
+
+    row._topGap = 6
+    return row
+end
+
+---Creates an icon + name row with a detail line under the name, both at
+---full width, for rows that carry several values.
+---@param icon string
+---@param name string
+---@param detail string
+---@param showFrame boolean|nil
+---@return Control
+function ColumnBuilder:IconDetailRow(icon, name, detail, showFrame)
+    local row = self.pools.iconDetailRow:Acquire()
+
+    if not row.iconCtrl then
+        initRowIcon(row)
+
+        row.label = CreateControl(row:GetName() .. "Label", row, CT_LABEL)
+        row.label:SetFont("ZoFontGamepad27")
+        row.label:SetColor(ZO_NORMAL_TEXT:UnpackRGBA())
+        row.label:SetAnchor(TOPLEFT, row, TOPLEFT, ICON_TEXT_LABEL_OFFSET, 0)
+        row.label:SetAnchor(TOPRIGHT, row, TOPRIGHT, 0, 0)
+        row.label:SetHeight(ICON_DETAIL_NAME_HEIGHT)
+        row.label:SetMaxLineCount(1)
+        row.label:SetWrapMode(TEXT_WRAP_MODE_ELLIPSIS)
+        row.label:SetVerticalAlignment(TEXT_ALIGN_BOTTOM)
+
+        row.detail = CreateControl(row:GetName() .. "Detail", row, CT_LABEL)
+        row.detail:SetFont("ZoFontGamepad22")
+        row.detail:SetColor(ZO_SELECTED_TEXT:UnpackRGBA())
+        row.detail:SetAnchor(TOPLEFT, row.label, BOTTOMLEFT, 0, 0)
+        row.detail:SetAnchor(BOTTOMRIGHT, row, BOTTOMRIGHT, 0, 0)
+        row.detail:SetMaxLineCount(1)
+        row.detail:SetWrapMode(TEXT_WRAP_MODE_ELLIPSIS)
+        row.detail:SetVerticalAlignment(TEXT_ALIGN_TOP)
+
+        row._measureWidth = function(control)
+            local textWidth = math.max(control.label:GetStringWidth(control.label:GetText()),
+                control.detail:GetStringWidth(control.detail:GetText()))
+            return ICON_TEXT_LABEL_OFFSET + textWidth + VALUE_WIDTH_SLACK
+        end
+    end
+
+    row:SetHeight(ROW_CONTENT.ICON_DETAIL_ROW)
+    row:SetWidth(self.width)
+    setRowIcon(row, icon, showFrame)
+    row.label:SetText(name)
+    row.detail:SetText(detail)
+    row.label:SetHidden(false)
+    row.detail:SetHidden(false)
+
+    row._topGap = 6
+    return row
+end
+
 ---Creates an icon + text row (small framed icon with label).
 ---@param icon string Texture path
 ---@param text string
@@ -398,24 +550,7 @@ function ColumnBuilder:IconTextRow(icon, text, color, showFrame)
 
     -- Lazy init sub-controls
     if not row.iconCtrl then
-        row.iconCtrl = CreateControl(row:GetName() .. "Icon", row, CT_TEXTURE)
-        row.iconCtrl:SetDimensions(ICON_TEXT_ICON_SIZE, ICON_TEXT_ICON_SIZE)
-        row.iconCtrl:SetAnchor(LEFT, row, LEFT, ICON_TEXT_FRAME_INSET, 0)
-
-        row.frame = CreateControl(row:GetName() .. "Frame", row, CT_BACKDROP)
-        row.frame:SetEdgeTexture("EsoUI/Art/Miscellaneous/Gamepad/edgeframeGamepadBorder.dds", 128, 8)
-        row.frame:SetCenterColor(0, 0, 0, 0)
-        row.frame:SetEdgeColor(ZO_NORMAL_TEXT:UnpackRGBA())
-        row.frame:SetDrawLevel(1)
-        row.frame:SetAnchor(TOPLEFT, row.iconCtrl, TOPLEFT, -ICON_TEXT_FRAME_INSET, -ICON_TEXT_FRAME_INSET)
-        row.frame:SetAnchor(BOTTOMRIGHT, row.iconCtrl, BOTTOMRIGHT, ICON_TEXT_FRAME_INSET, ICON_TEXT_FRAME_INSET)
-
-        row.circleFrame = CreateControl(row:GetName() .. "CircleFrame", row, CT_TEXTURE)
-        row.circleFrame:SetTexture("EsoUI/Art/Miscellaneous/Gamepad/gp_passiveFrame_64.dds")
-        row.circleFrame:SetColor(ZO_NORMAL_TEXT:UnpackRGBA())
-        row.circleFrame:SetDrawLevel(1)
-        row.circleFrame:SetAnchor(TOPLEFT, row.iconCtrl, TOPLEFT, -ICON_TEXT_FRAME_INSET, -ICON_TEXT_FRAME_INSET)
-        row.circleFrame:SetAnchor(BOTTOMRIGHT, row.iconCtrl, BOTTOMRIGHT, ICON_TEXT_FRAME_INSET, ICON_TEXT_FRAME_INSET)
+        initRowIcon(row)
 
         row.label = CreateControl(row:GetName() .. "Label", row, CT_LABEL)
         row.label:SetFont("ZoFontGamepad27")
@@ -436,13 +571,7 @@ function ColumnBuilder:IconTextRow(icon, text, color, showFrame)
 
     row:SetHeight(ICON_TEXT_ROW_HEIGHT)
     row._layoutWidth(row, self.width)
-    row.iconCtrl:SetTexture(icon)
-    row.iconCtrl:SetHidden(false)
-
-    local frameVisible = showFrame ~= false
-    local isPassive = frameVisible and journal.utils.isPassiveIcon(icon)
-    row.frame:SetHidden(not frameVisible or isPassive)
-    row.circleFrame:SetHidden(not frameVisible or not isPassive)
+    setRowIcon(row, icon, showFrame)
 
     row.label:SetText(text)
 
@@ -726,6 +855,9 @@ function ColumnBuilder:DeathAttackRow(attack, isKillingBlow)
     local killingBlowIcon = row:GetNamedChild("KillingBlow")
     if killingBlowIcon then killingBlowIcon:SetHidden(not isKillingBlow) end
 
+    -- No attacker name here: group cards render sharedData, which always
+    -- goes through the shared-payload serialization (own entry included) -
+    -- attacker names never survive it, so the field is absent in practice
     row:GetNamedChild("Name"):SetText(journal.utils.getAbilityDisplayName(attack.abilityId))
     row:GetNamedChild("Value"):SetText(journal.utils.formatCompact(attack.damage))
 
@@ -796,6 +928,20 @@ function ColumnBuilder:HorizontalStack(gap, ...)
     return container
 end
 
+---@param header Control
+---@return Control
+local function sectionTimingLabel(header)
+    local label = header:GetNamedChild("Timing")
+    if not label then
+        label = CreateControl(header:GetName() .. "Timing", header, CT_LABEL)
+        label:SetFont("ZoFontGamepad22")
+        label:SetColor(ZO_NORMAL_TEXT:UnpackRGBA())
+        label:SetHorizontalAlignment(TEXT_ALIGN_RIGHT)
+        label:SetVerticalAlignment(TEXT_ALIGN_BOTTOM)
+    end
+    return label
+end
+
 ---Creates a section with header and stacked children.
 ---Returns nil if no children (conditional rendering).
 ---@param title string Section header text
@@ -810,11 +956,14 @@ function ColumnBuilder:Section(title, ...)
 
     local titleLabel = header:GetNamedChild("Title")
     initFontAdjusting(titleLabel, SECTION_TITLE_FONTS)
+    titleLabel:ClearAnchors()
+    titleLabel:SetAnchor(TOPLEFT, header, TOPLEFT, 0, 0)
+    titleLabel:SetDimensions(self.width, ROW_CONTENT.SECTION_HEADER - SECTION_TITLE_BOTTOM_INSET)
     titleLabel:SetText(title)
 
-    -- Clear any previous timing label
     local timingLabel = header:GetNamedChild("Timing")
     if timingLabel then timingLabel:SetHidden(true) end
+    header:SetHeight(ROW_CONTENT.SECTION_HEADER)
 
     header:SetParent(container)
     header:ClearAnchors()
@@ -1334,17 +1483,11 @@ function ColumnBuilder:SetSectionTiming(sectionContainer, text)
     if not sectionContainer or not sectionContainer._header then return end
     local header = sectionContainer._header
 
-    local timingLabel = header:GetNamedChild("Timing")
-    if not timingLabel then
-        timingLabel = CreateControl(header:GetName() .. "Timing", header, CT_LABEL)
-        timingLabel:SetFont("ZoFontGamepad22")
-        timingLabel:SetColor(ZO_NORMAL_TEXT:UnpackRGBA())
-        timingLabel:SetHorizontalAlignment(TEXT_ALIGN_RIGHT)
-        timingLabel:SetVerticalAlignment(TEXT_ALIGN_BOTTOM)
-        timingLabel:SetAnchor(BOTTOMRIGHT, header, BOTTOMRIGHT, 0, -5)
-        timingLabel:SetDimensions(120, 50)
-    end
+    local timingLabel = sectionTimingLabel(header)
     if text then
+        timingLabel:ClearAnchors()
+        timingLabel:SetAnchor(BOTTOMRIGHT, header, BOTTOMRIGHT, 0, -SECTION_TITLE_BOTTOM_INSET)
+        timingLabel:SetDimensions(120, ROW_CONTENT.SECTION_HEADER)
         timingLabel:SetText(text)
         timingLabel:SetHidden(false)
     else

@@ -1,0 +1,39 @@
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "name": "bs-share",
+    "main": "src/worker.ts",
+    "compatibility_date": "2026-07-01",
+    "triggers": { "crons": ["15 * * * *"] },
+    "observability": {
+        "enabled": true
+    },
+    "assets": {
+        "directory": "./public",
+        "binding": "ASSETS",
+        // The worker routes /u and /s/:id to .html assets itself; automatic
+        // .html redirects would rewrite the share URL and lose the id
+        "html_handling": "none"
+    },
+    // Custom domains disable the workers.dev route by default; keep both
+    "workers_dev": true,
+    "routes": [
+        {
+            "pattern": "bs.sheludchenkov.com",
+            "custom_domain": true
+        }
+    ],
+    "d1_databases": [
+        {
+            "binding": "DB",
+            "database_name": "bs-share",
+            "database_id": "419babe2-c5c8-412f-9280-ceb1239a743c",
+            "migrations_dir": "./migrations"
+        }
+    ],
+    "r2_buckets": [
+        {
+            "binding": "ICONS",
+            "bucket_name": "bs-icons"
+        }
+    ]
+}

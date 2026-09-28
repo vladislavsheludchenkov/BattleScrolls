@@ -1,3 +1,4 @@
+---@diagnostic disable: undefined-field, inject-field -- the ESO Control/ZO_* API stubs are too incomplete for field checking in UI code
 -----------------------------------------------------------
 -- Group Table
 -- Sortable table for Group tab overview using
@@ -31,6 +32,7 @@ local SORT_KEYS = {
     hps         = { isNumeric = true, tiebreaker = "dps" },
     alive       = { isNumeric = true, tiebreaker = "dps" },
     deaths      = { isNumeric = true, tiebreaker = "dps" },
+    res         = { isNumeric = true, tiebreaker = "dps" },
 }
 
 -- Column widths (px)
@@ -43,6 +45,7 @@ local COL_DTPS  = 80
 local COL_HPS   = 80
 local COL_ALIVE = 70
 local COL_DEATHS = 80
+local COL_RES = 60
 
 ---@diagnostic disable-next-line: undefined-doc-class -- ESO API base class
 ---@class BattleScrolls_GroupTable : ZO_GamepadInteractiveSortFilterList
@@ -91,6 +94,7 @@ function GroupTable:InitializeSortFilterList(control)
     initSortHeader("HPS", GetString(BATTLESCROLLS_STAT_HPS), "hps")
     initSortHeader("Alive", GetString(BATTLESCROLLS_GROUP_COL_ALIVE), "alive")
     initSortHeader("Deaths", GetString(BATTLESCROLLS_GROUP_COL_DEATHS), "deaths")
+    initSortHeader("Res", GetString(BATTLESCROLLS_GROUP_COL_RES), "res")
 
     -- Base call creates sortHeaderGroup, list, sortFunction
     ZO_GamepadInteractiveSortFilterList.InitializeSortFilterList(self, control)
@@ -316,7 +320,7 @@ function GroupTable:ConfigureBossColumns(bossNames)
     -- Subtract ZO_SCROLL_BAR_WIDTH because rows live in the Content area which is
     -- narrower than Headers by the scrollbar width. Using the content-area width for
     -- both headers and rows keeps all columns aligned.
-    local rightFixed = COL_DPS + COL_CRIT + COL_DTPS + COL_HPS + COL_ALIVE + COL_DEATHS + (5 * PADDING)
+    local rightFixed = COL_DPS + COL_CRIT + COL_DTPS + COL_HPS + COL_ALIVE + COL_DEATHS + COL_RES + (6 * PADDING)
     local bossWidth = self.bossCount * (self.bossColWidth + PADDING)
     local rawWidth = (headers:GetWidth() > 0) and headers:GetWidth() or 1050
     local totalWidth = rawWidth - ZO_SCROLL_BAR_WIDTH
@@ -408,6 +412,7 @@ function GroupTable:BuildMasterList()
             alive = data.aliveTimeMs and data.durationMs > 0
                 and (data.aliveTimeMs / data.durationMs * 100) or 100,
             deaths = data.deaths and data.deaths.deathCount or 0,
+            res = data.resurrections or 0,
             isLocal = member.isLocal,
             boss1Dps = 0, boss2Dps = 0, boss3Dps = 0, boss4Dps = 0,
             rank = 0,
@@ -483,6 +488,7 @@ function GroupTable:SetupRow(rowControl, data)
     setText("HPS", data.hps > 0 and utils.formatCompact(data.hps) or "-")
     setText("Alive", string.format("%.0f%%", data.alive))
     setText("Deaths", data.deaths > 0 and tostring(data.deaths) or "-")
+    setText("Res", data.res > 0 and tostring(data.res) or "-")
 
     for i = 1, MAX_BOSSES do
         local val = data[string.format("boss%dDps", i)] or 0
@@ -493,7 +499,7 @@ function GroupTable:SetupRow(rowControl, data)
     local defaultColor = ZO_SELECTED_TEXT
     setColor("Rank", defaultColor)
     setColor("Name", data.isLocal and ZO_HIGHLIGHT_TEXT or defaultColor)
-    for _, col in ipairs({"DPS", "Crit", "DTPS", "HPS", "Alive", "Deaths", "Boss1", "Boss2", "Boss3", "Boss4"}) do
+    for _, col in ipairs({"DPS", "Crit", "DTPS", "HPS", "Alive", "Deaths", "Res", "Boss1", "Boss2", "Boss3", "Boss4"}) do
         setColor(col, defaultColor)
     end
 end

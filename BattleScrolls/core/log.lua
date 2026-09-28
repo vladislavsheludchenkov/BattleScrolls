@@ -27,8 +27,6 @@ BattleScrolls = BattleScrolls or {}
 ---@field Warn fun(message: string|fun():string|nil) Log at WARN level
 ---@field Info fun(message: string|fun():string|nil) Log at INFO level
 ---@field Debug fun(message: string|fun():string|nil) Log at DEBUG level
-
----@type BattleScrollsLog
 local log = {}
 BattleScrolls.log = log
 

@@ -25,7 +25,7 @@ local strings = {
     -- Encounter Tabs
     -------------------------
     [BATTLESCROLLS_TAB_ALL_ENCOUNTERS] = "全部战斗",
-    [BATTLESCROLLS_TAB_BOSS_ENCOUNTERS] = "Boss战",
+    [BATTLESCROLLS_TAB_BOSS_ENCOUNTERS] = "首领战",
     [BATTLESCROLLS_TAB_OTHER_ENCOUNTERS] = "其他战斗",
     [BATTLESCROLLS_TAB_PLAYER_ENCOUNTERS] = "PvP战斗",
     [BATTLESCROLLS_TAB_TARGET_DUMMY] = "目标假人",
@@ -34,7 +34,7 @@ local strings = {
     -- Stats Tabs
     -------------------------
     [BATTLESCROLLS_TAB_OVERVIEW] = "概览",
-    [BATTLESCROLLS_TAB_BOSS_DAMAGE_DONE] = "Boss伤害",
+    [BATTLESCROLLS_TAB_BOSS_DAMAGE_DONE] = "首领伤害",
     [BATTLESCROLLS_TAB_DAMAGE_DONE] = "造成伤害",
     [BATTLESCROLLS_TAB_DAMAGE_TAKEN] = "受到伤害",
     [BATTLESCROLLS_TAB_HEALING_OUT] = "治疗输出",
@@ -55,23 +55,23 @@ local strings = {
     [BATTLESCROLLS_HEADER_WEAVING] = "卡轻击",
     [BATTLESCROLLS_HEADER_WEAVING_BY_ABILITY] = "按技能卡轻击",
     [BATTLESCROLLS_STAT_AVG_WEAVE_TIME] = "平均施法延迟时间",
-    [BATTLESCROLLS_STAT_WEAVE_TIME_BEFORE] = "编织时间（前）",
+    [BATTLESCROLLS_STAT_WEAVE_TIME_BEFORE] = "卡轻击时间（前）",
     [BATTLESCROLLS_STAT_TIME_LOST] = "浪费时间",
     [BATTLESCROLLS_STAT_LIGHT_ATTACKS] = "轻攻击",
     [BATTLESCROLLS_STAT_HEAVY_ATTACKS] = "重攻击",
     [BATTLESCROLLS_STAT_SKILL_ACTIVATIONS] = "技能释放",
     [BATTLESCROLLS_STAT_CASTS] = "施法次数",
-    [BATTLESCROLLS_STAT_WEAVING_ERRORS] = "编织失误",
+    [BATTLESCROLLS_STAT_WEAVING_ERRORS] = "卡轻击失误",
     [BATTLESCROLLS_STAT_MISSED_LA] = "遗漏轻攻击",
     [BATTLESCROLLS_STAT_DOUBLE_LA] = "重复轻攻击",
     [BATTLESCROLLS_TOOLTIP_DELAY_AFTER] = "施法后延迟",
     [BATTLESCROLLS_TOOLTIP_DELAY_BEFORE] = "施法前延迟",
     [BATTLESCROLLS_FORMAT_SECONDS] = "<<1>>秒",
     [BATTLESCROLLS_FORMAT_MILLISECONDS] = "<<1>>毫秒",
-    [BATTLESCROLLS_TOOLTIP_INTER_CAST_DESC] = "施法间的平均延迟时间。从技能GCD或施法时间结束到下一个动作开始计算。也称为CMX中的Weaving Average。",
-    [BATTLESCROLLS_TOOLTIP_TIME_LOST_DESC] = "战斗中施法间的总空闲时间。也称为CMX中的Weaving Total。",
-    [BATTLESCROLLS_TOOLTIP_MISSED_LA_DESC] = "连续释放两个技能，中间没有穿插轻攻击。",
-    [BATTLESCROLLS_TOOLTIP_DOUBLE_LA_DESC] = "连续两次轻攻击，中间没有穿插技能。",
+    [BATTLESCROLLS_TOOLTIP_INTER_CAST_DESC] = "两次施放之间的平均间隔，从技能的全局冷却或施法时间结束算到你的下一个动作。Combat Metrics 中称为 Weaving Average。",
+    [BATTLESCROLLS_TOOLTIP_TIME_LOST_DESC] = "整场战斗的短施法延迟总和，不含3秒及以上的空档（空档时间）。Combat Metrics称其为Weaving Total。",
+    [BATTLESCROLLS_TOOLTIP_MISSED_LA_DESC] = "连续释放两个技能，中间没有卡轻击轻攻击。",
+    [BATTLESCROLLS_TOOLTIP_DOUBLE_LA_DESC] = "连续两次轻攻击，中间没有卡轻击技能。",
 
     -------------------------
     -- Time Headers
@@ -140,9 +140,9 @@ local strings = {
     [BATTLESCROLLS_SETTINGS_RECORD_IN_OVERLAND] = "在野外记录",
     [BATTLESCROLLS_SETTINGS_RECORD_IN_HOUSES] = "在住宅中记录",
     [BATTLESCROLLS_SETTINGS_RECORD_IN_PVP] = "在PvP中记录",
-    [BATTLESCROLLS_SETTINGS_RECORD_BOSS_FIGHTS] = "记录Boss战",
+    [BATTLESCROLLS_SETTINGS_RECORD_BOSS_FIGHTS] = "记录首领战",
     [BATTLESCROLLS_SETTINGS_RECORD_TRASH_FIGHTS] = "记录小怪战",
-    [BATTLESCROLLS_SETTINGS_RECORD_TRASH_FIGHTS_TEXT] = "与普通敌人的战斗（非Boss、非玩家）。",
+    [BATTLESCROLLS_SETTINGS_RECORD_TRASH_FIGHTS_TEXT] = "与普通敌人的战斗（非首领、非玩家）。",
     [BATTLESCROLLS_SETTINGS_RECORD_PLAYER_FIGHTS] = "记录PvP战斗",
     [BATTLESCROLLS_SETTINGS_RECORD_PLAYER_FIGHTS_TEXT] = "与其他玩家的PvP战斗。",
     [BATTLESCROLLS_SETTINGS_RECORD_DUMMY_FIGHTS] = "记录目标假人战",
@@ -163,16 +163,17 @@ local strings = {
     [BATTLESCROLLS_SETTINGS_STORAGE_SIZE_YOLO] = "能出什么问题呢？",
     -- Storage tooltip
     [BATTLESCROLLS_SETTINGS_STORAGE_TT_DESC] = "保留多少战斗历史。超过限制时，最旧的未锁定区域会被自动删除。您可以锁定单个区域以保护它们不被清理。",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_NOTE] = "此限制仅适用于保存的历史记录。插件还会使用内存来追踪当前战斗和渲染界面，因此总使用量会更高。",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_NOTE] = "此限制仅适用于保存的数据：战斗、方案和设置。插件还会使用内存来追踪当前战斗和渲染界面，因此总使用量会更高。",
     [BATTLESCROLLS_SETTINGS_STORAGE_TT_CURRENT] = "历史: <<1>> MB / <<2>> MB (<<3>>%)",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_PRESETS] = "预设 (试炼 ~0.5-1 MB，地下城 ~0.25-0.5 MB):",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_XS] = "  极小: 5 MB - 最近几次",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_SMALL] = "  小: 8 MB - 一晚的开荒",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_MEDIUM] = "  中: 12 MB - 一周的休闲游戏",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_LARGE] = "  大: 18 MB - 几周的记录",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_XL] = "  极大: 25 MB - 一个月的回忆",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_CAUTION] = "  小心: 40 MB - 你真的很喜欢数据",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_YOLO] = "  能出什么问题呢？: 60 MB - 危险地活着",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_PROTECTED] = "仅锁定的战斗、方案和设置就已超过上限：清理无法降到上限以下。",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_PRESETS] = "预设 (试炼一次 ~0.3 MB，地下城 ~0.15 MB，一晚开荒 ~1 MB):",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_XS] = "  极小: 5 MB - 只留最新的卷轴",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_SMALL] = "  小: 8 MB - 一叠厚厚的卷轴",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_MEDIUM] = "  中: 12 MB - 一本翔实的战斗日志",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_LARGE] = "  大: 18 MB - 一座个人藏书室",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_XL] = "  极大: 25 MB - 一整座档案馆",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_CAUTION] = "  小心: 35 MB - 你真的很喜欢数据",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_YOLO] = "  能出什么问题呢？: 50 MB - 这是你自找的",
     [BATTLESCROLLS_SETTINGS_STORAGE_TT_WARNING] = "关于ESO内存限制：所有插件共享100 MB内存池。达到70 MB时，ESO会显示警告。达到100 MB时，界面会重新加载并禁用所有插件。如果你使用很多插件，请选择较小的预设。提示：在聊天中输入 /addonmemdisplay 可以查看实时内存监控。",
 
     -------------------------
@@ -182,7 +183,7 @@ local strings = {
     [BATTLESCROLLS_SETTINGS_PLAYER_BUFFS] = "自身增益",
     [BATTLESCROLLS_SETTINGS_PLAYER_DEBUFFS] = "自身减益",
     [BATTLESCROLLS_SETTINGS_GROUP_BUFFS] = "团队增益",
-    [BATTLESCROLLS_SETTINGS_BOSS_DEBUFFS] = "Boss减益",
+    [BATTLESCROLLS_SETTINGS_BOSS_DEBUFFS] = "首领减益",
     [BATTLESCROLLS_SETTINGS_RECON_PRECISION] = "校验精度",
     [BATTLESCROLLS_SETTINGS_RECON_PRECISION_TOOLTIP] = "效果追踪与游戏状态校验的频率。更高精度能捕获更多遗漏事件，但会消耗更多内存。内存仅在重载UI时释放。",
     [BATTLESCROLLS_SETTINGS_RECON_MAX] = "最高",
@@ -205,10 +206,10 @@ local strings = {
     [BATTLESCROLLS_STAT_SUMMARY] = "摘要",
 
     -- Boss Damage
-    [BATTLESCROLLS_STAT_PERSONAL_BOSS_DAMAGE] = "个人Boss伤害",
-    [BATTLESCROLLS_STAT_PERSONAL_BOSS_DPS] = "个人Boss DPS",
-    [BATTLESCROLLS_STAT_PERSONAL_BOSS_DAMAGE_SHARE] = "个人Boss伤害占比",
-    [BATTLESCROLLS_HEADER_BOSS_DAMAGE_DONE] = "Boss伤害",
+    [BATTLESCROLLS_STAT_PERSONAL_BOSS_DAMAGE] = "个人首领伤害",
+    [BATTLESCROLLS_STAT_PERSONAL_BOSS_DPS] = "个人首领 DPS",
+    [BATTLESCROLLS_STAT_PERSONAL_BOSS_DAMAGE_SHARE] = "个人首领伤害占比",
+    [BATTLESCROLLS_HEADER_BOSS_DAMAGE_DONE] = "首领伤害",
 
     -- Total Damage
     [BATTLESCROLLS_STAT_PERSONAL_DAMAGE] = "个人伤害",
@@ -239,18 +240,19 @@ local strings = {
     -- Proc Tracking
     [BATTLESCROLLS_HEADER_PROC_TRACKING] = "触发追踪",
     [BATTLESCROLLS_STAT_TOTAL_PROCS] = "<<1>>次",
-    [BATTLESCROLLS_STAT_MEDIAN_INTERVAL] = "中位数",
 
     -------------------------
     -- Damage Stats Details
     -------------------------
-    [BATTLESCROLLS_STAT_TOTAL_BOSS_DAMAGE] = "总Boss伤害",
-    [BATTLESCROLLS_STAT_BOSS_DPS] = "Boss DPS",
+    [BATTLESCROLLS_STAT_TOTAL_BOSS_DAMAGE] = "总首领伤害",
+    [BATTLESCROLLS_STAT_BOSS_DPS] = "首领 DPS",
     [BATTLESCROLLS_STAT_GROUP_SHARE] = "团队占比",
     [BATTLESCROLLS_STAT_TOTAL_DAMAGE] = "总伤害",
     [BATTLESCROLLS_STAT_DPS] = "DPS",
 
     [BATTLESCROLLS_HEADER_BY_ABILITY] = "按技能",
+
+    [BATTLESCROLLS_HEADER_CASTS] = "施放",
     [BATTLESCROLLS_HEADER_BY_DAMAGE_TYPE] = "按伤害类型",
     [BATTLESCROLLS_HEADER_DIRECT_VS_DOT] = "直接 vs DoT",
     [BATTLESCROLLS_HEADER_DAMAGE_DELIVERY] = "伤害方式",
@@ -334,6 +336,7 @@ local strings = {
     [BATTLESCROLLS_TOOLTIP_AVG_TICK] = "平均跳",
     [BATTLESCROLLS_TOOLTIP_MIN_TICK] = "最小跳",
     [BATTLESCROLLS_TOOLTIP_MAX_TICK] = "最大跳",
+    [BATTLESCROLLS_TOOLTIP_TICKS] = "跳数",
 
     [BATTLESCROLLS_TOOLTIP_BY_TARGET] = "按目标",
     [BATTLESCROLLS_TOOLTIP_MEAN_INTERVAL] = "平均间隔",
@@ -374,7 +377,7 @@ local strings = {
     -- Filter Dialog
     -------------------------
     [BATTLESCROLLS_FILTER_DAMAGE_DONE] = "筛选伤害",
-    [BATTLESCROLLS_FILTER_BOSS_DAMAGE] = "筛选Boss伤害",
+    [BATTLESCROLLS_FILTER_BOSS_DAMAGE] = "筛选首领伤害",
     [BATTLESCROLLS_FILTER_BY_SOURCE] = "按来源筛选",
     [BATTLESCROLLS_FILTER_BY_TARGET] = "按目标筛选",
     [BATTLESCROLLS_FILTER_BY_GROUP_MEMBER] = "按成员筛选",
@@ -382,7 +385,7 @@ local strings = {
     [BATTLESCROLLS_FILTER_RESET] = "重置",
     [BATTLESCROLLS_FILTER_DAMAGE_DONE_BY] = "伤害来源",
     [BATTLESCROLLS_FILTER_DAMAGE_DONE_TO] = "伤害目标",
-    [BATTLESCROLLS_FILTER_BOSS_TARGET] = "Boss目标",
+    [BATTLESCROLLS_FILTER_BOSS_TARGET] = "首领目标",
 
     -------------------------
     -- Encounter Display
@@ -406,14 +409,14 @@ local strings = {
     -------------------------
     -- LibHarvensAddonSettings Integration
     -------------------------
-    [BATTLESCROLLS_LIBHARVENS_OPEN_BUTTON] = "打开战斗卷轴",
-    [BATTLESCROLLS_LIBHARVENS_TOOLTIP] = "战斗卷轴也可以从<<1>>菜单访问。",
+    [BATTLESCROLLS_LIBHARVENS_OPEN_BUTTON] = "打开 Battle Scrolls",
+    [BATTLESCROLLS_LIBHARVENS_TOOLTIP] = "Battle Scrolls 也可以从<<1>>菜单访问。",
 
     -------------------------
     -- Misc
     -------------------------
     [BATTLESCROLLS_UNKNOWN] = "未知",
-    [BATTLESCROLLS_UNKNOWN_BOSS] = "未知Boss",
+    [BATTLESCROLLS_UNKNOWN_BOSS] = "未知首领",
 
     -------------------------
     -- Personal Meter Designs
@@ -448,29 +451,29 @@ local strings = {
     -------------------------
     [BATTLESCROLLS_METER_EFFECTIVE] = "有效",
     [BATTLESCROLLS_METER_EFF] = "有效",
-    [BATTLESCROLLS_METER_BOSS] = "Boss",
+    [BATTLESCROLLS_METER_BOSS] = "首领",
     [BATTLESCROLLS_METER_ALL] = "全部",
     [BATTLESCROLLS_METER_ALL_DAMAGE] = "总伤害",
     [BATTLESCROLLS_METER_TOTAL] = "合计",
-    [BATTLESCROLLS_METER_BOSS_ALL_DAMAGE] = "Boss伤害 / 总伤害",
+    [BATTLESCROLLS_METER_BOSS_ALL_DAMAGE] = "首领伤害 / 总伤害",
     [BATTLESCROLLS_METER_EFFECTIVE_RAW_HEALING] = "有效 / 总治疗",
 
     -- Overview Panel Q3/Q4 Headers
     [BATTLESCROLLS_OVERVIEW_TOP_ABILITIES] = "主要技能",
-    [BATTLESCROLLS_OVERVIEW_BOSSES] = "Boss",
+    [BATTLESCROLLS_OVERVIEW_BOSSES] = "首领",
     [BATTLESCROLLS_OVERVIEW_TARGETS] = "目标",
     [BATTLESCROLLS_OVERVIEW_SOURCES] = "来源",
     [BATTLESCROLLS_OVERVIEW_TARGETS_HEALED] = "治疗目标",
     [BATTLESCROLLS_OVERVIEW_HEALERS] = "治疗者",
     [BATTLESCROLLS_OVERVIEW_GROUP_BUFFS] = "团队增益",
-    [BATTLESCROLLS_OVERVIEW_BOSS_DEBUFFS] = "Boss减益",
+    [BATTLESCROLLS_OVERVIEW_BOSS_DEBUFFS] = "首领减益",
 
     -- Group Stats
-    [BATTLESCROLLS_OVERVIEW_BOSS_DAMAGE] = "Boss伤害",
+    [BATTLESCROLLS_OVERVIEW_BOSS_DAMAGE] = "首领伤害",
     [BATTLESCROLLS_STAT_GROUP_DAMAGE] = "团队伤害",
     [BATTLESCROLLS_STAT_GROUP_DPS] = "团队DPS",
-    [BATTLESCROLLS_STAT_GROUP_BOSS_DAMAGE] = "团队Boss伤害",
-    [BATTLESCROLLS_STAT_GROUP_BOSS_DPS] = "团队Boss DPS",
+    [BATTLESCROLLS_STAT_GROUP_BOSS_DAMAGE] = "团队首领伤害",
+    [BATTLESCROLLS_STAT_GROUP_BOSS_DPS] = "团队首领 DPS",
 
     -- Overview Panel - Ability Stats
     [BATTLESCROLLS_STAT_MAX_PREFIX] = "最高: <<1>>",
@@ -497,7 +500,7 @@ local strings = {
     [BATTLESCROLLS_OVERVIEW_NO_EFFECTS] = "无效果记录",
 
     -- Overview Panel Short Labels
-    [BATTLESCROLLS_BOSS_DAMAGE] = "Boss伤害",
+    [BATTLESCROLLS_BOSS_DAMAGE] = "首领伤害",
     [BATTLESCROLLS_DAMAGE_DONE] = "造成伤害",
     [BATTLESCROLLS_HEALING_OUT] = "治疗输出",
     [BATTLESCROLLS_SELF_HEALING] = "自我治疗",
@@ -523,8 +526,8 @@ local strings = {
     -------------------------
     -- Onboarding
     -------------------------
-    [BATTLESCROLLS_ONBOARDING_WELCOME_TITLE] = "欢迎使用战斗卷轴",
-    [BATTLESCROLLS_ONBOARDING_WELCOME_TEXT] = "战斗卷轴记录您的战斗遭遇，让您稍后在日志中查看。\n\n功能：\n- 实时DPS/HPS计量器\n- 详细的伤害和治疗分解\n- 增益/减益覆盖率追踪\n- Boss减益监控\n\n让我们配置一些设置。",
+    [BATTLESCROLLS_ONBOARDING_WELCOME_TITLE] = "欢迎使用 Battle Scrolls",
+    [BATTLESCROLLS_ONBOARDING_WELCOME_TEXT] = "Battle Scrolls 记录您的战斗遭遇，让您稍后在日志中查看。\n\n功能：\n- 实时DPS/HPS计量器\n- 详细的伤害和治疗分解\n- 增益/减益覆盖率追踪\n- 首领减益监控\n\n让我们配置一些设置。",
     [BATTLESCROLLS_ONBOARDING_GET_STARTED] = "开始",
     [BATTLESCROLLS_ONBOARDING_GET_STARTED_DESC] = "引导我完成设置选项",
     [BATTLESCROLLS_ONBOARDING_SKIP] = "跳过",
@@ -546,23 +549,23 @@ local strings = {
     -- Storage options
     [BATTLESCROLLS_ONBOARDING_STORAGE_QUESTION] = "保留多少历史记录？",
     [BATTLESCROLLS_ONBOARDING_STORAGE_MINIMAL] = "最少 (5 MB)",
-    [BATTLESCROLLS_ONBOARDING_STORAGE_MINIMAL_DESC] = "约6次试炼",
+    [BATTLESCROLLS_ONBOARDING_STORAGE_MINIMAL_DESC] = "约15次试炼",
     [BATTLESCROLLS_ONBOARDING_STORAGE_MODERATE] = "适中 (12 MB)",
-    [BATTLESCROLLS_ONBOARDING_STORAGE_MODERATE_DESC] = "约16次试炼",
+    [BATTLESCROLLS_ONBOARDING_STORAGE_MODERATE_DESC] = "约40次试炼",
     [BATTLESCROLLS_ONBOARDING_STORAGE_GENEROUS] = "较多 (25 MB)",
-    [BATTLESCROLLS_ONBOARDING_STORAGE_GENEROUS_DESC] = "约36次试炼",
+    [BATTLESCROLLS_ONBOARDING_STORAGE_GENEROUS_DESC] = "约80次试炼",
     -- Effects tracking
     [BATTLESCROLLS_ONBOARDING_EFFECTS_QUESTION] = "需要多少增益/减益追踪？",
     [BATTLESCROLLS_ONBOARDING_EFFECTS_FULL] = "完整追踪",
-    [BATTLESCROLLS_ONBOARDING_EFFECTS_FULL_DESC] = "您的增益、Boss减益以及团队增益覆盖率（如所有团队成员的主要勇气覆盖率）",
+    [BATTLESCROLLS_ONBOARDING_EFFECTS_FULL_DESC] = "您的增益、首领减益以及团队增益覆盖率（如所有团队成员的主要勇气覆盖率）",
     [BATTLESCROLLS_ONBOARDING_EFFECTS_ESSENTIAL] = "仅基本",
-    [BATTLESCROLLS_ONBOARDING_EFFECTS_ESSENTIAL_DESC] = "仅您的增益和Boss减益。跳过团队追踪以减少内存使用。",
+    [BATTLESCROLLS_ONBOARDING_EFFECTS_ESSENTIAL_DESC] = "仅您的增益和首领减益。跳过团队追踪以减少内存使用。",
     [BATTLESCROLLS_ONBOARDING_EFFECTS_DISABLED] = "禁用",
     [BATTLESCROLLS_ONBOARDING_EFFECTS_DISABLED_DESC] = "不追踪增益/减益。内存使用最少，但报告中无覆盖率数据。",
     -- Completion
     [BATTLESCROLLS_ONBOARDING_COMPLETE_TITLE] = "一切就绪！",
-    [BATTLESCROLLS_ONBOARDING_COMPLETE_TEXT] = "战斗卷轴已准备好追踪您的战斗。\n\n现在去战斗吧！\n\n您的战斗记录将显示在日志中。您可以随时在设置选项卡中调整这些设置。",
-    [BATTLESCROLLS_ONBOARDING_CHAT_MESSAGE] = "[战斗卷轴] 感谢安装！打开日志 > 战斗卷轴进行设置和激活。",
+    [BATTLESCROLLS_ONBOARDING_COMPLETE_TEXT] = "Battle Scrolls 已准备好追踪您的战斗。\n\n现在去战斗吧！\n\n您的战斗记录将显示在日志中。您可以随时在设置选项卡中调整这些设置。",
+    [BATTLESCROLLS_ONBOARDING_CHAT_MESSAGE] = "[Battle Scrolls] 感谢安装！打开日志 > Battle Scrolls 进行设置和激活。",
     [BATTLESCROLLS_ONBOARDING_CONTINUE] = "继续",
     [BATTLESCROLLS_ONBOARDING_FINISH] = "完成设置",
     [BATTLESCROLLS_ONBOARDING_LETS_GO] = "出发！",
@@ -610,7 +613,7 @@ local strings = {
     -- Group Tab Enhancements
     -------------------------
     [BATTLESCROLLS_STAT_SURVIVABILITY] = "生存能力",
-    [BATTLESCROLLS_BOSS_DAMAGE_TAKEN] = "Boss造成的伤害",
+    [BATTLESCROLLS_BOSS_DAMAGE_TAKEN] = "首领造成的伤害",
 
     -- Group Member Card Strings
     [BATTLESCROLLS_GROUP_CARD_OF_GROUP] = "团队比",
@@ -669,7 +672,7 @@ local strings = {
     [BATTLESCROLLS_SETUP_CLASS_MASTERY] = "职业精通",
     [BATTLESCROLLS_SETUP_LOADOUT] = "配装",
     [BATTLESCROLLS_SETUP_PERKS] = "辅助能力",
-    [BATTLESCROLLS_SETUP_MUNDUS] = "蒙杜斯",
+    [BATTLESCROLLS_SETUP_MUNDUS] = "梦达思",
     [BATTLESCROLLS_SETUP_FOOD] = "食物",
     [BATTLESCROLLS_WEAPON_GREATSWORD] = "巨剑",
     [BATTLESCROLLS_WEAPON_BATTLE_AXE] = "战斧",
@@ -766,7 +769,7 @@ local strings = {
 
     -- Encounter category options
     [BATTLESCROLLS_PIVOT_ENC_ALL] = "全部战斗",
-    [BATTLESCROLLS_PIVOT_ENC_BOSS] = "Boss战",
+    [BATTLESCROLLS_PIVOT_ENC_BOSS] = "首领战",
     [BATTLESCROLLS_PIVOT_ENC_TRASH] = "小怪战",
     [BATTLESCROLLS_PIVOT_ENC_PLAYER] = "PvP战斗",
     [BATTLESCROLLS_PIVOT_ENC_DUMMY] = "假人战斗",
@@ -784,7 +787,7 @@ local strings = {
     -- Target filter
     [BATTLESCROLLS_PIVOT_TARGETS] = "目标",
     [BATTLESCROLLS_PIVOT_TARGETS_ALL] = "所有目标",
-    [BATTLESCROLLS_PIVOT_TARGETS_BOSSES] = "仅Boss",
+    [BATTLESCROLLS_PIVOT_TARGETS_BOSSES] = "仅首领",
 
     -- Domain names
     [BATTLESCROLLS_PIVOT_DOMAIN_DAMAGE] = "伤害",
@@ -798,7 +801,7 @@ local strings = {
     [BATTLESCROLLS_PIVOT_DIM_ABILITY] = "技能",
     [BATTLESCROLLS_PIVOT_DIM_TARGET] = "目标",
     [BATTLESCROLLS_PIVOT_DIM_SOURCE] = "来源",
-    [BATTLESCROLLS_PIVOT_DIM_BOSS] = "Boss",
+    [BATTLESCROLLS_PIVOT_DIM_BOSS] = "首领",
     [BATTLESCROLLS_PIVOT_DIM_DAMAGE_TYPE] = "伤害类型",
     [BATTLESCROLLS_PIVOT_DIM_DELIVERY] = "攻击方式",
     [BATTLESCROLLS_PIVOT_DIM_AOE_ST] = "AoE / 单体",
@@ -818,8 +821,8 @@ local strings = {
     [BATTLESCROLLS_PIVOT_METRIC_MIN_HIT] = "最小命中",
     [BATTLESCROLLS_PIVOT_METRIC_AVG_HIT] = "平均命中",
     [BATTLESCROLLS_PIVOT_METRIC_EFFECTIVE_HEALING] = "有效治疗",
-    [BATTLESCROLLS_PIVOT_METRIC_RAW_HEALING] = "原始治疗",
-    [BATTLESCROLLS_PIVOT_METRIC_RAW_HPS] = "原始HPS",
+    [BATTLESCROLLS_PIVOT_METRIC_RAW_HEALING] = "总治疗",
+    [BATTLESCROLLS_PIVOT_METRIC_RAW_HPS] = "总HPS",
     [BATTLESCROLLS_PIVOT_METRIC_EFFECTIVE_HPS] = "有效HPS",
     [BATTLESCROLLS_PIVOT_METRIC_OVERHEAL_PERCENT] = "过量治疗 %",
     [BATTLESCROLLS_PIVOT_METRIC_HEAL_CRIT_PERCENT] = "治疗暴击 %",
@@ -831,21 +834,21 @@ local strings = {
     [BATTLESCROLLS_PIVOT_METRIC_APPLICATIONS] = "应用次数",
     [BATTLESCROLLS_PIVOT_METRIC_MAX_STACKS_TIME] = "最大层数时间 %",
     [BATTLESCROLLS_PIVOT_METRIC_GROUP_DPS] = "DPS",
-    [BATTLESCROLLS_PIVOT_METRIC_GROUP_BOSS_DPS] = "Boss DPS",
+    [BATTLESCROLLS_PIVOT_METRIC_GROUP_BOSS_DPS] = "首领 DPS",
     [BATTLESCROLLS_PIVOT_METRIC_GROUP_TOTAL_DAMAGE] = "总伤害",
     [BATTLESCROLLS_PIVOT_METRIC_GROUP_CRIT_PERCENT] = "暴击 %",
     [BATTLESCROLLS_PIVOT_METRIC_GROUP_DOT_PERCENT] = "DoT %",
     [BATTLESCROLLS_PIVOT_METRIC_GROUP_AOE_PERCENT] = "AoE %",
     [BATTLESCROLLS_PIVOT_METRIC_GROUP_MAX_HIT] = "最大命中",
     [BATTLESCROLLS_PIVOT_METRIC_GROUP_DTPS] = "DTPS",
-    [BATTLESCROLLS_PIVOT_METRIC_GROUP_RAW_HPS] = "原始HPS",
+    [BATTLESCROLLS_PIVOT_METRIC_GROUP_RAW_HPS] = "总HPS",
     [BATTLESCROLLS_PIVOT_METRIC_GROUP_EFFECTIVE_HPS] = "有效HPS",
     [BATTLESCROLLS_PIVOT_METRIC_EFFECTIVE_HPS_OUT] = "有效HPS (输出)",
-    [BATTLESCROLLS_PIVOT_METRIC_RAW_HPS_OUT] = "原始HPS (输出)",
+    [BATTLESCROLLS_PIVOT_METRIC_RAW_HPS_OUT] = "总HPS (输出)",
     [BATTLESCROLLS_PIVOT_METRIC_EFFECTIVE_HPS_IN] = "有效HPS (受到)",
-    [BATTLESCROLLS_PIVOT_METRIC_RAW_HPS_IN] = "原始HPS (受到)",
-    [BATTLESCROLLS_PIVOT_METRIC_BOSS_DPS] = "Boss DPS",
-    [BATTLESCROLLS_PIVOT_METRIC_BOSS_DAMAGE] = "Boss伤害",
+    [BATTLESCROLLS_PIVOT_METRIC_RAW_HPS_IN] = "总HPS (受到)",
+    [BATTLESCROLLS_PIVOT_METRIC_BOSS_DPS] = "首领 DPS",
+    [BATTLESCROLLS_PIVOT_METRIC_BOSS_DAMAGE] = "首领伤害",
     [BATTLESCROLLS_PIVOT_METRIC_DTPS] = "DTPS",
     [BATTLESCROLLS_PIVOT_METRIC_DAMAGE_TAKEN] = "受到伤害",
     [BATTLESCROLLS_PIVOT_METRIC_GROUP_ALIVE_PERCENT] = "存活 %",
@@ -874,12 +877,12 @@ local strings = {
     [BATTLESCROLLS_PIVOT_LOADING] = "正在加载战斗... <<1>> / <<2>>",
     [BATTLESCROLLS_PIVOT_NO_RESULTS] = "没有与查询匹配的数据",
     [BATTLESCROLLS_PIVOT_NO_ENCOUNTERS] = "没有符合筛选条件的战斗",
-    [BATTLESCROLLS_PIVOT_NO_BOSSES] = "没有符合筛选条件的Boss战斗",
+    [BATTLESCROLLS_PIVOT_NO_BOSSES] = "没有符合筛选条件的首领战斗",
     [BATTLESCROLLS_PIVOT_ENCOUNTERS_PROCESSED] = "已处理 <<1>>场战斗",
     [BATTLESCROLLS_PIVOT_ROWS_CAPPED] = "结果已限制为 <<1>> 行",
     [BATTLESCROLLS_PIVOT_COLUMNS_CAPPED] = "结果已限制为 <<1>> 列",
     [BATTLESCROLLS_PIVOT_TIP_DOMAIN_OVERVIEW] = "所有伤害、治疗和效果域的汇总概览。显示合计总数而非单独明细。",
-    [BATTLESCROLLS_PIVOT_TIP_ENC_BOSS_NAMES] = "筛选包含所选Boss的战斗。在下一步中选择Boss名称。",
+    [BATTLESCROLLS_PIVOT_TIP_ENC_BOSS_NAMES] = "筛选包含所选首领的战斗。在下一步中选择首领名称。",
     [BATTLESCROLLS_PIVOT_TIP_DIM_DELIVERY] = "按施加方式分割数据：直接、DoT（持续伤害）、治疗吸收、HoT（持续治疗）、恢复、护盾或混合。",
     [BATTLESCROLLS_PIVOT_TIP_DIM_DAMAGE_TYPE] = "按伤害类型分割数据：物理、火焰、闪电、冰霜、魔法、毒素、疾病、流血、湮灭等。",
     [BATTLESCROLLS_PIVOT_TIP_DOMAIN_GROUP] = "每位成员的战斗数据（DPS、总伤害、暴击率等）。如需查看组队成员的增益/减益持续时间，请使用团队效果。",
@@ -899,7 +902,7 @@ local strings = {
     [BATTLESCROLLS_PIVOT_SELECT_ZONES] = "选择区域",
     [BATTLESCROLLS_PIVOT_SELECT_INSTANCES] = "选择副本",
     [BATTLESCROLLS_PIVOT_SELECT_ENCOUNTERS] = "选择战斗",
-    [BATTLESCROLLS_PIVOT_SELECT_BOSSES] = "选择Boss名称",
+    [BATTLESCROLLS_PIVOT_SELECT_BOSSES] = "选择首领名称",
     [BATTLESCROLLS_PIVOT_SELECT_METRICS] = "选择指标",
     [BATTLESCROLLS_PIVOT_SELECTED_COUNT] = "已选择<<1>>项",
     [BATTLESCROLLS_PIVOT_SELECT_ALL] = "全选",
@@ -907,7 +910,7 @@ local strings = {
     [BATTLESCROLLS_PIVOT_NONE_SELECTED] = "未选择",
 
     -- Filter/range
-    [BATTLESCROLLS_PIVOT_ENC_BOSS_NAMES] = "按Boss名称",
+    [BATTLESCROLLS_PIVOT_ENC_BOSS_NAMES] = "按首领名称",
     [BATTLESCROLLS_PIVOT_CUSTOM_DAYS] = "最近<<1>>天",
     [BATTLESCROLLS_PIVOT_CUSTOM_DAYS_PROMPT] = "回溯天数",
     [BATTLESCROLLS_PIVOT_CUSTOM_RANGE_TITLE] = "自定义时间范围",
@@ -924,3 +927,466 @@ for stringId, stringValue in pairs(strings) do
 end
 
 BATTLESCROLLS_KEYBIND_ICON_SCALE = 109  -- CJK: 180 * 17/28
+
+-- v17 storage migration
+local migrationStrings = {
+    [BATTLESCROLLS_MIGRATION_START] = "正在进行一次性存储升级 - 接下来几分钟可能出现短暂卡顿",
+    [BATTLESCROLLS_MIGRATION_DONE] = "存储升级完成！已重新编码 <<1>> 场战斗，释放了 <<2>> MB",
+    [BATTLESCROLLS_MIGRATION_TIP] = "现在可以在设置中调低内存预设——新格式下每 MB 能保存更多战斗记录。",
+}
+for stringId, stringValue in pairs(migrationStrings) do
+    SafeAddString(stringId, stringValue, 1)
+end
+
+-- Online sharing
+local shareStrings = {
+    [BATTLESCROLLS_SHARE_FIGHT] = "分享战斗",
+    [BATTLESCROLLS_SHARE_INSTANCE] = "上传全部战斗",
+    [BATTLESCROLLS_SHARE_PREPARING] = "正在准备分享...",
+    [BATTLESCROLLS_SHARE_TITLE] = "分享",
+    [BATTLESCROLLS_SHARE_PROGRESS_HEADER] = "部分",
+    [BATTLESCROLLS_SHARE_PART_SENT] = "第<<1>>部分 — 已发送",
+    [BATTLESCROLLS_SHARE_PART_READY] = "第<<1>>部分 — 待发送",
+    [BATTLESCROLLS_SHARE_PART_PENDING] = "第<<1>>部分",
+    [BATTLESCROLLS_SHARE_SEND_PART] = "发送第<<1>>/<<2>>部分",
+    [BATTLESCROLLS_SHARE_HINT_HEADER] = "使用说明",
+    [BATTLESCROLLS_SHARE_PRIVACY_TITLE] = "玩家名称和战斗数据将保存到线上",
+    [BATTLESCROLLS_SHARE_PRIVACY_NOTICE] = "上传内容包括你和其他玩家的名称、平台、游戏服务器、战斗统计和配装。报告不会自动到期，任何获得链接的人都可查看或下载。分享前请告知相关玩家。隐私与删除请求：<<1>>",
+    [BATTLESCROLLS_SHARE_TT_READY] = "请确认游戏弹出的提示——打开的浏览器页面会把这部分战斗数据转发到分享网站，随后即可关闭浏览器。返回游戏并发送下一部分；即使离开此界面，进度也会保留。所有部分送达后，页面会显示不公开的分享链接和二维码。",
+    [BATTLESCROLLS_SHARE_TT_SENT] = "这一部分已交给浏览器。如果浏览器页面提示它缺失（崩溃的标签页会丢失其部分），请选中此行并按重新发送键。",
+    [BATTLESCROLLS_SHARE_TT_PENDING] = "各部分按顺序逐一发送——轮到这一部分时即可发送。",
+    [BATTLESCROLLS_SHARE_TT_DONE] = "浏览器页面现在显示不公开的分享链接和二维码——只有拥有链接的人才能打开。如果页面提示缺少部分，请在上方选中并重新发送。“完成发送”会丢弃游戏侧的此次上传。",
+    [BATTLESCROLLS_SHARE_CHOICE_HEADER] = "选择发送内容",
+    [BATTLESCROLLS_SHARE_CHOICE_FULL] = "全部战斗（<<1>>）",
+    [BATTLESCROLLS_SHARE_CHOICE_BOSSES] = "仅首领（<<1>>）",
+    [BATTLESCROLLS_SHARE_CHOICE_PARTS] = "需发送部分数：<<1>>",
+    [BATTLESCROLLS_SHARE_TT_CHOICE_FULL] = "本副本记录的全部战斗，包括小怪。数据越多，需要通过浏览器发送的部分就越多。",
+    [BATTLESCROLLS_SHARE_TT_CHOICE_BOSSES] = "仅首领战。小怪战斗通常占据大部分体积，因此需要发送的部分会少得多。",
+    [BATTLESCROLLS_SHARE_DONE_HEADER] = "所有部分已发送",
+    [BATTLESCROLLS_SHARE_DONE_HINT] = "链接和二维码在浏览器页面上。",
+    [BATTLESCROLLS_SHARE_CONTINUE] = "继续分享",
+    [BATTLESCROLLS_SHARE_CANCEL] = "取消分享",
+    [BATTLESCROLLS_SHARE_FAILED] = "无法准备分享。",
+    [BATTLESCROLLS_SHARE_RESEND_PART] = "重新发送第 <<1>> 部分",
+    [BATTLESCROLLS_SHARE_PART_RESENDING] = "第 <<1>> 部分 — 重新发送中…",
+    [BATTLESCROLLS_SHARE_FINISH] = "完成分享",
+}
+for id, str in pairs(shareStrings) do
+    SafeAddString(id, str, 1)
+end
+
+-- 新功能：重命名、团队伤害、复活、进度条颜色、终极技、命定楔石、祖恩
+local featureStrings = {
+    [BATTLESCROLLS_RENAME] = "重命名",
+    [BATTLESCROLLS_RENAME_TEXT] = "输入新名称。输入原名称（<<1>>）即可重置。",
+
+    [BATTLESCROLLS_TAB_GROUP_DAMAGE] = "团队伤害",
+    [BATTLESCROLLS_FILTER_GROUP_DAMAGE] = "筛选团队伤害",
+    [BATTLESCROLLS_FILTER_OTHERS] = "其他人",
+    [BATTLESCROLLS_TOOLTIP_GROUP_DAMAGE_SCOPE] = "游戏客户端记录到的全部伤害，包括你自己（以及宠物和同伴）的伤害和附近其他玩家的伤害。ESO 不提供其他玩家的具体身份，因此他们的伤害统一归入“其他人”。",
+
+    [BATTLESCROLLS_GROUP_COL_RES] = "复活",
+
+    [BATTLESCROLLS_SETTINGS_BAR_COLOR] = "你的进度条颜色",
+    [BATTLESCROLLS_SETTINGS_BAR_COLOR_TEXT] = "使用 Battle Scrolls 「进度条」样式的队友会以此颜色看到你的进度条，即使你使用其他样式或关闭了自己的团队计量器也会生效。",
+    [BATTLESCROLLS_COLOR_DEFAULT] = "默认",
+    [BATTLESCROLLS_COLOR_WHEEL] = "色相与饱和度",
+    [BATTLESCROLLS_COLOR_BRIGHTNESS] = "亮度",
+    [BATTLESCROLLS_COLOR_HEX] = "十六进制色值",
+    [BATTLESCROLLS_COLOR_HEX_INVALID] = "请输入六位十六进制数，例如 #3EB6FF。",
+    [BATTLESCROLLS_COLOR_SAVE] = "保存",
+    [BATTLESCROLLS_COLOR_SAVE_HINT] = "无论你使用哪种样式，所有使用 Battle Scrolls 「进度条」样式的队友都会以此颜色看到你的进度条。",
+
+    [BATTLESCROLLS_HEADER_ULTIMATE] = "终极技能",
+    [BATTLESCROLLS_STAT_ULT_AT_ENTRY] = "进入战斗时的终极值",
+    [BATTLESCROLLS_STAT_ULT_GENERATED] = "获得的终极值",
+    [BATTLESCROLLS_STAT_ULT_SPENT_DRAINED] = "消耗与流失的终极值",
+    [BATTLESCROLLS_STAT_ULT_SPENT] = "消耗的终极值",
+    [BATTLESCROLLS_STAT_ULT_LOST] = "施放时浪费",
+    [BATTLESCROLLS_STAT_ULT_LOST_TT] = "施放终极技能会清空整条终极值，因此超出其消耗的部分全部损失。",
+    [BATTLESCROLLS_STAT_ULT_DRAINED] = "流失的终极值",
+    [BATTLESCROLLS_HEADER_ULT_SOURCES] = "终极值来源",
+    [BATTLESCROLLS_ULT_BASE_GENERATION] = "基础获取",
+    [BATTLESCROLLS_ULT_HEROISM_LINE] = "包含<<C:1>>：覆盖率<<2>>%，约<<3>>",
+    [BATTLESCROLLS_HEADER_ULT_CASTS] = "已使用的终极技能",
+
+    [BATTLESCROLLS_HEADER_CRUX] = "魔核",
+    [BATTLESCROLLS_STAT_CRUX_GENERATORS] = "生成技能施放次数",
+    [BATTLESCROLLS_STAT_CRUX_AT_FULL] = "魔核已满时施放",
+    [BATTLESCROLLS_STAT_CRUX_SPENDERS] = "消耗技能施放次数",
+    [BATTLESCROLLS_STAT_CRUX_UNDER] = "不足3层魔核时施放",
+    [BATTLESCROLLS_CRUX_AT_N] = "<<1>>层魔核时：<<2>>",
+    [BATTLESCROLLS_HEADER_CRUX_BY_ABILITY] = "各技能的魔核使用情况",
+
+    [BATTLESCROLLS_HEADER_ZEN] = "持续伤害叠加（祖恩）",
+    [BATTLESCROLLS_ZEN_AVG_DOTS] = "平均DoT数",
+    [BATTLESCROLLS_ZEN_UPTIME] = "你的祖恩覆盖率",
+    [BATTLESCROLLS_ZEN_PEAK_TIME] = "<<1>>的时间",
+    [BATTLESCROLLS_ZEN_DOTS_LABEL] = "<<1>>个DoT",
+    [BATTLESCROLLS_ZEN_SHARE_LINE] = "平均<<1>> — 5个DoT时<<2>>",
+    [BATTLESCROLLS_ZEN_SHORT] = "祖恩",
+    [BATTLESCROLLS_ZEN_NOTE] = "即使未穿戴祖恩套装，也会记录你的DoT。这些数据展示了你的祖恩减益生效时能够提供的加成。没有你的祖恩时，记录的时间仅用于评估潜力。",
+    [BATTLESCROLLS_ZEN_DISTRIBUTION_NOTE] = "每一行DoT都显示该数量持续时间占记录时间的比例。祖恩百分比表示该行时间内，你自己的减益生效的时间比例。",
+
+    [BATTLESCROLLS_HEADER_SUPPORT] = "辅助",
+    [BATTLESCROLLS_STAT_RESURRECTIONS] = "复活次数",
+}
+for id, str in pairs(featureStrings) do
+    SafeAddString(id, str, 1)
+end
+
+local cruxPassiveStrings = {
+    [BATTLESCROLLS_STAT_CRUX_PASSIVE] = "非施放损失",
+    [BATTLESCROLLS_STAT_CRUX_PASSIVE_TT] = "在附近既没有消耗技能施放、也没有死亡的情况下自行消失的魔核。魔核会在30秒后过期。",
+    [BATTLESCROLLS_STAT_CRUX_DEATH] = "死亡损失",
+    [BATTLESCROLLS_STAT_CRUX_PROC_WASTED] = "魔核已满时的被动获取",
+    [BATTLESCROLLS_STAT_CRUX_PROC_WASTED_TT] = "在你已经有3层魔核时触发的被动获取，因此毫无收益。「<<1>>」及其变体和<<2>>只在你没有魔核时才给予魔核，所以从不计入此处。",
+    [BATTLESCROLLS_STAT_CRUX_CONDITIONAL_TT] = "该来源在没有施放的情况下被动生成的魔核。",
+    [BATTLESCROLLS_STAT_CRUX_OTHER] = "其他魔核增长",
+    [BATTLESCROLLS_STAT_CRUX_OTHER_TT] = "获得时没有任何已追踪来源触发的魔核。",
+    [BATTLESCROLLS_HEADER_CRUX_GAINED] = "按技能的魔核获取",
+}
+for id, str in pairs(cruxPassiveStrings) do
+    SafeAddString(id, str, 1)
+end
+
+local activityOverviewStrings = {
+    [BATTLESCROLLS_STAT_DOWNTIME] = "空档时间",
+    [BATTLESCROLLS_TOOLTIP_DOWNTIME_DESC] = "两次施放之间3秒及以上的空档，例如处理机制、复活或死亡。不计入施法延迟。",
+    [BATTLESCROLLS_STAT_PER_MINUTE] = "<<1>>/分",
+    [BATTLESCROLLS_DETAIL_MEDIAN] = "中位数 <<1>>",
+    [BATTLESCROLLS_DETAIL_DELAY] = "延迟 <<1>>",
+    [BATTLESCROLLS_DETAIL_AT_FULL] = "<<1>> 已满时",
+    [BATTLESCROLLS_DETAIL_LOST] = "损失 <<1>>",
+    [BATTLESCROLLS_DETAIL_AVG_DOTS] = "平均<<1>>DoT",
+    [BATTLESCROLLS_DETAIL_AT_DOTS] = "<<2>>时<<1>>",
+}
+for id, str in pairs(activityOverviewStrings) do
+    SafeAddString(id, str, 1)
+end
+
+-- Release history
+SafeAddString(BATTLESCROLLS_WHATS_NEW, "更新内容", 1)
+SafeAddString(BATTLESCROLLS_WHATS_NEW_DESC, "查看 Battle Scrolls 的更新历史，从最新版本一直到首次公开发布。", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_6_0_0, [=[
+|cD4AF37新功能：|r
+
+- |cD4AF37你的卷轴现在可以离开泰姆瑞尔了！|r从日志分享一场战斗或整次副本，在浏览器中打开。扫描电视上的二维码，在手机上打开链接。然后就可以自己查看战斗详情，或分享到任何你想分享的地方
+
+- 查看与插件相同的战斗和|cFFFFFF方案|r数据，也可以导出 |cFFFFFFCSV 和 JSON|r，进行自己的分析
+
+- |cFFFFFF活动页|r新增|cFFFFFF终极值|r获取与消耗、奥术师魔核使用、“祖恩之触”所需的持续伤害效果数量和复活记录。即使未穿戴祖恩套装，也能通过DoT数量评估可提供的祖恩加成。卡轻击统计将短暂施法延迟与较长的空档时间分开
+
+- 你的死亡回顾现在会显示|cFFFFFF攻击者姓名|r（如果能获取到）
+
+- |cFFFFFF团队伤害|r显示客户端观察到的所有伤害，包括未安装 Battle Scrolls 的玩家。ESO 不提供其他伤害的具体来源，因此统一归入“|cFFFFFF其他人|r”
+
+- 可以为自己的|cFFFFFF进度条|r选择颜色，队友的“|cFFFFFF进度条|r”面板也会使用这个颜色；也可以重命名历史中的副本和战斗
+
+- 日志新增“|cFFFFFF更新内容|r”，所有历史版本都有日期和七种语言的说明。以防你错过了几卷
+
+|cD4AF37主要改动：|r
+
+- 重做战斗历史存储，相同空间可容纳|cFFFFFF更多战斗|r。新格式还应能|cFFFFFF减少大型战斗后的卡顿|r，并|cFFFFFF大幅加快|r在日志中打开战斗记录的速度。登录后会在后台|cFFFFFF自动转换|r旧记录；这项一次性处理可能造成短暂卡顿。替换前会逐场与原始记录核对
+
+|cD4AF37问题修复：|r
+
+- 玩家死亡后，团队仍在战斗却提前结束战斗记录的情况应该会|cFFFFFF大幅减少|r，尤其是在卢晶堡垒的最后一场战斗中
+
+- 修复|cFFFFFF治疗计算|r忽略部分筛选、其他团队成员的|cFFFFFF方案|r缺少毒药，以及团队共享和历史清理中的其他问题
+
+- 团队战斗摘要和|cFFFFFF方案|r的共享|cFFFFFF更加可靠|r，减少了穿过门或经过加载画面后数据缺失的情况
+
+|cE6B566已知问题：|r
+
+- 存储升级释放的空间可能要在重新加载界面后，才会反映到 ESO 的插件|cFFFFFF内存|r指示器中
+
+- 随着|cFFFFFF更新51对炼金术的调整|r，方案中的毒药效果名称可能缺失或显示错误。网页版不显示制作的毒药的效果
+
+- 网页分享功能尚未在 |cFFFFFFPlayStation|r 上测试。如果遇到任何问题，包括完全无法使用，请向我们反馈]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_5_3_1, [=[|cD4AF37问题修复：|r
+
+- |cFFFFFF团队页|r中其他玩家|cFFFFFF方案|r的职业精通和技能线现在能正确显示]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_5_3_0, [=[|cD4AF37新功能：|r
+
+- 支持|cFFFFFF职业精通|r被动；学习至少一个后，用它们替代技能线列表
+
+- 支持“|cFFFFFF复仇|r”模式：|cFFFFFF方案|r概览显示所选配装和辅助能力，并隐藏在此模式下不适用的信息
+
+|cD4AF37小改动：|r
+
+- 英文将普通怪群从 trash 改称 basepop，与开发者用语一致]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_5_2_0, [=[|cD4AF37新功能：|r
+
+- |cFFFFFF生命恢复|r计入治疗，作为独立类型。总治疗根据战斗中的|cFFFFFF生命恢复|r属性估算，有效与过量部分根据实际生命变化估算
+
+- 玩家受到的|cFFFFFF治疗吸收|r作为独立的承受伤害类型记录
+
+- 被|cFFFFFF护盾|r吸收的造成和承受伤害计入总量及 DPS/DTPS，但不计入技能或类型细分
+
+- 被吸收的治疗也会计入对外治疗、自我治疗和受到治疗的总量及 HPS
+
+|cD4AF37小改动：|r
+
+- 详情列表固定最多显示 50 个技能和 20 个目标/来源，不再按情境采用原来的 25/15/10 限制
+
+|cD4AF37问题修复：|r
+
+- 对外治疗按治疗方式聚合时也包含自我治疗，与其他聚合视图保持一致
+
+|cE6B566已知问题：|r
+
+- ESO 不提供|cFFFFFF生命恢复|r每次生效的准确时间，因此总治疗根据存活时间估算。如果恢复的同时生命值仍在下降，部分有效治疗可能无法被统计]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_5_1_0, [=[|cD4AF37新功能：|r
+
+- 施加给自己和队友的|cFFFFFF伤害护盾|r计为治疗。施加量为总治疗，实际吸收的伤害为有效治疗
+
+- |cFFFFFF护盾|r成为与直接和持续治疗并列的独立类型，出现在治疗页、|cFFFFFF概览|r和对外治疗聚合中
+
+|cE6B566已知问题：|r
+
+- 同一目标在 50 毫秒内获得多个|cFFFFFF护盾|r时，个别|cFFFFFF护盾|r跳数可能被归入错误技能
+
+|cD4AF37小改动：|r
+
+- 伤害、治疗、效果、触发、|cFFFFFF卡轻击|r和|cFFFFFF方案|r的说明显示实际 ESO 技能 ID
+
+- 修正部分技能使用错误或通用图标的问题，包括“实用命运雕刻者”“焕光荣耀”“异主链枷”、药水、“精华汲取”“无畏命令”、协同技“洁净”“鲜血盛宴”、“静水符文护卫”“洁净之光”“绵延颂歌”以及特质“和谐”
+
+- 个人面板的治疗条需要更高 HPS 才能填满
+
+- 治疗构成改称“按类型治疗”，并隐藏没有意义的单一类型细分
+
+|cD4AF37问题修复：|r
+
+- 减少|cFFFFFF卡轻击|r中漏轻击和双轻击的误判
+
+- 关闭效果追踪后，首领识别更可靠
+
+- 修复部分治疗说明中平均单跳低于最小单跳的问题]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_5_0_0, [=[|cD4AF37新功能：|r
+
+- 新增|cFFFFFF卡轻击|r追踪！统计施法间平均和总损失时间、漏掉的轻击与技能，提供整体和按技能细分
+
+- 新增“活动”页存放这些数据
+
+- 在聚合中选择“|cFFFFFF概览|r”数据域时，也能使用|cFFFFFF卡轻击|r数据
+
+|cD4AF37小改动：|r
+
+- 触发追踪从|cFFFFFF概览|r移到活动。你发现它一直都在那里了吗？
+
+- 改善战斗内外的|cFFFFFF内存|r和性能，尤其在部分或完全关闭效果追踪时
+
+|cD4AF37问题修复：|r
+
+- 关闭效果追踪的玩家在|cFFFFFF团队页|r显示实际存活时间比例，不再始终为 100%]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_4_0_0, [=[|cD4AF37新功能：|r
+
+- 想过“我的奇幻网游里应该有|cFFFFFF电子表格|r”吗？大概没有，不过现在有了。可以从任意数量的历史战斗中聚合想看的数据，还支持|cFFFFFF数据透视表|r
+
+|cD4AF37小改动：|r
+
+- 每场战斗显示游戏版本，例如 11.3.5
+
+- 打开 Battle Scrolls 时，其他玩家会看到你在读卷轴。不然还能是什么呢？
+
+- 战斗列表标题显示区域名称
+
+|cD4AF37问题修复：|r
+
+- 队友的棱彩消耗降低附魔现在能正确显示
+
+- |cFFFFFF团队页|r和|cFFFFFF方案|r页现在采用相同的方案布局]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_3_1_0, [=[|cD4AF37新功能：|r
+
+- |cFFFFFF效果页|r新增|cFFFFFF搜索|r，使用方式类似背包搜索
+
+|cD4AF37问题修复：|r
+
+- 查看其他团队成员的奥术师|cFFFFFF方案|r时，种族、职业和梦达思之石信息不再缺失
+
+- 再次减少团队菜单|cFFFFFF闪烁|r]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_3_0_2, "|cFFFFFF减少团队菜单闪烁|r", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_3_0_1, [=[|cD4AF37问题修复：|r
+
+- 存在空槽位时，队友的|cFFFFFF勇士点数|r不再显示在错误星座中。此为发送端修复，队友也需要更新
+
+- 从有|cFFFFFF方案|r数据的玩家切换到没有数据的玩家时，不再尝试显示不存在的|cFFFFFF方案|r信息]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_3_0_0, [=[|cD4AF37方案记录|r
+
+- 每场战斗都会保存|cFFFFFF方案|r，并在新的|cFFFFFF方案|r页显示，方便准确回顾当时用了什么
+
+- |cFFFFFF概览|r也显示|cFFFFFF方案|r的主要内容，让晒输出成绩更方便
+
+- |cFFFFFF角色菜单|r新增简洁的|cFFFFFF方案|r概览
+
+- |cFFFFFF团队页|r也会记录安装 Battle Scrolls 的其他团队成员的|cFFFFFF方案|r]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_2_1_2, "|cFFFFFF无可见改动，为版本 3 做准备|r", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_2_1_1, "|cFFFFFF调整范围和单体伤害计算以适应更新后的龙骑士。对旧战斗同样生效。|r", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_2_1_0, [=[- 新增|cFFFFFF子分类|r导航：相关视图归入同一页签，使用方向键或左摇杆左右切换
+  - 造成伤害和首领伤害合并到“伤害”页
+  - 对外治疗、自我治疗、受到治疗合并到“治疗”页
+  - 自身、首领和团队效果拆成独立|cFFFFFF子分类|r，不再挤在一个长列表里
+
+- 隐藏“Attempt to read past end of buffer”界面错误。战斗结束后经过加载界面时，团队数据仍可能不正确，但至少不会立刻弹出错误挡在脸上]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_2_0_1, [=[|cD4AF37团队日志|r
+
+为有 Battle Scrolls 队友参与的战斗新增|cFFFFFF团队页|r。
+
+|cD4AF37概览：|r
+
+- 可排序对比表：每个首领、DPS、暴击率、DTPS、HPS、存活比例和死亡数
+
+|cD4AF37个人详情：|r
+
+- 输出：DPS、总量、暴击、最大一击、直接伤害、范围伤害、伤害类型、DPS 排名和与输出职业平均值的比较
+
+- 生存：DTPS、存活时间、死亡数、主要承伤技能和死亡回顾
+
+- 治疗：总 HPS 与有效 HPS、过量治疗、自我治疗
+
+- 按首领显示伤害条、伤害构成和承受伤害
+
+|cD4AF37有数据时，现有说明也显示团队信息：|r
+
+- 首领目标显示各成员 DPS 和贡献比例；DPS 与首领 DPS 行显示成员细分
+
+- DTPS 和承伤来源显示成员 DTPS
+
+- 伤害构成与输出职业平均值比较
+
+- 对外与自我治疗的总 HPS 和过量治疗显示成员细分
+
+|cD4AF37死亡追踪：|r
+
+- 死亡回顾随战斗保存
+
+- |cFFFFFF概览|r的承伤部分显示死亡数
+
+- 承伤页显示死亡时间，说明中可看回顾
+
+- |cFFFFFF团队页|r显示每人首次与末次死亡及完整攻击详情
+
+|cD4AF37小改动：|r
+
+- |cFFFFFF概览|r显示直接伤害比例，不再显示持续伤害比例
+
+- 新增|cFFFFFF夜市|r专用设置：无论通常的区域筛选如何设置，都可以记录|cFFFFFF夜市|r中的全部战斗
+
+- DPS 面板放在战利品历史等其他界面元素后方
+
+- 所有页签默认选中|cFFFFFF概览|r。会多用一点|cFFFFFF内存|r，不过你也不需要空闲内存，对吧？
+
+- 玩家名不显示 @
+
+- Hodor 和“|cFFFFFF进度条|r” 面板标题显示战斗时长
+
+- 修改筛选和区域对话框音效
+
+|cD4AF37本地化：|r
+
+- 修复复数形式
+
+- 俄语和德语的叠层用语与套装说明统一]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_3_6, "|cFFFFFF修复未安装 LibGroupBroadcast 时登录出现的界面错误|r", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_3_5, "|cFFFFFF暂时将 LibGroupBroadcast 设为可选依赖，以应对主机插件的混乱|r", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_3_4, "|cFFFFFF无可见改动，为在日志查看队友 DPS 做准备|r", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_3_3, "|cFFFFFF无可见改动，为在日志查看队友 DPS 做准备|r", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_3_2, [=[|cD4AF37问题修复：|r
+
+- 未组队时不再尝试向团队发送 DPS 数据。由 DakJaniels 修复]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_3_1, [=[|cD4AF37问题修复：|r
+
+- 改善卢晶堡垒最后一战，以及因传送门等机制暂时远离首领时的首领识别
+
+- 卢晶堡垒最后一战、骨笼第一战等复杂战斗后，应该不会再出现“|cFFFFFF1000ms limit hit|r”错误]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_3_0, [=[|cD4AF37新功能：|r
+
+- 将效果标为|cFFFFFF收藏|r，可置顶于所有相关列表
+
+|cD4AF37问题修复：|r
+
+- 战斗中途加入的成员，其效果|cFFFFFF覆盖率|r只按实际在场时间计算
+
+- 修复部分团队面板在首次进入战斗时，短暂在左上角出现空白元素的问题
+
+|cD4AF37小改动：|r
+
+- 输出职业部分只有一个人时，也显示总 DPS 行]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_2_0, [=[|cD4AF37新功能：|r
+
+- 在区域列表按 |cFFFFFFX/方块|r即可锁定区域，防止超出存储上限时被自动清理。最新区域也始终受|cFFFFFF保护|r
+
+|cD4AF37本地化：|r
+
+- 统一德语和俄语的区域用语
+
+|cD4AF37问题修复：|r
+
+- 流畅预设不再卡在加载中，也不再阻止战斗进入日志。更新后原本使用此预设的玩家将恢复为默认性能模式]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_1_0, [=[|cD4AF37新功能：|r
+
+- 可以从历史中|cFFFFFF删除|r单个区域或战斗
+
+|cD4AF37问题修复：|r
+
+- 修复插件的流畅预设搭配游戏的“保真”画质模式时无限加载或 Battle Scrolls 不出现在菜单中的问题。已受影响的玩家更新后可能还需再执行一次 |cFFFFFF/reloadui|r
+
+- 使用筛选后，销毁物品等游戏对话框不再报错
+
+- 修复从 Battle Scrolls 返回日志时动画方向偶尔相反的问题]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_0_3, "|cFFFFFF尝试修复 PS5 存档损坏问题；由于无法在本地复现，暂时还不能确认效果|r", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_0_2, [=[|cD4AF37存储和效果追踪改进|r
+
+|cD4AF37存储：|r
+
+- 优化编码与解码，加快日志加载
+
+- 降低处理战斗时的|cFFFFFF内存|r使用
+
+|cD4AF37效果：|r
+
+- 修复成员在战斗中掉线时的效果|cFFFFFF覆盖率|r
+
+- 改善对成员中途重新连接的处理]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_0_1, "|cFFFFFF修复一个问题|r", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_0_0, [=[|cD4AF37首次公开发布|r
+
+|cD4AF37DPS 面板：|r
+
+- 实时战斗伤害显示
+
+- 个人样式：默认、精简、|cFFFFFF进度条|r
+
+- 团队样式：文字、Hodor 风格、|cFFFFFF进度条|r
+
+- 可调整位置、缩放和战斗后保留时间
+
+|cD4AF37战斗日志：|r
+
+- 区域 -> 战斗 -> 指标三级导航
+
+- 按区域类型和战斗类型筛选
+
+- 可配置存储上限
+
+|cD4AF37伤害：|r
+
+- 按目标和技能细分
+
+- 直接伤害、持续伤害和暴击
+
+- 单体与范围伤害
+
+|cD4AF37治疗：|r
+
+- 按来源和目标查看造成与受到治疗
+
+|cD4AF37效果：|r
+
+- 玩家和团队的增益/减益|cFFFFFF覆盖率|r、首领减益和触发追踪
+
+通过 |cFFFFFFLibGroupBroadcast|r 共享团队 DPS
+
+|cD4AF37支持语言：|r英语、德语、法语、西班牙语、俄语、日语、中文]=], 1)

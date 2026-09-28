@@ -38,8 +38,6 @@ end
 ---@field HEALTH_RECOVERY_ICON string Synthetic health recovery icon
 ---@field VENGEANCE_LOADOUTS_BY_SKILL_LINE_ID table<number, VengeanceLoadoutDef> Vengeance loadout metadata keyed by skill line id
 ---@field VENGEANCE_PERK_SLOTS number[] Positional perk slot order: red, yellow, blue
-
----@type BattleScrollsConstants
 local constants = {}
 
 BattleScrolls.constants = constants
@@ -547,18 +545,18 @@ constants.aoeAbilityIds = {
 
     -- CATEGORY: Skill>Scribing>Signature
     [217689] = true, -- Hunter's Focus (Trample) | Last Checked: U47
-    [217500] = true, -- Sorcerer's Class Mastery (Traveling Knife) | Last Checked: U47
-    [220135] = true, -- Sorcerer's Class Mastery (Vault) | Last Checked: U47
-    [220509] = true, -- Sorcerer's Class Mastery (Wield Soul) | Last Checked: U47
-    [220620] = true, -- Sorcerer's Class Mastery (Soul Burst) | Last Checked: U47
-    [220831] = true, -- Sorcerer's Class Mastery (Shield Throw) | Last Checked: U47
-    [221132] = true, -- Sorcerer's Class Mastery (Mender's Bond) | Last Checked: U47
-    [221166] = true, -- Sorcerer's Class Mastery (Ulfsild's Contingency) | Last Checked: U47
-    [221289] = true, -- Sorcerer's Class Mastery (Elemental Explosion) | Last Checked: U47
-    [221374] = true, -- Sorcerer's Class Mastery (Trample) | Last Checked: U47
-    [221573] = true, -- Sorcerer's Class Mastery (Torch) | Last Checked: U47
-    [221644] = true, -- Sorcerer's Class Mastery (Smash) | Last Checked: U47
-    [227096] = true, -- Sorcerer's Class Mastery (Banner) | Last Checked: U47
+    [217500] = true, -- Sorcerer's Class Flourish (Traveling Knife) | Last Checked: U47
+    [220135] = true, -- Sorcerer's Class Flourish (Vault) | Last Checked: U47
+    [220509] = true, -- Sorcerer's Class Flourish (Wield Soul) | Last Checked: U47
+    [220620] = true, -- Sorcerer's Class Flourish (Soul Burst) | Last Checked: U47
+    [220831] = true, -- Sorcerer's Class Flourish (Shield Throw) | Last Checked: U47
+    [221132] = true, -- Sorcerer's Class Flourish (Mender's Bond) | Last Checked: U47
+    [221166] = true, -- Sorcerer's Class Flourish (Ulfsild's Contingency) | Last Checked: U47
+    [221289] = true, -- Sorcerer's Class Flourish (Elemental Explosion) | Last Checked: U47
+    [221374] = true, -- Sorcerer's Class Flourish (Trample) | Last Checked: U47
+    [221573] = true, -- Sorcerer's Class Flourish (Torch) | Last Checked: U47
+    [221644] = true, -- Sorcerer's Class Flourish (Smash) | Last Checked: U47
+    [227096] = true, -- Sorcerer's Class Flourish (Banner) | Last Checked: U47
 
     -- CATEGORY: Skill>Weapon>Bow
     [38724] = true, -- Acid Spray (Initial Hit Only) | Last Checked: U47

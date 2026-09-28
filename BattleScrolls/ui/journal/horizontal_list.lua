@@ -1,3 +1,4 @@
+---@diagnostic disable: undefined-field, inject-field -- the ESO Control/ZO_* API stubs are too incomplete for field checking in UI code
 if not SemisPlaygroundCheckAccess() then
     return
 end
@@ -63,6 +64,17 @@ local function HorizontalListSetup(control, data, selected, _reselectingDuringRe
         end
     end)
 
+    -- The stock template creates the list without an equalityFunction, so
+    -- Commit() falls back to identity comparison against entry tables that
+    -- are rebuilt every render: it would land on index 0 and the follow-up
+    -- SetSelectedDataIndex would then fire setFunction for any setting whose
+    -- current value is not the first option (re-applying values - and e.g.
+    -- making LibAsync print - on every settings open). Match by value and
+    -- prime oldSelectedData so Commit re-selects with reselecting=true.
+    hList.equalityFunction = function(a, b)
+        return a.value == b.value
+    end
+    hList.oldSelectedData = currentValue ~= nil and { value = currentValue } or nil
     hList:Commit()
     local ALLOW_EVEN_IF_DISABLED = true
     local NO_ANIMATION = true

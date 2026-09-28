@@ -3,9 +3,13 @@
 -- Post-combat encounter data sharing via LibGroupBroadcast
 --
 -- Defines the protocol format for sharing combat stats with
--- group members after each fight. Uses LGB protocol 437
--- with a required setupHash. The one-bit reserved field before
--- setupHash preserves the old optional-field wire layout.
+-- group members after each fight. Protocol 437 (V2) is the live
+-- format and cannot change; protocol 439 (V3) adds the
+-- resurrection count and the zen metrics (avg DoT stacks, time
+-- at 5 stacks). Queue two identical V3 copies for reliability;
+-- keep V2 receive-only during the v5 to v6 rollout.
+-- The one-bit reserved field before setupHash preserves the old
+-- optional-field wire layout on 437.
 -----------------------------------------------------------
 
 if not SemisPlaygroundCheckAccess() then
@@ -15,7 +19,7 @@ end
 BattleScrolls = BattleScrolls or {}
 
 ---@class EncounterShare
----@field protocol Protocol|nil LibGroupBroadcast encounter share protocol instance (437)
+---@field protocol Protocol|nil Outbound encounter protocol (439, V3)
 local encounterShare = {}
 BattleScrolls.encounterShare = encounterShare
 
@@ -162,7 +166,23 @@ local function onReceive(unitTag, data)
         topDamageTakenAbilities = data.topDamageTakenAbilities or {},
         deaths = deaths,
         setupHash = data.setupHash,
+        resurrections = data.resurrections, -- V3 (439) only; nil from V2 senders
     }
+
+    -- V3 (439) only: per-boss zen metrics (empty array on the wire = none)
+    if data.zen and #data.zen > 0 then
+        ---@type SharedZenBoss[]
+        local zenByBoss = {}
+        for i, entry in ipairs(data.zen) do
+            zenByBoss[i] = {
+                bossTag = numToBossTag(entry.bossTag),
+                tagSeq = entry.tagSeq,
+                avgStacksTenths = entry.avgStacksTenths,
+                timeAt5Ms = entry.timeAt5Ms,
+            }
+        end
+        sharedData.zenByBoss = zenByBoss
+    end
 
     notifyAllCallbacks(unitTag, sharedData)
 end
@@ -174,7 +194,7 @@ end
 ---Send pre-built SharedEncounterData via LGB
 ---@param sharedData SharedEncounterData The encounter data to send
 ---@param timestampS number The encounter timestamp (for wire format)
----@param setupHash number 16-bit setup hash (protocol 437)
+---@param setupHash number 16-bit setup hash
 function encounterShare:send(sharedData, timestampS, setupHash)
     if not encounterShare.protocol then
         return
@@ -218,6 +238,19 @@ function encounterShare:send(sharedData, timestampS, setupHash)
         }
     end
 
+    -- Per-boss zen metrics: string tags → 0-indexed numbers (V3 only)
+    local wireZen = {}
+    if sharedData.zenByBoss then
+        for i, entry in ipairs(sharedData.zenByBoss) do
+            wireZen[i] = {
+                bossTag = bossTagToNum(entry.bossTag),
+                tagSeq = entry.tagSeq,
+                avgStacksTenths = entry.avgStacksTenths,
+                timeAt5Ms = entry.timeAt5Ms,
+            }
+        end
+    end
+
     local payload = {
         timestampLow17 = timestampLow17,
         durationMs = sharedData.durationMs,
@@ -235,13 +268,17 @@ function encounterShare:send(sharedData, timestampS, setupHash)
         topDamageTakenAbilities = sharedData.topDamageTakenAbilities,
         deaths = wireDeaths,
         setupHash = setupHash,
+        -- V3-only fields
+        resurrections = sharedData.resurrections and sharedData.resurrections > 0
+            and sharedData.resurrections or nil,
+        zen = wireZen,
     }
 
     -- Store setupHash on sharedData for local callbacks
     sharedData.setupHash = setupHash
 
     if IsUnitGrouped("player") then
-        encounterShare.protocol:Send(payload)
+        BattleScrolls.sendLargeGroupMessage(encounterShare.protocol, payload)
     end
     notifyAllCallbacks("player", sharedData)
     -- BattleScrolls.log.Debug("EncounterShare: sent encounter data")
@@ -363,8 +400,32 @@ function encounterShare:Initialize()
     protocol:AddField(LGB.CreateReservedField("reservedSetupHashIsNil", 1))
     protocol:AddField(LGB.CreateNumericField("setupHash", { minValue = 0, numBits = 16, trimValues = true }))
     protocol:OnData(onReceive)
-    protocol:Finalize({ isRelevantInCombat = false, replaceQueuedMessages = false })
-    encounterShare.protocol = protocol
+    if not protocol:Finalize({ isRelevantInCombat = false, replaceQueuedMessages = false }) then
+        BattleScrolls.log.Warn("EncounterShare: V2 reader 437 failed to finalize")
+    end
+
+    -- V3 (439): V2 layout + resurrections and Z'en. A new ID is necessary:
+    -- LGB rejects missing/trailing fields, so appending to 437 is not safe.
+    local protocolV3 = handler:DeclareProtocol(439, "BattleScrolls_EncounterShareV3")
+    addEncounterFields(protocolV3, LGB)
+    protocolV3:AddField(LGB.CreateReservedField("reservedSetupHashIsNil", 1))
+    protocolV3:AddField(LGB.CreateNumericField("setupHash", { minValue = 0, numBits = 16, trimValues = true }))
+    protocolV3:AddField(LGB.CreateOptionalField(LGB.CreateNumericField("resurrections", { minValue = 0, numBits = 5, trimValues = true })))
+    protocolV3:AddField(LGB.CreateArrayField(
+        LGB.CreateTableField("zen", {
+            LGB.CreateNumericField("bossTag", { minValue = 0, numBits = 4, trimValues = true }),
+            LGB.CreateNumericField("tagSeq", { minValue = 0, numBits = 3, trimValues = true }),
+            LGB.CreateNumericField("avgStacksTenths", { minValue = 0, maxValue = 50, numBits = 6, trimValues = true }),
+            LGB.CreateNumericField("timeAt5Ms", { minValue = 0, numBits = 24, trimValues = true }),
+        }),
+        { maxLength = 12 }
+    ))
+    protocolV3:OnData(onReceive)
+    if not protocolV3:Finalize({ isRelevantInCombat = false, replaceQueuedMessages = false }) then
+        BattleScrolls.log.Warn("EncounterShare: V3 protocol 439 failed to finalize")
+    else
+        encounterShare.protocol = protocolV3
+    end
 
     -- BattleScrolls.log.Info("EncounterShare: initialized")
 end

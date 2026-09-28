@@ -1,3 +1,4 @@
+---@diagnostic disable: undefined-field, inject-field -- the ESO Control/ZO_* API stubs are too incomplete for field checking in UI code
 -----------------------------------------------------------
 -- Entry Builder
 -- Unified Q1 parametric list entry construction.
@@ -26,8 +27,15 @@ local journal = BattleScrolls.journal
 ---@class DetailRow
 ---@field icon string Pre-resolved texture path
 ---@field label string Display text
+---@field sublabel string|nil Attacker name rendered above the ability
 ---@field value string|nil Right-aligned value text
 ---@field isHighlighted boolean|nil Killing blow skull indicator
+
+---@class DetailRowsTooltip
+---@field type "detailRows"
+---@field title string
+---@field subtitle string|nil
+---@field rows DetailRow[]
 
 ---@class TooltipAbility
 ---@field abilityId number ESO ability ID (populateAbilityRow resolves icon/name/frame)
@@ -51,13 +59,13 @@ local journal = BattleScrolls.journal
 ---| { type: "item", itemLink: string }
 ---| { type: "panel", panelSpec: PanelSpec }
 ---| { type: "groupTable" }
----| { type: "detailRows", title: string, subtitle: string|nil, rows: DetailRow[] }
+---| DetailRowsTooltip
 ---| { type: "abilityList", title: string, abilities: TooltipAbility[] }
 ---| { type: "iconList", title: string, groups: IconGroup[]|nil, rows: IconRow[]|nil }
 ---| { type: "vengeancePerk", perkDefId: number, slotFlag: number }
 
 ---@class PanelSpec
----@field layout string|nil Layout mode: "three-column" (default), "two-column", "wide-right", "wide-left"
+---@field layout string|nil Layout mode: "three-column" (default), "three-equal", "two-column", "wide-right", "wide-left", "reading"
 ---@field build fun(q2: ColumnBuilder, q3: ColumnBuilder, q4: ColumnBuilder)
 
 local EntryBuilder = {}

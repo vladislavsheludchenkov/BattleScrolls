@@ -1,3 +1,4 @@
+---@diagnostic disable: undefined-field, inject-field -- the ESO Control/ZO_* API stubs are too incomplete for field checking in UI code
 -----------------------------------------------------------
 -- Group Renderer
 -- Renders the Group tab showing shared encounter data from
@@ -157,6 +158,8 @@ local function resolveBossName(bossSeqNames, bossTag, tagSeq)
     return zo_strformat(SI_UNIT_NAME, bossTag)
 end
 
+-- FIXME: Move boss DPS and group-average calculations into Arithmancer; centralize
+-- the healer/tank eligibility rules also used by tooltips.buildGroupAvgTooltip.
 ---Computes group average DPS across the top damage dealers.
 ---Stops at the first healer (HPS > DPS) or tank (damage < 1/10th of top).
 ---Members MUST be sorted by DPS descending.
@@ -328,7 +331,22 @@ local function buildGroupPlayerPanel(q2, q3, q4, ctx, data, playerName, members)
         end
     end
 
-    col2:mount(journal.SECTION_GAP, 0, damageSection, vsAverageSection, survivabilitySection, healingSection)
+    -- Z'en / DoT stacking section: per-boss delivery metrics, present only
+    -- for bosses the sender's Z'en debuff actually touched (V3 senders)
+    local zenSection
+    if data.zenByBoss and #data.zenByBoss > 0 then
+        local zenRows = {}
+        for _, zb in ipairs(data.zenByBoss) do
+            local bossName = resolveBossName(bossSeqNames, zb.bossTag, zb.tagSeq)
+            table.insert(zenRows, col2:StatRow(bossName,
+                zo_strformat(GetString(BATTLESCROLLS_ZEN_SHARE_LINE),
+                    string.format("%.1f", zb.avgStacksTenths / 10),
+                    utils.formatDuration(zb.timeAt5Ms))))
+        end
+        zenSection = col2:Section(GetString(BATTLESCROLLS_HEADER_ZEN), unpack(zenRows))
+    end
+
+    col2:mount(journal.SECTION_GAP, 0, damageSection, vsAverageSection, survivabilitySection, healingSection, zenSection)
 
     LibEffect.Yield():Await()
 

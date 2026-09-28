@@ -1,0 +1,21 @@
+New features:
+- Your scrolls can leave Tamriel now! Share a fight or run from the Journal in a browser. Scan your TV's QR code to get the link on your phone, then explore or share it anywhere
+- Explore combat and build data as in the add-on, with CSV and JSON export
+- Activity tracks Ultimate generation and spending, Arcanist Crux usage, Z'en DoT stacking and resurrections. DoT counts show the potential Z'en bonus without wearing the set. Weaving separates short cast delays from downtime
+- Your death recaps now show attacker names when available
+- Group Damage shows all damage your client observed, including players without Battle Scrolls. ESO doesn't identify other sources, so they share one "Others" pool
+- Pick your bar color for everyone's Bars meter, and rename runs and fights
+- What's New in the Journal has dated release notes in all seven languages
+
+Major changes:
+- Reworked history fits more fights in the same space and should reduce stutters after big encounters, with much faster loading when opening fights in the Journal. History upgrades automatically in the background after login; this one-time process may briefly stutter. Each fight is checked against its original before replacement
+
+Bugfixes:
+- Fights should end early much less often when you die while your group keeps fighting, especially in Lucent Citadel's final encounter
+- Fixed healing filters, missing poisons in group builds, and group sharing and history cleanup edge cases
+- More reliable group summaries and builds after door transitions and loading screens
+
+Known issues:
+- ESO's Add-On Memory gauge may need a UI reload to reflect space freed by the storage upgrade
+- Update 51's alchemy changes may cause missing or incorrect poison effect names in builds. Crafted poison effects are not shown in the web viewer
+- Web sharing is untested on PlayStation. Please report any problems, including if it doesn't work at all

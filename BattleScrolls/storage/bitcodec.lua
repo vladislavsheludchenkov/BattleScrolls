@@ -116,6 +116,23 @@ function BitEncoder:writeBit(value)
     self:writeUInt(value and 1 or 0, 1)
 end
 
+---Writes an unsigned integer as a LEB128-style varint (7 bits per group +
+---continuation bit). Small values dominate combat data, so typical fields
+---cost 8-16 bits instead of their fixed worst-case width. Uses plain
+---arithmetic (not 32-bit bitops) so values are exact up to 2^53.
+---@param value number|nil Non-negative integer (nil treated as 0, floats floored)
+function BitEncoder:writeVarUInt(value)
+    value = math.floor(value or 0)
+    if value < 0 then
+        value = 0
+    end
+    while value >= 128 do
+        self:writeUInt(128 + value % 128, 8)
+        value = math.floor(value / 128)
+    end
+    self:writeUInt(value, 8)
+end
+
 ---Writes a length-prefixed string (8-bit length + raw bytes)
 ---Strings longer than 255 bytes are truncated.
 ---@param str string|nil String to write (nil treated as empty)
@@ -127,6 +144,14 @@ function BitEncoder:writeString(str)
     self:writeUInt(len, 8)
     for i = 1, len do
         self:writeUInt(string.byte(str, i), 8)
+    end
+end
+
+---Pads with zero bits to the next byte boundary. v17 sections are aligned so
+---that varint/string reads and writes stay on the byte fast path.
+function BitEncoder:alignToByte()
+    if self._currentBits > 0 then
+        self:writeUInt(0, 8 - self._currentBits)
     end
 end
 
@@ -271,6 +296,7 @@ end
 ---Ensures bytes array has at least `needed` bytes decoded
 ---@private
 ---@param needed number Byte count needed
+---@return boolean satisfied False when the source chunks ran out first
 function BitDecoder:_ensureBytes(needed)
     local bytes = self._bytes
     while #bytes < needed do
@@ -296,6 +322,7 @@ function BitDecoder:_ensureBytes(needed)
             bytes[#bytes + 1] = n % 256
         end
     end
+    return #bytes >= needed
 end
 
 ---Reads an unsigned integer
@@ -305,7 +332,13 @@ function BitDecoder:readUInt(bits)
     -- Ensure enough bytes for this read
     local totalBitsNeeded = self._bitOffset + bits
     local bytesNeeded = math.ceil(totalBitsNeeded / 8)
-    self:_ensureBytes(bytesNeeded)
+    if not self:_ensureBytes(bytesNeeded) then
+        -- Must be a hard error: ESO's native bit ops accept nil (as 0), so
+        -- reading past the end would otherwise silently fabricate unbounded
+        -- zero-filled data that round-trips verification (a misparsed legacy
+        -- stream once inflated 1.4KB encounters to 400KB this way)
+        error("BitDecoder: read past end of stream")
+    end
 
     local bytes = self._bytes
     local readPos = self._bitOffset  -- bit position within buffer
@@ -355,6 +388,29 @@ end
 ---@return boolean
 function BitDecoder:readBit()
     return self:readUInt(1) == 1
+end
+
+---Skips padding bits up to the next byte boundary (counterpart of
+---BitEncoder:alignToByte).
+function BitDecoder:alignToByte()
+    if self._bitOffset > 0 then
+        self:readUInt(8 - self._bitOffset)
+    end
+end
+
+---Reads a LEB128-style varint written by BitEncoder:writeVarUInt.
+---@return number
+function BitDecoder:readVarUInt()
+    local result = 0
+    local multiplier = 1
+    while true do
+        local group = self:readUInt(8)
+        if group < 128 then
+            return result + group * multiplier
+        end
+        result = result + (group - 128) * multiplier
+        multiplier = multiplier * 128
+    end
 end
 
 ---Reads a length-prefixed string (8-bit length + raw bytes)

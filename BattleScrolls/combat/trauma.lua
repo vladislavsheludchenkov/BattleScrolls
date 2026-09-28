@@ -114,6 +114,7 @@ local function prunePendingDeltas(nowMs)
     local writeIndex = 1
     for i = 1, #pendingDeltas do
         local entry = pendingDeltas[i]
+        ---@diagnostic disable-next-line: undefined-field -- LuaLS cannot see through the generic field constraint
         if entry and nowMs - entry.arrivedAtMs <= PENDING_EVENT_WINDOW_MS then
             pendingDeltas[writeIndex] = entry
             writeIndex = writeIndex + 1
@@ -178,6 +179,7 @@ local function prunePendingEvents(entries, nowMs)
     local writeIndex = 1
     for i = 1, #entries do
         local entry = entries[i]
+        ---@diagnostic disable-next-line: undefined-field -- LuaLS cannot see through the generic field constraint
         if entry and nowMs - entry.arrivedAtMs <= PENDING_EVENT_WINDOW_MS then
             entries[writeIndex] = entry
             writeIndex = writeIndex + 1

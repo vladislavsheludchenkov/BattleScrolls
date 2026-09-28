@@ -297,6 +297,24 @@ local function renderDpsMeterGroupSettings(list, settings, defaults, onRefresh, 
     }
     list:AddEntry("ZO_GamepadOptionsCheckboxRowWithHeader", groupEnabledData)
 
+    -- This preference controls how others see you, independently of your own meter.
+    local r, g, b = BattleScrolls.dpsMeterUtils.ColorFromName(BattleScrolls.utils.GetUndecoratedDisplayName())
+    -- Use a tintable texture: the gamepad font does not render the square glyph.
+    local swatch = ZO_ColorDef:New(r, g, b):Colorize(zo_iconFormatInheritColor("EsoUI/Art/Dye/Gamepad/dye_square.dds", 24, 24))
+    list:AddEntry("ZO_GamepadOptionsLabelRow", {
+        text = string.format("%s %s", GetString(BATTLESCROLLS_SETTINGS_BAR_COLOR), swatch),
+        sound = SOUNDS.NONE, -- The picker plays the native dialog opening sound.
+        tooltip = textTooltip(GetString(BATTLESCROLLS_SETTINGS_BAR_COLOR), GetString(BATTLESCROLLS_SETTINGS_BAR_COLOR_TEXT)),
+        onSelected = function()
+            -- A preview from a preceding design/size setting must not cover this control.
+            local meter = BattleScrolls.dpsMeter
+            if meter and meter.isPreviewActive then meter:EndPreview() end
+        end,
+        callback = function()
+            journal.colorPicker:show(onRefresh)
+        end,
+    })
+
     -- Only show group meter settings when enabled
     local groupEnabled = settings and settings.dpsMeterGroupEnabled ~= false
     if not groupEnabled then return end
@@ -695,7 +713,8 @@ local function renderStorageSettings(list, settings, defaults)
         table.insert(storageSizePresetLabels, GetString(_G[preset.labelStringId]))
     end
 
-    local bytes, _, _ = BattleScrolls.storage:EstimateHistorySize()
+    local estimate = BattleScrolls.storage:EstimateSavedSize()
+    local bytes = estimate.totalBytes
 
     local storageSizeData = {}
     storageSizeData.text = GetString(BATTLESCROLLS_SETTINGS_HISTORY_SIZE_LIMIT)
@@ -705,15 +724,21 @@ local function renderStorageSettings(list, settings, defaults)
     storageSizeData.refreshTooltipText = function()
         -- Calculate current usage for tooltip
         local currentPreset = BattleScrolls.storage:GetCurrentSizePreset()
-        local usagePercent = currentPreset.memoryMB > 0 and (bytes / currentPreset.memoryMB / 1000000 * 100) or 0
-        local memoryMB = bytes / 1000000  -- Approximate memory in MB
+        local MIB = BattleScrolls.sizeModel.MIB
+        local limitBytes = currentPreset.memoryMiB * MIB
+        local usagePercent = limitBytes > 0 and (bytes / limitBytes * 100) or 0
+        local memoryMiB = bytes / MIB
+        -- Locked fights plus the pools and settings can only be evicted around, not below
+        local protectedBytes = estimate.lockedBytes + estimate.setupBytes + estimate.otherBytes
+        local protectedNote = protectedBytes > limitBytes and GetString(BATTLESCROLLS_SETTINGS_STORAGE_TT_PROTECTED) or nil
 
         storageSizeData.tooltip.text = table.concat({
             GetString(BATTLESCROLLS_SETTINGS_STORAGE_TT_DESC),
             "",
             GetString(BATTLESCROLLS_SETTINGS_STORAGE_TT_NOTE),
             "",
-            zo_strformat(GetString(BATTLESCROLLS_SETTINGS_STORAGE_TT_CURRENT), string.format("%.1f", memoryMB), currentPreset.memoryMB, string.format("%.0f", usagePercent)),
+            zo_strformat(GetString(BATTLESCROLLS_SETTINGS_STORAGE_TT_CURRENT), string.format("%.1f", memoryMiB), currentPreset.memoryMiB, string.format("%.0f", usagePercent)),
+            protectedNote,
             "",
             GetString(BATTLESCROLLS_SETTINGS_STORAGE_TT_PRESETS),
             GetString(BATTLESCROLLS_SETTINGS_STORAGE_TT_XS),

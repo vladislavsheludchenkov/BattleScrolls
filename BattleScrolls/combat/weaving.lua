@@ -42,6 +42,8 @@ BattleScrolls = BattleScrolls or {}
 ---@field skillActivations number Total skill/ultimate activations
 ---@field totalWeavingErrors number Total skill->skill count (no LA in between)
 ---@field doubleLaErrors number Total la->la count (double light attack without a skill)
+---@field downtimeMs number Sum of gaps of DOWNTIME_GAP_MS or more (kept out of the per-ability delays)
+---@field downtimeGaps number Count of those gaps
 
 ---@class WeavingPendingGap
 ---@field prevSkillAbilityId number Skill before the closed gap
@@ -64,6 +66,9 @@ local LA_SLOT = 1
 local SKILL_SLOT_MIN = 3
 local SKILL_SLOT_MAX = 8
 local LA_CONFIRM_GRACE_MS = 500
+
+-- Gaps this long are mechanics, resurrecting or being dead, not weaving
+local DOWNTIME_GAP_MS = 3000
 
 -- Exhausting Fatecarver: channel time extends by 338ms per Crux stack consumed
 local CRUX_MS_PER_STACK = 338
@@ -116,6 +121,8 @@ function weaving.newState()
         skillActivations = 0,
         totalWeavingErrors = 0,
         doubleLaErrors = 0,
+        downtimeMs = 0,
+        downtimeGaps = 0,
     }
 end
 
@@ -143,6 +150,11 @@ end
 ---@param prevSkillEndTime number Estimated end time of the skill before the LA
 local function attributeWeavingTime(w, prevSkillAbilityId, thisSkillAbilityId, thisSkillTime, prevSkillEndTime)
     local weavingTime = zo_max(0, thisSkillTime - prevSkillEndTime)
+    if weavingTime >= DOWNTIME_GAP_MS then
+        w.downtimeMs = w.downtimeMs + weavingTime
+        w.downtimeGaps = w.downtimeGaps + 1
+        return
+    end
 
     -- "After" attribution: weave time after the previous skill
     if prevSkillAbilityId then

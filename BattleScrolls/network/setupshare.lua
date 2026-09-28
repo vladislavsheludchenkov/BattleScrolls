@@ -8,8 +8,8 @@
 -- with group members using a hash-based caching protocol.
 --
 -- Protocol 432: Setup Request (hash only)
--- Protocol 434: Setup Response V2 (legacy)
--- Protocol 436: Setup Response V3 (Class Mastery or Vengeance payload)
+-- Protocol 433: Setup Response V4 (wider ability IDs, 7-entry armor groups)
+-- Protocol 436: Setup Response V3 (receive-only for v5 clients)
 -----------------------------------------------------------
 
 if not SemisPlaygroundCheckAccess() then
@@ -26,8 +26,7 @@ local JEWELRY_SLOT_INDICES = setupAnalysis.JEWELRY_SLOT_INDICES
 
 ---@class SetupShare
 ---@field requestProtocol Protocol|nil Protocol 432
----@field responseProtocol Protocol|nil Protocol 434 legacy response
----@field responseProtocolV3 Protocol|nil Protocol 436 response with normal/Vengeance variants
+---@field responseProtocol Protocol|nil Protocol 433 response with normal/Vengeance variants
 local setupShare = {}
 BattleScrolls.setupShare = setupShare
 
@@ -38,10 +37,6 @@ BattleScrolls.setupShare = setupShare
 ---@type table<number, CompactSetup>
 local localSetupCache = {}
 local LOCAL_CACHE_MAX = 4
-
--- Selects the outbound setup response protocol. Protocol 436 stays registered
--- regardless so we can read data from newer clients.
-local SEND_SETUP_RESPONSE_V3 = type(IsClassMasterySkillLine) == "function"
 
 ---@type number[]
 local localCacheOrder = {} -- oldest first
@@ -54,6 +49,11 @@ local localCacheOrder = {} -- oldest first
 local lastResponseTime = {} -- hash → GetGameTimeMilliseconds
 
 local RESPONSE_THROTTLE_MS = 5000
+
+-- Request a fresh build after upgrading, even when equipment is unchanged.
+-- Older cached responses can lack poisons or contain clamped ability IDs.
+-- Existing history retains its original hashes and cached builds.
+local SETUP_HASH_SALT = 0x6000
 
 -- =============================================================================
 -- CONVERT TO COMPACT
@@ -391,7 +391,7 @@ function setupShare.computeHash(compact)
         for _, f in ipairs(compact.foodAbilityIds) do mix(f) end
         for _, m in ipairs(compact.mundusAbilityIds) do mix(m) end
 
-        if SEND_SETUP_RESPONSE_V3 and compact.classMasteryAbilityIds ~= nil and #compact.classMasteryAbilityIds > 0 then
+        if compact.classMasteryAbilityIds ~= nil and #compact.classMasteryAbilityIds > 0 then
             for _, abilityId in ipairs(compact.classMasteryAbilityIds) do mix(abilityId) end
         else
             for _, sl in ipairs(compact.classSkillLineIds) do mix(sl) end
@@ -408,7 +408,7 @@ function setupShare.computeHash(compact)
         if compact.backPoisonItemId then mix(compact.backPoisonItemId) end
     end
 
-    return h
+    return BitXor(h, SETUP_HASH_SALT)
 end
 
 -- =============================================================================
@@ -439,7 +439,7 @@ end
 -- PERSISTENT SHARED SETUP STORE
 -- =============================================================================
 
----@type table<string, table<number, CompactSetup>>|nil
+---@type table<string, table<number, StoredSharedSetup>>|nil
 local sharedSetups = nil
 
 ---Checks if a setup is already stored for a player.
@@ -459,7 +459,16 @@ end
 function setupShare:getSetup(displayName, hash)
     if not sharedSetups then return nil end
     local playerSetups = sharedSetups[displayName]
-    return playerSetups and playerSetups[hash] or nil
+    local stored = playerSetups and playerSetups[hash]
+    if not stored then return nil end
+    if rawget(stored, "c") then
+        ---@cast stored EncodedSharedSetup
+        return BattleScrolls.binaryStorage.decodeSharedSetup(stored)
+    end
+    -- Still readable while the delayed startup migration is pending, or
+    -- when its round-trip verification kept a legacy entry untouched.
+    ---@cast stored CompactSetup
+    return stored
 end
 
 ---Stores a setup for a player.
@@ -471,14 +480,14 @@ function setupShare:storeSetup(displayName, hash, compact)
     if not sharedSetups[displayName] then
         sharedSetups[displayName] = {}
     end
-    sharedSetups[displayName][hash] = compact
+    sharedSetups[displayName][hash] = BattleScrolls.binaryStorage.encodeSharedSetup(compact)
 end
 
 -- =============================================================================
 -- ENCOUNTER HASH HANDLER
 -- =============================================================================
 
----Called when an encounter share (protocol 437) provides a setupHash.
+---Called when an encounter share provides a setupHash.
 ---Requests the full setup if not already cached.
 ---@param displayName string Sender's display name
 ---@param hash number 16-bit setup hash
@@ -553,11 +562,45 @@ local function buildWireScribedAbilities(entries)
     return wire
 end
 
----Builds the normal build payload body for protocol 434 or protocol 436's normal variant.
+local CLASS_SKILL_LINE_PAYLOAD_KEY = "classSkillLinePayload"
+local CLASS_MASTERY_PAYLOAD_KEY = "classMasteryPayload"
+local FRONT_POISON_EFFECT_PAYLOAD_KEY = "frontPoisonEffectPayload"
+local FRONT_POISON_ITEM_PAYLOAD_KEY = "frontPoisonItemPayload"
+local BACK_POISON_EFFECT_PAYLOAD_KEY = "backPoisonEffectPayload"
+local BACK_POISON_ITEM_PAYLOAD_KEY = "backPoisonItemPayload"
+
+---Adds class skill line or Class Mastery data to a normal setup wire payload.
+---@param payload table
 ---@param compact CompactSetup
----@param includeClassMastery boolean
+local function addClassPayload(payload, compact)
+    if compact.classMasteryAbilityIds ~= nil and #compact.classMasteryAbilityIds > 0 then
+        payload[CLASS_MASTERY_PAYLOAD_KEY] = { classMasteryAbilityIds = compact.classMasteryAbilityIds }
+    else
+        payload[CLASS_SKILL_LINE_PAYLOAD_KEY] = { classSkillLineIds = compact.classSkillLineIds }
+    end
+end
+
+---Adds poison data to a normal setup wire payload.
+---@param payload table
+---@param compact CompactSetup
+local function addPoisonPayload(payload, compact)
+    if compact.frontPoisonEffect then
+        payload[FRONT_POISON_EFFECT_PAYLOAD_KEY] = { frontPoisonEffect = compact.frontPoisonEffect }
+    elseif compact.frontPoisonItemId then
+        payload[FRONT_POISON_ITEM_PAYLOAD_KEY] = { frontPoisonItemId = compact.frontPoisonItemId }
+    end
+
+    if compact.backPoisonEffect then
+        payload[BACK_POISON_EFFECT_PAYLOAD_KEY] = { backPoisonEffect = compact.backPoisonEffect }
+    elseif compact.backPoisonItemId then
+        payload[BACK_POISON_ITEM_PAYLOAD_KEY] = { backPoisonItemId = compact.backPoisonItemId }
+    end
+end
+
+---Builds the normal build payload body for the setup response normal variant.
+---@param compact CompactSetup
 ---@return table
-local function buildNormalWirePayload(compact, includeClassMastery)
+local function buildNormalWirePayload(compact)
     local payload = {
         frontAbilities = compact.frontAbilities,
         backAbilities = compact.backAbilities,
@@ -586,17 +629,10 @@ local function buildNormalWirePayload(compact, includeClassMastery)
         foodAbilityIds = compact.foodAbilityIds,
         mundusAbilityIds = compact.mundusAbilityIds,
         scribedAbility = buildWireScribedAbilities(compact.scribedAbilities),
-        frontPoisonEffect = compact.frontPoisonEffect,
-        frontPoisonItemId = compact.frontPoisonItemId,
-        backPoisonEffect = compact.backPoisonEffect,
-        backPoisonItemId = compact.backPoisonItemId,
     }
 
-    if includeClassMastery and compact.classMasteryAbilityIds ~= nil and #compact.classMasteryAbilityIds > 0 then
-        payload.classMasteryAbilityIds = compact.classMasteryAbilityIds
-    else
-        payload.classSkillLineIds = compact.classSkillLineIds
-    end
+    addClassPayload(payload, compact)
+    addPoisonPayload(payload, compact)
 
     return payload
 end
@@ -642,39 +678,21 @@ local function onSetupRequest(unitTag, data)
         return
     end
 
-    local sent = false
-    if SEND_SETUP_RESPONSE_V3 then
-        if not setupShare.responseProtocolV3 then return end
-        local payload = {
-            setupHash = hash,
-            classId = compact.classId,
-            raceId = compact.raceId,
-        }
-        if compact.isVengeance then
-            payload.vengeanceSetup = buildVengeanceWirePayload(compact)
-        else
-            payload.normalSetup = buildNormalWirePayload(compact, true)
-        end
-        setupShare.responseProtocolV3:Send(payload)
-        sent = true
+    if not setupShare.responseProtocol then return end
+    local payload = {
+        setupHash = hash,
+        classId = compact.classId,
+        raceId = compact.raceId,
+    }
+    if compact.isVengeance then
+        payload.vengeanceSetup = buildVengeanceWirePayload(compact)
     else
-        if compact.isVengeance then
-            -- Protocol 434 is already live and has no Vengeance variant.
-            return
-        end
-        if not setupShare.responseProtocol then return end
-        local payload = buildNormalWirePayload(compact, false)
-        payload.setupHash = hash
-        payload.classId = compact.classId
-        payload.raceId = compact.raceId
-        setupShare.responseProtocol:Send(payload)
-        sent = true
+        payload.normalSetup = buildNormalWirePayload(compact)
     end
-
-    if sent then
+    if BattleScrolls.sendLargeGroupMessage(setupShare.responseProtocol, payload) then
         lastResponseTime[hash] = now
-        -- log.Debug(function() return string.format("SetupShare: sent setup response for hash %d", hash) end)
     end
+    -- log.Debug(function() return string.format("SetupShare: sent setup response for hash %d", hash) end)
 end
 
 ---Decodes set entries from LGB wire data.
@@ -736,8 +754,11 @@ local function decodeWireScribedAbilities(entries)
     return scribedAbilities
 end
 
-local CLASS_PAYLOAD_VARIANT_KEY = "variants(classSkillLineIds, classMasteryAbilityIds)"
+local CLASS_RAW_PAYLOAD_VARIANT_KEY = "variants(classSkillLineIds, classMasteryAbilityIds)"
+local CLASS_WRAPPED_PAYLOAD_VARIANT_KEY = "variants(classSkillLinePayload, classMasteryPayload)"
 local CLASS_SKILL_LINE_ID_WIRE_MAX = 1023
+local FRONT_POISON_WRAPPED_VARIANT_KEY = "variants(frontPoisonEffectPayload, frontPoisonItemPayload)"
+local BACK_POISON_WRAPPED_VARIANT_KEY = "variants(backPoisonEffectPayload, backPoisonItemPayload)"
 
 ---Decodes class skill lines or Class Mastery abilities from a normal setup body.
 ---LibGroupBroadcast's VariantField preserves variant labels at the top level,
@@ -751,7 +772,14 @@ local function decodeClassPayload(data)
         return data.classSkillLineIds or { 0, 0, 0 }, data.classMasteryAbilityIds
     end
 
-    local nestedVariant = data[CLASS_PAYLOAD_VARIANT_KEY]
+    local wrappedVariant = data[CLASS_WRAPPED_PAYLOAD_VARIANT_KEY]
+    if type(wrappedVariant) == "table" then
+        if wrappedVariant.classSkillLineIds or wrappedVariant.classMasteryAbilityIds then
+            return wrappedVariant.classSkillLineIds or { 0, 0, 0 }, wrappedVariant.classMasteryAbilityIds
+        end
+    end
+
+    local nestedVariant = data[CLASS_RAW_PAYLOAD_VARIANT_KEY]
     if type(nestedVariant) ~= "table" then
         return { 0, 0, 0 }, nil
     end
@@ -765,12 +793,44 @@ local function decodeClassPayload(data)
     return nestedVariant, nil
 end
 
----Reconstructs a normal CompactSetup from flat legacy fields or protocol 436 normal body fields.
+---Decodes poison values from direct fields or nested V3 normal setup variants.
+---@param data table
+---@return number|nil frontPoisonEffect
+---@return number|nil frontPoisonItemId
+---@return number|nil backPoisonEffect
+---@return number|nil backPoisonItemId
+local function decodePoisonPayload(data)
+    local frontPoisonEffect = data.frontPoisonEffect
+    local frontPoisonItemId = data.frontPoisonItemId
+    local backPoisonEffect = data.backPoisonEffect
+    local backPoisonItemId = data.backPoisonItemId
+
+    if not frontPoisonEffect and not frontPoisonItemId then
+        local value = data[FRONT_POISON_WRAPPED_VARIANT_KEY]
+        if type(value) == "table" then
+            frontPoisonEffect = value.frontPoisonEffect
+            frontPoisonItemId = value.frontPoisonItemId
+        end
+    end
+
+    if not backPoisonEffect and not backPoisonItemId then
+        local value = data[BACK_POISON_WRAPPED_VARIANT_KEY]
+        if type(value) == "table" then
+            backPoisonEffect = value.backPoisonEffect
+            backPoisonItemId = value.backPoisonItemId
+        end
+    end
+
+    return frontPoisonEffect, frontPoisonItemId, backPoisonEffect, backPoisonItemId
+end
+
+---Reconstructs a normal CompactSetup from a setup response's normal body fields.
 ---@param common table
 ---@param data table
 ---@return CompactSetup
 local function decodeNormalCompact(common, data)
     local classSkillLineIds, classMasteryAbilityIds = decodeClassPayload(data)
+    local frontPoisonEffect, frontPoisonItemId, backPoisonEffect, backPoisonItemId = decodePoisonPayload(data)
 
     return {
         classId = common.classId,
@@ -808,10 +868,10 @@ local function decodeNormalCompact(common, data)
         classSkillLineIds = classSkillLineIds,
         classMasteryAbilityIds = classMasteryAbilityIds,
         scribedAbilities = decodeWireScribedAbilities(data.scribedAbility),
-        frontPoisonEffect = data.frontPoisonEffect,
-        frontPoisonItemId = data.frontPoisonItemId,
-        backPoisonEffect = data.backPoisonEffect,
-        backPoisonItemId = data.backPoisonItemId,
+        frontPoisonEffect = frontPoisonEffect,
+        frontPoisonItemId = frontPoisonItemId,
+        backPoisonEffect = backPoisonEffect,
+        backPoisonItemId = backPoisonItemId,
     }
 end
 
@@ -866,19 +926,10 @@ local function storeDecodedSetup(unitTag, hash, compact)
     -- log.Debug(function() return string.format("SetupShare: received and stored setup from %s hash %d", displayName, hash) end)
 end
 
----Handles incoming legacy normal setup response (protocol 434).
+---Handles incoming setup response with normal/Vengeance variants (protocols 436 and 433).
 ---@param unitTag string
 ---@param data table
-local function onLegacySetupResponse(unitTag, data)
-    local hash = data.setupHash
-    if not hash then return end
-    storeDecodedSetup(unitTag, hash, decodeNormalCompact(data, data))
-end
-
----Handles incoming setup response with normal/Vengeance variants (protocol 436).
----@param unitTag string
----@param data table
-local function onSetupResponseV3(unitTag, data)
+local function onSetupResponse(unitTag, data)
     local hash = data.setupHash
     if not hash then return end
 
@@ -898,37 +949,41 @@ end
 -- PROTOCOL FIELD DECLARATIONS
 -- =============================================================================
 
----Declares an optional ability bar array field (6 x 18-bit abilityId)
+---@class SetupWireFieldOptions
+---@field abilityIdBits number Bits per ability ID field
+---@field armorGroupMaxLength number Max entries in armor trait/enchant group arrays
+
+---@type SetupWireFieldOptions
+local V3_FIELD_OPTIONS = { abilityIdBits = 18, armorGroupMaxLength = 4 }
+
+-- V4 widens ability IDs (U51 IDs already exceed 2^18) and lets armor trait/enchant
+-- groups cover all 7 armor slots (the array length prefix is 3 bits either way).
+---@type SetupWireFieldOptions
+local V4_FIELD_OPTIONS = { abilityIdBits = 19, armorGroupMaxLength = 7 }
+
+---Declares an optional ability bar array field (6 x abilityId)
 ---@param LGB table LibGroupBroadcast reference
 ---@param name string Unique field name (e.g. "frontAbilities")
+---@param abilityIdBits number Bits per ability ID
 ---@return table field
-local function createAbilityBarField(LGB, name)
+local function createAbilityBarField(LGB, name, abilityIdBits)
     return LGB.CreateOptionalField(
         LGB.CreateArrayField(
-            LGB.CreateNumericField(name, { minValue = 0, numBits = 18, trimValues = true }),
+            LGB.CreateNumericField(name, { minValue = 0, numBits = abilityIdBits, trimValues = true }),
             { maxLength = 6 }
         )
     )
 end
 
----Appends field declarations to a protocol.
----@param protocol Protocol
----@param fields table[]
-local function addFieldsToProtocol(protocol, fields)
-    for _, field in ipairs(fields) do
-        protocol:AddField(field)
-    end
-end
-
 ---Creates LGB fields for the normal build payload body.
 ---@param LGB table LibGroupBroadcast reference
----@param includeClassMasteryAbilities boolean
+---@param opts SetupWireFieldOptions
 ---@return table[] fields
-local function createNormalSetupFields(LGB, includeClassMasteryAbilities)
+local function createNormalSetupFields(LGB, opts)
     local fields = {
-        createAbilityBarField(LGB, "frontAbilities"),
-        createAbilityBarField(LGB, "backAbilities"),
-        createAbilityBarField(LGB, "werewolfAbilities"),
+        createAbilityBarField(LGB, "frontAbilities", opts.abilityIdBits),
+        createAbilityBarField(LGB, "backAbilities", opts.abilityIdBits),
+        createAbilityBarField(LGB, "werewolfAbilities", opts.abilityIdBits),
         LGB.CreateArrayField(
             LGB.CreateTableField("set", {
                 LGB.CreateNumericField("setId", { minValue = 0, numBits = 10, trimValues = true }),
@@ -949,14 +1004,14 @@ local function createNormalSetupFields(LGB, includeClassMasteryAbilities)
                 LGB.CreateNumericField("traitType", { minValue = 0, numBits = 6, trimValues = true }),
                 LGB.CreateNumericField("count", { minValue = 0, numBits = 3, trimValues = true }),
             }),
-            { maxLength = 4 }
+            { maxLength = opts.armorGroupMaxLength }
         ),
         LGB.CreateArrayField(
             LGB.CreateTableField("armorEnchant", {
                 LGB.CreateNumericField("enchantId", { minValue = 0, numBits = 9, trimValues = true }),
                 LGB.CreateNumericField("count", { minValue = 0, numBits = 3, trimValues = true }),
             }),
-            { maxLength = 4 }
+            { maxLength = opts.armorGroupMaxLength }
         ),
         LGB.CreateArrayField(
             LGB.CreateTableField("jewelryTrait", {
@@ -985,36 +1040,33 @@ local function createNormalSetupFields(LGB, includeClassMasteryAbilities)
             { maxLength = 12 }
         ),
         LGB.CreateArrayField(
-            LGB.CreateNumericField("foodAbilityIds", { minValue = 0, numBits = 18, trimValues = true }),
+            LGB.CreateNumericField("foodAbilityIds", { minValue = 0, numBits = opts.abilityIdBits, trimValues = true }),
             { maxLength = 3 }
         ),
         LGB.CreateArrayField(
-            LGB.CreateNumericField("mundusAbilityIds", { minValue = 0, numBits = 18, trimValues = true }),
+            LGB.CreateNumericField("mundusAbilityIds", { minValue = 0, numBits = opts.abilityIdBits, trimValues = true }),
             { maxLength = 2 }
         ),
     }
 
-    if includeClassMasteryAbilities then
-        fields[#fields + 1] = LGB.CreateVariantField({
+    fields[#fields + 1] = LGB.CreateVariantField({
+        LGB.CreateTableField(CLASS_SKILL_LINE_PAYLOAD_KEY, {
             LGB.CreateArrayField(
                 LGB.CreateNumericField("classSkillLineIds", { minValue = 0, numBits = 10, trimValues = true }),
                 { maxLength = 3 }
             ),
+        }),
+        LGB.CreateTableField(CLASS_MASTERY_PAYLOAD_KEY, {
             LGB.CreateArrayField(
                 LGB.CreateNumericField("classMasteryAbilityIds", { minValue = 0, numBits = 20, trimValues = true }),
                 { maxLength = 5 }
             ),
-        })
-    else
-        fields[#fields + 1] = LGB.CreateArrayField(
-            LGB.CreateNumericField("classSkillLineIds", { minValue = 0, numBits = 10, trimValues = true }),
-            { maxLength = 3 }
-        )
-    end
+        }),
+    })
 
     fields[#fields + 1] = LGB.CreateArrayField(
         LGB.CreateTableField("scribedAbility", {
-            LGB.CreateNumericField("abilityId", { minValue = 0, numBits = 18, trimValues = true }),
+            LGB.CreateNumericField("abilityId", { minValue = 0, numBits = opts.abilityIdBits, trimValues = true }),
             LGB.CreateNumericField("scriptId1", { minValue = 0, numBits = 8, trimValues = true }),
             LGB.CreateNumericField("scriptId2", { minValue = 0, numBits = 8, trimValues = true }),
             LGB.CreateNumericField("scriptId3", { minValue = 0, numBits = 8, trimValues = true }),
@@ -1023,14 +1075,22 @@ local function createNormalSetupFields(LGB, includeClassMasteryAbilities)
     )
     fields[#fields + 1] = LGB.CreateOptionalField(
         LGB.CreateVariantField({
-            LGB.CreateNumericField("frontPoisonEffect", { minValue = 0, numBits = 24, trimValues = true }),
-            LGB.CreateNumericField("frontPoisonItemId", { minValue = 0, numBits = 18, trimValues = true }),
+            LGB.CreateTableField(FRONT_POISON_EFFECT_PAYLOAD_KEY, {
+                LGB.CreateNumericField("frontPoisonEffect", { minValue = 0, numBits = 24, trimValues = true }),
+            }),
+            LGB.CreateTableField(FRONT_POISON_ITEM_PAYLOAD_KEY, {
+                LGB.CreateNumericField("frontPoisonItemId", { minValue = 0, numBits = 18, trimValues = true }),
+            }),
         })
     )
     fields[#fields + 1] = LGB.CreateOptionalField(
         LGB.CreateVariantField({
-            LGB.CreateNumericField("backPoisonEffect", { minValue = 0, numBits = 24, trimValues = true }),
-            LGB.CreateNumericField("backPoisonItemId", { minValue = 0, numBits = 18, trimValues = true }),
+            LGB.CreateTableField(BACK_POISON_EFFECT_PAYLOAD_KEY, {
+                LGB.CreateNumericField("backPoisonEffect", { minValue = 0, numBits = 24, trimValues = true }),
+            }),
+            LGB.CreateTableField(BACK_POISON_ITEM_PAYLOAD_KEY, {
+                LGB.CreateNumericField("backPoisonItemId", { minValue = 0, numBits = 18, trimValues = true }),
+            }),
         })
     )
 
@@ -1039,12 +1099,13 @@ end
 
 ---Creates LGB fields for the Vengeance payload body.
 ---@param LGB table LibGroupBroadcast reference
+---@param opts SetupWireFieldOptions
 ---@return table[] fields
-local function createVengeanceSetupFields(LGB)
+local function createVengeanceSetupFields(LGB, opts)
     return {
-        createAbilityBarField(LGB, "frontAbilities"),
-        createAbilityBarField(LGB, "backAbilities"),
-        createAbilityBarField(LGB, "werewolfAbilities"),
+        createAbilityBarField(LGB, "frontAbilities", opts.abilityIdBits),
+        createAbilityBarField(LGB, "backAbilities", opts.abilityIdBits),
+        createAbilityBarField(LGB, "werewolfAbilities", opts.abilityIdBits),
         LGB.CreateNumericField("frontMHWeaponType", { minValue = 0, numBits = 5, trimValues = true }),
         LGB.CreateNumericField("frontOHWeaponType", { minValue = 0, numBits = 5, trimValues = true }),
         LGB.CreateNumericField("backMHWeaponType", { minValue = 0, numBits = 5, trimValues = true }),
@@ -1056,7 +1117,7 @@ local function createVengeanceSetupFields(LGB)
         ),
         LGB.CreateArrayField(
             LGB.CreateTableField("scribedAbility", {
-                LGB.CreateNumericField("abilityId", { minValue = 0, numBits = 18, trimValues = true }),
+                LGB.CreateNumericField("abilityId", { minValue = 0, numBits = opts.abilityIdBits, trimValues = true }),
                 LGB.CreateNumericField("scriptId1", { minValue = 0, numBits = 8, trimValues = true }),
                 LGB.CreateNumericField("scriptId2", { minValue = 0, numBits = 8, trimValues = true }),
                 LGB.CreateNumericField("scriptId3", { minValue = 0, numBits = 8, trimValues = true }),
@@ -1069,6 +1130,32 @@ end
 -- =============================================================================
 -- INITIALIZE
 -- =============================================================================
+
+---Declares a setup response protocol (hash/class/race envelope + normal/Vengeance
+---variant). V3 and V4 share this shape — onSetupResponse decodes both — and differ
+---only in field widths, so both must go through this function.
+---@param handler table LGB handler
+---@param LGB table LibGroupBroadcast reference
+---@param id number Protocol ID
+---@param name string Protocol name
+---@param opts SetupWireFieldOptions
+---@return Protocol|nil protocol Finalized protocol, or nil on failure
+local function declareResponseProtocol(handler, LGB, id, name, opts)
+    local protocol = handler:DeclareProtocol(id, name)
+    protocol:AddField(LGB.CreateNumericField("setupHash", { minValue = 0, numBits = 16, trimValues = true }))
+    protocol:AddField(LGB.CreateNumericField("classId", { minValue = 0, numBits = 8, trimValues = true }))
+    protocol:AddField(LGB.CreateNumericField("raceId", { minValue = 0, numBits = 8, trimValues = true }))
+    protocol:AddField(LGB.CreateVariantField({
+        LGB.CreateTableField("normalSetup", createNormalSetupFields(LGB, opts)),
+        LGB.CreateTableField("vengeanceSetup", createVengeanceSetupFields(LGB, opts)),
+    }))
+    protocol:OnData(onSetupResponse)
+    if not protocol:Finalize({ isRelevantInCombat = false, replaceQueuedMessages = false }) then
+        log.Warn("SetupShare: response protocol " .. id .. " failed to finalize")
+        return nil
+    end
+    return protocol
+end
 
 ---Initialize setup sharing protocols with LibGroupBroadcast
 function setupShare:Initialize()
@@ -1095,32 +1182,9 @@ function setupShare:Initialize()
     end
     self.requestProtocol = requestProtocol
 
-    -- Protocol 434: Setup Response V2 (live legacy, normal builds only)
-    local responseProtocol = handler:DeclareProtocol(434, "BattleScrolls_SetupResponseV2")
-    responseProtocol:AddField(LGB.CreateNumericField("setupHash", { minValue = 0, numBits = 16, trimValues = true }))
-    responseProtocol:AddField(LGB.CreateNumericField("classId", { minValue = 0, numBits = 8, trimValues = true }))
-    responseProtocol:AddField(LGB.CreateNumericField("raceId", { minValue = 0, numBits = 8, trimValues = true }))
-    addFieldsToProtocol(responseProtocol, createNormalSetupFields(LGB, false))
-    responseProtocol:OnData(onLegacySetupResponse)
-    if not responseProtocol:Finalize({ isRelevantInCombat = false, replaceQueuedMessages = false }) then
-        log.Warn("SetupShare: response protocol 434 failed to finalize")
-        return
-    end
-    self.responseProtocol = responseProtocol
+    -- Protocol 436: receive builds from clients still on v5. Keep its widths.
+    declareResponseProtocol(handler, LGB, 436, "BattleScrolls_SetupResponseV3", V3_FIELD_OPTIONS)
 
-    -- Protocol 436: Setup Response V3 (unreleased Class Mastery/Vengeance patch)
-    local responseProtocolV3 = handler:DeclareProtocol(436, "BattleScrolls_SetupResponseV3")
-    responseProtocolV3:AddField(LGB.CreateNumericField("setupHash", { minValue = 0, numBits = 16, trimValues = true }))
-    responseProtocolV3:AddField(LGB.CreateNumericField("classId", { minValue = 0, numBits = 8, trimValues = true }))
-    responseProtocolV3:AddField(LGB.CreateNumericField("raceId", { minValue = 0, numBits = 8, trimValues = true }))
-    responseProtocolV3:AddField(LGB.CreateVariantField({
-        LGB.CreateTableField("normalSetup", createNormalSetupFields(LGB, true)),
-        LGB.CreateTableField("vengeanceSetup", createVengeanceSetupFields(LGB)),
-    }))
-    responseProtocolV3:OnData(onSetupResponseV3)
-    if not responseProtocolV3:Finalize({ isRelevantInCombat = false, replaceQueuedMessages = false }) then
-        log.Warn("SetupShare: response protocol 436 failed to finalize")
-        return
-    end
-    self.responseProtocolV3 = responseProtocolV3
+    -- Protocol 433: both copies use the complete format, never a lossy V3 copy.
+    self.responseProtocol = declareResponseProtocol(handler, LGB, 433, "BattleScrolls_SetupResponseV4", V4_FIELD_OPTIONS)
 end

@@ -144,13 +144,10 @@ local function computeEncounterDisplayName(encounter, unitNames)
 end
 
 ---@class Scribe
----@field pushedToStorage boolean Whether the data has been pushed to storage
 ---@field instance InstanceStorage The current instance data (always compressed format)
 ---@field decodedAbilityInfo table<number, AbilityInfo> Decoded cache for active instance
-
----@type Scribe
+---@field registry EncounterRegistry|nil Live ability/name registry for the active instance (v17+)
 local scribe = {
-    pushedToStorage = false,
     instance = {
         zone = "",
         isOverland = true,
@@ -237,9 +234,37 @@ local function upsertSharedDataEntry(entries, entry)
         entries[existingIndex] = entry
         return false
     end
-
     table.insert(entries, entry)
     return true
+end
+
+---Insert or replace a shared entry on a stored compact encounter. v17+
+---encounters keep entries binary in _shared (matched on the plain d/t/u
+---keys); older stored encounters keep plain sharedData.
+---@param encounter CompactEncounter
+---@param entry SharedDataEntry
+---@return boolean inserted True when this is a new entry, false on replace.
+local function upsertStoredSharedEntry(encounter, entry)
+    if (encounter._v or 0) >= 17 or encounter._shared then
+        local compactEntry = BattleScrolls.binaryStorage.encodeSharedEntry(entry)
+        local entries = encounter._shared
+        if not entries then
+            entries = {}
+            encounter._shared = entries
+        end
+        for i, existing in ipairs(entries) do
+            if existing.d == entry.displayName
+                and existing.t == entry.data.timestampS
+                and existing.u == entry.data.durationMs then
+                entries[i] = compactEntry
+                return false
+            end
+        end
+        table.insert(entries, compactEntry)
+        return true
+    end
+    encounter.sharedData = encounter.sharedData or {}
+    return upsertSharedDataEntry(encounter.sharedData, entry)
 end
 
 ---Attempt to match shared data to an existing encounter
@@ -355,6 +380,8 @@ local function matchShare(unitTag, sharedData)
         -- BattleScrolls.log.Debug(function()
         --     return string.format("EncounterShare: absorbed %s into discarded sink", displayName)
         -- end)
+    elseif bestType == "stored" then
+        inserted = upsertStoredSharedEntry(bestTarget --[[@as CompactEncounter]], entry)
     elseif bestTarget then
         bestTarget.sharedData = bestTarget.sharedData or {}
         inserted = upsertSharedDataEntry(bestTarget.sharedData, entry)
@@ -393,6 +420,15 @@ local function addDiscardedSink(entry)
     })
 end
 
+---The live instance cannot be re-encoded while scribe owns its registry, so
+---an instance still holding pre-v20 encounters is closed instead of resumed
+---and the migration picks it up like any other
+---@param instance InstanceStorage
+---@return boolean
+local function migrationPending(instance)
+    return not instance._migrationFailed and BattleScrolls.migration.hasLegacyEncounters(instance)
+end
+
 function scribe:Initialize()
     -- Register callback for incoming encounter share data
     BattleScrolls.encounterShare:RegisterCallback("scribe", matchShare)
@@ -401,14 +437,18 @@ function scribe:Initialize()
     LibEffect.Async(function()
         -- Load instance from history or create new
         local history = BattleScrolls.storage.savedVariables.history
-        if history and #history > 0 and history[#history].left == false then
-            local lastInstance = history[#history]
+        local lastInstance = history and history[#history]
+        if lastInstance and lastInstance.left == false and not migrationPending(lastInstance) then
             self.instance = lastInstance
-            self.pushedToStorage = true
             -- Decode abilityInfo into cache (yields internally)
             local result = BattleScrolls.storage.DecodeInstanceFieldsAsync(lastInstance):Await()
             self.decodedAbilityInfo = result[1]
+            self.registry = BattleScrolls.binaryStorage.newRegistry(result[3], result[4])
+            BattleScrolls.storage:CacheInstanceRegistry(lastInstance, self.registry)
         else
+            if lastInstance and lastInstance.left == false then
+                lastInstance.left = true
+            end
             self:ResetForNewInstance()
         end
 
@@ -470,9 +510,9 @@ end
 ---Resets the scribe for a new instance
 function scribe:ResetForNewInstance()
     self.instance.left = true
-    self.pushedToStorage = false
     -- Reset decoded cache
     self.decodedAbilityInfo = {}
+    self.registry = BattleScrolls.binaryStorage.newRegistry()
     -- Determine zone type
     local isInstanced = CanExitInstanceImmediately()
     local isHouse = GetCurrentZoneHouseId() ~= 0
@@ -520,12 +560,30 @@ function scribe:FinalizeEncounter()
     BattleScrolls.state:Reset()
 end
 
+-- Cheap check (a dozen unit-API calls at most), so retry densely enough
+-- that short holds like the 500ms death linger resolve promptly
+local RESET_RETRY_DELAY_MS = 500
+local resetRetryToken = 0
+
 function scribe:WaitAndMaybeReset()
-    zo_callLater(function()
-        if BattleScrolls.state:ShouldReset() then
-            self:FinalizeEncounter()
+    -- Single-flight: a new trigger supersedes any pending retry chain
+    resetRetryToken = resetRetryToken + 1
+    local token = resetRetryToken
+    local function check()
+        if token ~= resetRetryToken then
+            return
         end
-    end, 150)
+        local state = BattleScrolls.state
+        if state:ShouldReset() then
+            self:FinalizeEncounter()
+        elseif state.initialized and not state.inCombat then
+            -- Something soft is holding the encounter open (dead player,
+            -- group still fighting) and its release may produce no event
+            -- for us - re-check until it resolves or we re-enter combat
+            zo_callLater(check, RESET_RETRY_DELAY_MS)
+        end
+    end
+    zo_callLater(check, 150)
 end
 
 ---Import encounter from state asynchronously
@@ -547,7 +605,6 @@ function scribe:ImportEncounterFromStateAsync()
     local capturedLocation = self.location
     ---@type BattleScrollsState|nil
     local capturedState = BattleScrolls.state:Snapshot()
-    local capturedPushedToStorage = self.pushedToStorage
 
     ---@class RawToDisplayEntry
     ---@field displayName string The display name for this unit
@@ -574,6 +631,14 @@ function scribe:ImportEncounterFromStateAsync()
 
     local instance = self.instance
     local decodedAbilityInfo = self.decodedAbilityInfo
+    -- Capture the registry together with its instance: the async body below
+    -- survives zone changes, and ResetForNewInstance swaps self.registry for
+    -- the new instance's - encoding against that would overwrite this
+    -- instance's persisted registry with one that no longer matches its
+    -- already-stored encounters. Lazily created for instances started before
+    -- the addon reload that introduced registries.
+    self.registry = self.registry or BattleScrolls.binaryStorage.newRegistry()
+    local registry = self.registry
 
     -- Register pending encounter so matchShare can find it during the encoding window
     local durationMs = capturedState.lastDamageDoneMs - capturedState.fightStartTimeMs
@@ -584,7 +649,10 @@ function scribe:ImportEncounterFromStateAsync()
     }
     table.insert(pendingEncounters, pendingEntry)
 
-    return LibEffect.Async(function()
+    -- Under the storage write mutex (see its declaration): serializes
+    -- finalizes against each other, the migration, the cleanup task and the
+    -- orphan prune, from the setup intern through the history push
+    return BattleScrolls.storage.writeMutex:WithPermit(LibEffect.Async(function()
         -- Finalize active effects on the state snapshot (moderate: up to ~600 effects)
         -- Pass lastDamageDoneMs so effect uptimes are consistent with fight duration
         BattleScrolls.effects.finalize(capturedState, capturedState.lastDamageDoneMs)
@@ -614,6 +682,12 @@ function scribe:ImportEncounterFromStateAsync()
             playerAliveTimeMs = playerAliveTimeMs ~= durationMs and playerAliveTimeMs or nil,
             unitAliveTimeMs = next(unitAliveTimeMs) and unitAliveTimeMs or nil,
             gameVersion = GetESOVersionString():match("%d+%.%d+%.%d+"),
+            -- Same resolution as state:GetPersonalUnitId: the real id when
+            -- combat events revealed it, else the inferred placeholder the
+            -- damage maps used for sourceUnitId-0 player events
+            playerUnitId = (capturedState.personalUnitIdByType
+                and capturedState.personalUnitIdByType[COMBAT_UNIT_TYPE_PLAYER])
+                or BattleScrolls.constants.INFERRED_PLAYER_UNIT_ID,
         }
 
         -- Capture death recaps
@@ -625,6 +699,19 @@ function scribe:ImportEncounterFromStateAsync()
             end
             encounter.deaths = { deathCount = deathCount, recaps = recaps }
         end
+
+        -- Activity trackers: ultimate economy, Crux usage, resurrections, Z'en.
+        -- Must precede the encounter-share send: resurrections ride in the
+        -- shared summary built from this encounter.
+        encounter.ultimate = BattleScrolls.ultimate.finalize(capturedState.ultimate)
+        encounter.crux = BattleScrolls.crux.finalize(capturedState.cruxActivity, capturedState.lastDamageDoneMs,
+            capturedState.lastPlayerDeathMs or 0)
+        local resurrectionLog = capturedState.resurrectionLog or {}
+        if #resurrectionLog > 0 then
+            encounter.resurrections = #resurrectionLog
+            encounter.resurrectionLog = resurrectionLog
+        end
+        encounter.zen = BattleScrolls.zen.finalize(capturedState.zen, capturedState.lastDamageDoneMs)
 
         encounter.setup = capturedState.playerSetup
         if encounter.setup and capturedState.effectsOnPlayer then
@@ -774,6 +861,8 @@ function scribe:ImportEncounterFromStateAsync()
                 skillActivations = cw.skillActivations,
                 totalWeavingErrors = cw.totalWeavingErrors,
                 doubleLaErrors = cw.doubleLaErrors,
+                downtimeMs = cw.downtimeMs,
+                downtimeGaps = cw.downtimeGaps,
                 byAbility = weavingByAbility,
             }
         end
@@ -798,17 +887,29 @@ function scribe:ImportEncounterFromStateAsync()
         capturedState = nil
         LibEffect.YieldWithGC():Await()
 
-        -- Encode encounter to binary (yields internally based on data volume)
-        local compactEncounter = BattleScrolls.storage.EncodeEncounterAsync(encounter):Await()
+        -- Dedup own setup: intern it in the pool and drop the section from the
+        -- encoded stream unless the 16-bit hash collides with a different setup
+        local pooledSetup = false
+        if encounter.setup and setupHash then
+            pooledSetup = BattleScrolls.storage:InternOwnSetup(setupHash, encounter.setup)
+        end
 
-        -- Re-encode instance fields (yields internally based on data volume)
+        -- Encode encounter to binary (yields internally based on data volume)
+        local compactEncounter = BattleScrolls.storage.EncodeEncounterAsync(encounter, pooledSetup, registry):Await()
+        if pooledSetup then
+            compactEncounter._setupHash = setupHash
+        end
+
+        -- Re-encode instance fields (yields internally based on data volume),
+        -- persisting the registries the encounter encode just appended to
         local encodedFields = BattleScrolls.binaryStorage.encodeInstanceFieldsAsync(
-            decodedAbilityInfo):Await()
+            decodedAbilityInfo, registry):Await()
         -- Atomic: set fields and insert encounter together
         instance._instanceData = encodedFields._instanceData
         instance._instanceDataVersion = encodedFields._instanceDataVersion
         table.insert(instance.encounters, compactEncounter)
         instance._estimatedSize = nil
+        BattleScrolls.storage:CacheInstanceRegistry(instance, registry)
 
         LibEffect.YieldWithGC():Await()
 
@@ -821,22 +922,28 @@ function scribe:ImportEncounterFromStateAsync()
             end
         end
         if allShared then
-            compactEncounter.sharedData = allShared
+            -- v17: shared entries are stored binary-encoded on the compact encounter
+            local compactShared = {}
+            for i, shared in ipairs(allShared) do
+                compactShared[i] = BattleScrolls.binaryStorage.encodeSharedEntry(shared)
+            end
+            compactEncounter._shared = compactShared
         end
 
         -- Remove pending entry now that the encounter is stored and shared data transferred
         removePendingEncounter(pendingEntry)
 
-        if not capturedPushedToStorage then
+        -- First encounter of the instance, or the instance was deleted from
+        -- the journal while this encounter was encoding: the fight happened,
+        -- so it re-enters the history as its own entry instead of vanishing
+        -- with the removed table
+        if not BattleScrolls.storage:IsInHistory(instance) then
             BattleScrolls.storage:PushInstance(instance)
-            if instance == self.instance then
-                self.pushedToStorage = true
-            end
         end
 
         BattleScrolls.gc:RequestGC(2)
         BattleScrolls.storage:CleanupIfNecessaryAsync()
-    end):Ensure(function()
+    end)):Ensure(function()
         -- Safety net: remove pending entry if async chain errors or is cancelled
         removePendingEncounter(pendingEntry)
     end):Run()

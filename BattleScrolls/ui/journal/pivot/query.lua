@@ -66,7 +66,9 @@ function query.applyFieldSelection(q, fieldName, selectedKey)
         end
     elseif fieldName == "domain" then
         q.domain = selectedKey
-        q.targetMode = nil  -- reset target filter when domain changes
+        -- Reset the target filter when the domain changes; Group Damage starts
+        -- on bosses like its journal tab
+        q.targetMode = selectedKey == pivot.Domain.DAMAGE_GROUP and pivot.TargetMode.BOSSES or nil
         -- Reset rows/columns/values to domain defaults (pick first two metrics)
         local metrics = pivot.DomainMetrics[selectedKey]
         q.rowDimension = pivot.Dimension.ENCOUNTER

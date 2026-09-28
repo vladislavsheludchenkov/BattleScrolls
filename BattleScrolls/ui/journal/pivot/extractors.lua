@@ -57,21 +57,37 @@ end
 ---@type table<string, DimensionExtractor>
 extractors.dimensions = {}
 
----Iterate a damage table and group breakdowns by a key function.
----@param damageTable table|nil Nested source->target->DamageDoneStorage
+---The damage maps a damage-style domain reads. Group Damage merges the
+---personal map with the observed one (everyone else, a single unattributed
+---pool keyed by source 0).
+---@param decoded DecodedEncounter
+---@param domain string
+---@return table[] damageTables Nested source->target->DamageDoneStorage maps (entries may be nil)
+local function damageTablesForDomain(decoded, domain)
+    if domain == pivot.Domain.DAMAGE_IN then
+        return { decoded.damageTakenByUnitId }
+    elseif domain == pivot.Domain.DAMAGE_GROUP then
+        return { decoded.damageByUnitId, decoded.damageByUnitIdGroup }
+    end
+    return { decoded.damageByUnitId }
+end
+
+---Iterate damage tables and group breakdowns by a key function.
+---@param damageTables table[] Nested source->target->DamageDoneStorage maps
 ---@param keyFn fun(sourceId: number, targetId: number, abilityId: number, bd: DamageBreakdown): string|nil
 ---@return table<string, DamageBreakdown[]>
-local function groupDamageBreakdowns(damageTable, keyFn)
-    if not damageTable then return {} end
+local function groupDamageBreakdowns(damageTables, keyFn)
     local result = {}
-    for sourceId, byTarget in pairs(damageTable) do
-        for targetId, damageData in pairs(byTarget) do
-            local abilities = Arithmancer.GetAbilities(damageData)
-            for abilityId, bd in pairs(abilities) do
-                local key = keyFn(sourceId, targetId, abilityId, bd)
-                if key then
-                    if not result[key] then result[key] = {} end
-                    table.insert(result[key], bd)
+    for _, damageTable in ipairs(damageTables) do
+        for sourceId, byTarget in pairs(damageTable) do
+            for targetId, damageData in pairs(byTarget) do
+                local abilities = Arithmancer.GetAbilities(damageData)
+                for abilityId, bd in pairs(abilities) do
+                    local key = keyFn(sourceId, targetId, abilityId, bd)
+                    if key then
+                        if not result[key] then result[key] = {} end
+                        table.insert(result[key], bd)
+                    end
                 end
             end
         end
@@ -119,7 +135,7 @@ extractors.dimensions[pivot.Dimension.ABILITY] = {
     id = pivot.Dimension.ABILITY,
     displayName = "BATTLESCROLLS_PIVOT_DIM_ABILITY",
     domains = {
-        [pivot.Domain.DAMAGE] = true, [pivot.Domain.DAMAGE_IN] = true,
+        [pivot.Domain.DAMAGE] = true, [pivot.Domain.DAMAGE_GROUP] = true, [pivot.Domain.DAMAGE_IN] = true,
         [pivot.Domain.HEALING_OUT] = true, [pivot.Domain.HEALING_IN] = true,
         [pivot.Domain.EFFECTS_SELF] = true, [pivot.Domain.EFFECTS_BOSS] = true, [pivot.Domain.EFFECTS_GROUP] = true,
     },
@@ -201,17 +217,15 @@ extractors.dimensions[pivot.Dimension.ABILITY] = {
             end
             return result
         end
-        -- Damage / Damage Taken
-        local damageTable = domain == pivot.Domain.DAMAGE_IN
-            and decoded.damageTakenByUnitId or decoded.damageByUnitId
-        return groupDamageBreakdowns(damageTable, keyByAbilityName)
+        -- Damage / Group Damage / Damage Taken
+        return groupDamageBreakdowns(damageTablesForDomain(decoded, domain), keyByAbilityName)
     end,
 }
 
 extractors.dimensions[pivot.Dimension.TARGET] = {
     id = pivot.Dimension.TARGET,
     displayName = "BATTLESCROLLS_PIVOT_DIM_TARGET",
-    domains = { [pivot.Domain.DAMAGE] = true, [pivot.Domain.HEALING_OUT] = true },
+    domains = { [pivot.Domain.DAMAGE] = true, [pivot.Domain.DAMAGE_GROUP] = true, [pivot.Domain.HEALING_OUT] = true },
     extract = function(decoded, _abilityInfo, domain, unitNames)
         if domain == pivot.Domain.HEALING_OUT then
             -- Healing: group by heal target
@@ -242,8 +256,8 @@ extractors.dimensions[pivot.Dimension.TARGET] = {
             end
             return byTarget
         end
-        -- Damage
-        return groupDamageBreakdowns(decoded.damageByUnitId, function(_, targetId)
+        -- Damage / Group Damage
+        return groupDamageBreakdowns(damageTablesForDomain(decoded, domain), function(_, targetId)
             local name = unitNames and unitNames[targetId]
             return name and zo_strformat(SI_UNIT_NAME, name) or GetString(BATTLESCROLLS_UNKNOWN)
         end)
@@ -282,9 +296,7 @@ extractors.dimensions[pivot.Dimension.SOURCE] = {
             return bySource
         end
         -- Damage / Damage Taken
-        local damageTable = domain == pivot.Domain.DAMAGE_IN
-            and decoded.damageTakenByUnitId or decoded.damageByUnitId
-        return groupDamageBreakdowns(damageTable, function(sourceId)
+        return groupDamageBreakdowns(damageTablesForDomain(decoded, domain), function(sourceId)
             local name = unitNames and unitNames[sourceId]
             return name and zo_strformat(SI_UNIT_NAME, name) or GetString(BATTLESCROLLS_UNKNOWN)
         end)
@@ -294,7 +306,7 @@ extractors.dimensions[pivot.Dimension.SOURCE] = {
 extractors.dimensions[pivot.Dimension.BOSS] = {
     id = pivot.Dimension.BOSS,
     displayName = "BATTLESCROLLS_PIVOT_DIM_BOSS",
-    domains = { [pivot.Domain.DAMAGE] = true, [pivot.Domain.EFFECTS_BOSS] = true },
+    domains = { [pivot.Domain.DAMAGE] = true, [pivot.Domain.DAMAGE_GROUP] = true, [pivot.Domain.EFFECTS_BOSS] = true },
     extract = function(decoded, _abilityInfo, domain, _unitNames)
         if domain == pivot.Domain.EFFECTS_BOSS then
             -- Group boss effects by boss name
@@ -311,9 +323,9 @@ extractors.dimensions[pivot.Dimension.BOSS] = {
             end
             return byBoss
         end
-        -- Damage
+        -- Damage / Group Damage
         if not decoded.bossTagSeqByUnitId or not decoded.bossSeqNames then return {} end
-        return groupDamageBreakdowns(decoded.damageByUnitId, function(_, targetId)
+        return groupDamageBreakdowns(damageTablesForDomain(decoded, domain), function(_, targetId)
             local tagSeq = decoded.bossTagSeqByUnitId[targetId]
             if not tagSeq then return nil end
             return decoded.bossSeqNames[tagSeq] or GetString(BATTLESCROLLS_UNKNOWN_BOSS)
@@ -324,27 +336,26 @@ extractors.dimensions[pivot.Dimension.BOSS] = {
 extractors.dimensions[pivot.Dimension.DAMAGE_TYPE] = {
     id = pivot.Dimension.DAMAGE_TYPE,
     displayName = "BATTLESCROLLS_PIVOT_DIM_DAMAGE_TYPE",
-    domains = { [pivot.Domain.DAMAGE] = true, [pivot.Domain.DAMAGE_IN] = true },
+    domains = { [pivot.Domain.DAMAGE] = true, [pivot.Domain.DAMAGE_GROUP] = true, [pivot.Domain.DAMAGE_IN] = true },
     extract = function(decoded, abilityInfo, domain, _unitNames)
-        local damageTable = domain == pivot.Domain.DAMAGE_IN
-            and decoded.damageTakenByUnitId or decoded.damageByUnitId
-        if not damageTable then return {} end
         local byType = {}
-        for _, byTarget in pairs(damageTable) do
-            for _, damageData in pairs(byTarget) do
-                local abilities = Arithmancer.GetAbilities(damageData)
-                for abilityId, bd in pairs(abilities) do
-                    if abilityId == constants.DAMAGE_SHIELDED_ABILITY_ID then
-                        local typeName = GetString(BATTLESCROLLS_DAMAGE_UNKNOWN_SHIELDED)
-                        if not byType[typeName] then byType[typeName] = {} end
-                        table.insert(byType[typeName], bd)
-                    else
-                        local info = abilityInfo[abilityId]
-                        if info and info.damageTypes then
-                            for damageType in pairs(info.damageTypes) do
-                                local typeName = (journal.DamageTypeNames and journal.DamageTypeNames[damageType]) or tostring(damageType)
-                                if not byType[typeName] then byType[typeName] = {} end
-                                table.insert(byType[typeName], bd)
+        for _, damageTable in ipairs(damageTablesForDomain(decoded, domain)) do
+            for _, byTarget in pairs(damageTable) do
+                for _, damageData in pairs(byTarget) do
+                    local abilities = Arithmancer.GetAbilities(damageData)
+                    for abilityId, bd in pairs(abilities) do
+                        if abilityId == constants.DAMAGE_SHIELDED_ABILITY_ID then
+                            local typeName = GetString(BATTLESCROLLS_DAMAGE_UNKNOWN_SHIELDED)
+                            if not byType[typeName] then byType[typeName] = {} end
+                            table.insert(byType[typeName], bd)
+                        else
+                            local info = abilityInfo[abilityId]
+                            if info and info.damageTypes then
+                                for damageType in pairs(info.damageTypes) do
+                                    local typeName = (journal.DamageTypeNames and journal.DamageTypeNames[damageType]) or tostring(damageType)
+                                    if not byType[typeName] then byType[typeName] = {} end
+                                    table.insert(byType[typeName], bd)
+                                end
                             end
                         end
                     end
@@ -360,6 +371,7 @@ extractors.dimensions[pivot.Dimension.DELIVERY] = {
     displayName = "BATTLESCROLLS_PIVOT_DIM_DELIVERY",
     domains = {
         [pivot.Domain.DAMAGE] = true,
+        [pivot.Domain.DAMAGE_GROUP] = true,
         [pivot.Domain.DAMAGE_IN] = true,
         [pivot.Domain.HEALING_OUT] = true,
         [pivot.Domain.HEALING_IN] = true,
@@ -413,9 +425,8 @@ extractors.dimensions[pivot.Dimension.DELIVERY] = {
             end
             return byDelivery
         end
-        -- Damage
-        local damageTable = domain == pivot.Domain.DAMAGE_IN and decoded.damageTakenByUnitId or decoded.damageByUnitId
-        return groupDamageBreakdowns(damageTable, function(_, _, abilityId)
+        -- Damage / Group Damage / Damage Taken
+        return groupDamageBreakdowns(damageTablesForDomain(decoded, domain), function(_, _, abilityId)
             if abilityId == constants.DAMAGE_SHIELDED_ABILITY_ID then
                 return GetString(BATTLESCROLLS_DAMAGE_UNKNOWN_SHIELDED)
             end
@@ -438,11 +449,10 @@ extractors.dimensions[pivot.Dimension.DELIVERY] = {
 extractors.dimensions[pivot.Dimension.AOE_ST] = {
     id = pivot.Dimension.AOE_ST,
     displayName = "BATTLESCROLLS_PIVOT_DIM_AOE_ST",
-    domains = { [pivot.Domain.DAMAGE] = true, [pivot.Domain.DAMAGE_IN] = true },
+    domains = { [pivot.Domain.DAMAGE] = true, [pivot.Domain.DAMAGE_GROUP] = true, [pivot.Domain.DAMAGE_IN] = true },
     extract = function(decoded, _abilityInfo, domain, _unitNames)
         local aoeAbilityIds = constants.aoeAbilityIds
-        local damageTable = domain == pivot.Domain.DAMAGE_IN and decoded.damageTakenByUnitId or decoded.damageByUnitId
-        return groupDamageBreakdowns(damageTable, function(_, _, abilityId)
+        return groupDamageBreakdowns(damageTablesForDomain(decoded, domain), function(_, _, abilityId)
             if abilityId == constants.DAMAGE_SHIELDED_ABILITY_ID then
                 return GetString(BATTLESCROLLS_DAMAGE_UNKNOWN_SHIELDED)
             end
@@ -512,7 +522,7 @@ extractors.dimensions[pivot.Dimension.ENCOUNTER] = {
     id = pivot.Dimension.ENCOUNTER,
     displayName = "BATTLESCROLLS_PIVOT_DIM_ENCOUNTER",
     domains = {
-        [pivot.Domain.DAMAGE] = true, [pivot.Domain.DAMAGE_IN] = true,
+        [pivot.Domain.DAMAGE] = true, [pivot.Domain.DAMAGE_GROUP] = true, [pivot.Domain.DAMAGE_IN] = true,
         [pivot.Domain.HEALING_OUT] = true, [pivot.Domain.HEALING_IN] = true,
         [pivot.Domain.EFFECTS_SELF] = true, [pivot.Domain.EFFECTS_BOSS] = true, [pivot.Domain.EFFECTS_GROUP] = true,
     },
@@ -523,7 +533,7 @@ extractors.dimensions[pivot.Dimension.INSTANCE] = {
     id = pivot.Dimension.INSTANCE,
     displayName = "BATTLESCROLLS_PIVOT_DIM_INSTANCE",
     domains = {
-        [pivot.Domain.DAMAGE] = true, [pivot.Domain.DAMAGE_IN] = true,
+        [pivot.Domain.DAMAGE] = true, [pivot.Domain.DAMAGE_GROUP] = true, [pivot.Domain.DAMAGE_IN] = true,
         [pivot.Domain.HEALING_OUT] = true, [pivot.Domain.HEALING_IN] = true,
         [pivot.Domain.EFFECTS_SELF] = true, [pivot.Domain.EFFECTS_BOSS] = true, [pivot.Domain.EFFECTS_GROUP] = true,
     },
@@ -596,7 +606,7 @@ extractors.metrics = {}
 extractors.metrics[pivot.Metric.TOTAL_DAMAGE] = {
     id = pivot.Metric.TOTAL_DAMAGE,
     displayName = "BATTLESCROLLS_PIVOT_METRIC_TOTAL_DAMAGE",
-    domains = { [pivot.Domain.DAMAGE] = true, [pivot.Domain.DAMAGE_IN] = true, [pivot.Domain.OVERVIEW] = true },
+    domains = { [pivot.Domain.DAMAGE] = true, [pivot.Domain.DAMAGE_GROUP] = true, [pivot.Domain.DAMAGE_IN] = true, [pivot.Domain.OVERVIEW] = true },
     extract = function(breakdown, _durationS)
         return breakdown.total or 0
     end,
@@ -613,7 +623,7 @@ extractors.metrics[pivot.Metric.TOTAL_DAMAGE] = {
 extractors.metrics[pivot.Metric.DPS] = {
     id = pivot.Metric.DPS,
     displayName = "BATTLESCROLLS_PIVOT_METRIC_DPS",
-    domains = { [pivot.Domain.DAMAGE] = true, [pivot.Domain.DAMAGE_IN] = true, [pivot.Domain.OVERVIEW] = true },
+    domains = { [pivot.Domain.DAMAGE] = true, [pivot.Domain.DAMAGE_GROUP] = true, [pivot.Domain.DAMAGE_IN] = true, [pivot.Domain.OVERVIEW] = true },
     extract = function(breakdown, durationS)
         local total = breakdown.total or 0
         return durationS >= 0.001 and (total / durationS) or 0
@@ -631,7 +641,7 @@ extractors.metrics[pivot.Metric.DPS] = {
 extractors.metrics[pivot.Metric.CRIT_PERCENT] = {
     id = pivot.Metric.CRIT_PERCENT,
     displayName = "BATTLESCROLLS_PIVOT_METRIC_CRIT_PERCENT",
-    domains = { [pivot.Domain.DAMAGE] = true, [pivot.Domain.DAMAGE_IN] = true, [pivot.Domain.OVERVIEW] = true },
+    domains = { [pivot.Domain.DAMAGE] = true, [pivot.Domain.DAMAGE_GROUP] = true, [pivot.Domain.DAMAGE_IN] = true, [pivot.Domain.OVERVIEW] = true },
     extract = function(breakdown, _durationS)
         local ticks = breakdown.ticks or 0
         local critTicks = breakdown.critTicks or 0
@@ -653,7 +663,7 @@ extractors.metrics[pivot.Metric.CRIT_PERCENT] = {
 extractors.metrics[pivot.Metric.HIT_COUNT] = {
     id = pivot.Metric.HIT_COUNT,
     displayName = "BATTLESCROLLS_PIVOT_METRIC_HIT_COUNT",
-    domains = { [pivot.Domain.DAMAGE] = true, [pivot.Domain.DAMAGE_IN] = true },
+    domains = { [pivot.Domain.DAMAGE] = true, [pivot.Domain.DAMAGE_GROUP] = true, [pivot.Domain.DAMAGE_IN] = true },
     extract = function(breakdown, _durationS)
         return breakdown.ticks or 0
     end,
@@ -670,7 +680,7 @@ extractors.metrics[pivot.Metric.HIT_COUNT] = {
 extractors.metrics[pivot.Metric.MAX_HIT] = {
     id = pivot.Metric.MAX_HIT,
     displayName = "BATTLESCROLLS_PIVOT_METRIC_MAX_HIT",
-    domains = { [pivot.Domain.DAMAGE] = true, [pivot.Domain.DAMAGE_IN] = true },
+    domains = { [pivot.Domain.DAMAGE] = true, [pivot.Domain.DAMAGE_GROUP] = true, [pivot.Domain.DAMAGE_IN] = true },
     extract = function(breakdown, _durationS)
         return breakdown.maxTick or 0
     end,
@@ -682,7 +692,7 @@ extractors.metrics[pivot.Metric.MAX_HIT] = {
 extractors.metrics[pivot.Metric.MIN_HIT] = {
     id = pivot.Metric.MIN_HIT,
     displayName = "BATTLESCROLLS_PIVOT_METRIC_MIN_HIT",
-    domains = { [pivot.Domain.DAMAGE] = true, [pivot.Domain.DAMAGE_IN] = true },
+    domains = { [pivot.Domain.DAMAGE] = true, [pivot.Domain.DAMAGE_GROUP] = true, [pivot.Domain.DAMAGE_IN] = true },
     extract = function(breakdown, _durationS)
         return breakdown.minTick or 0
     end,
@@ -694,7 +704,7 @@ extractors.metrics[pivot.Metric.MIN_HIT] = {
 extractors.metrics[pivot.Metric.AVG_HIT] = {
     id = pivot.Metric.AVG_HIT,
     displayName = "BATTLESCROLLS_PIVOT_METRIC_AVG_HIT",
-    domains = { [pivot.Domain.DAMAGE] = true, [pivot.Domain.DAMAGE_IN] = true },
+    domains = { [pivot.Domain.DAMAGE] = true, [pivot.Domain.DAMAGE_GROUP] = true, [pivot.Domain.DAMAGE_IN] = true },
     extract = function(breakdown, _durationS)
         local ticks = breakdown.ticks or 0
         return ticks > 0 and ((breakdown.rawTotal or 0) / ticks) or 0

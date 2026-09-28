@@ -1225,7 +1225,7 @@ function ArithmancerInstance:getHealingInSummary()
     local durationS = self:getDurationS()
     local healingStats = source.healingStats
 
-    if not healingStats or not healingStats.healingInFromGroup then
+    if not healingStats then
         return { rawHps = 0, effectiveHps = 0, total = 0, rawTotal = 0, overhealPercent = 0 }
     end
 
@@ -1237,6 +1237,13 @@ function ArithmancerInstance:getHealingInSummary()
             rawTotal = rawTotal + (data.total.raw or 0)
             effectiveTotal = effectiveTotal + (data.total.real or 0)
         end
+    end
+
+    -- Include self healing if not filtered out, matching the incoming breakdowns.
+    local includeSelf = not self._sourceFilter or self._sourceFilter[-1]
+    if includeSelf and healingStats.selfHealing then
+        rawTotal = rawTotal + (healingStats.selfHealing.total.raw or 0)
+        effectiveTotal = effectiveTotal + (healingStats.selfHealing.total.real or 0)
     end
 
     local rawHps = durationS > 0 and (rawTotal / durationS) or 0
@@ -1455,6 +1462,8 @@ function ArithmancerInstance:buildSharedEncounterData()
         }
     end
 
+    local zenByBoss = BattleScrolls.zen.shareByBoss(source.zen)
+
     ---@type SharedEncounterData
     return {
         timestampS = source.timestampS or 0,
@@ -1472,6 +1481,8 @@ function ArithmancerInstance:buildSharedEncounterData()
         aliveTimeMs = source.playerAliveTimeMs,
         topDamageTakenAbilities = topDamageTakenAbilities,
         deaths = deaths,
+        resurrections = source.resurrections,
+        zenByBoss = zenByBoss,
     }
 end
 
@@ -1603,8 +1614,9 @@ function ArithmancerInstance:getHealingInQuality()
             end
         end
 
-        -- Include self-healing if no sourceFilter is active
-        if not self._sourceFilter and healingStats.selfHealing and healingStats.selfHealing.bySourceUnitIdByAbilityId then
+        -- Include self-healing if not filtered out
+        local includeSelf = not self._sourceFilter or self._sourceFilter[-1]
+        if includeSelf and healingStats.selfHealing and healingStats.selfHealing.bySourceUnitIdByAbilityId then
             for _, byAbility in pairs(healingStats.selfHealing.bySourceUnitIdByAbilityId) do
                 for abilityId, breakdown in pairs(byAbility) do
                     if abilityId ~= HEAL_ABSORBED_ABILITY_ID then

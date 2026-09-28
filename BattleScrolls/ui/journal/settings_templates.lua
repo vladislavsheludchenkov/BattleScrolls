@@ -148,6 +148,9 @@ function settingsTemplates.setupSettingsList(list)
     -- Custom label/button setup for invoke callbacks
     local function LabelSetup(control, data, selected, _reselectingDuringRebuild, _enabled, _active)
         control.data = data
+        if selected and data.onSelected then
+            data.onSelected()
+        end
 
         -- Set up the name label
         local nameControl = control:GetNamedChild("Name")

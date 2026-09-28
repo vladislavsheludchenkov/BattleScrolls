@@ -1,3 +1,4 @@
+---@diagnostic disable: undefined-field, inject-field -- the ESO Control/ZO_* API stubs are too incomplete for field checking in UI code
 -----------------------------------------------------------
 -- The Chronicler
 -- Orchestrates how the battle journal is presented
@@ -26,9 +27,10 @@ local chronicler = {}
 -- Tooltips
 -------------------------
 
----Resets the left tooltip
+---Resets the journal's standard and wide death recap tooltips.
 function chronicler.resetTooltips()
     GAMEPAD_TOOLTIPS:Reset(GAMEPAD_LEFT_TOOLTIP)
+    GAMEPAD_TOOLTIPS:Reset(GAMEPAD_QUAD_2_3_TOOLTIP)
 end
 
 ---Called when list selection changes
@@ -38,25 +40,23 @@ function chronicler.onTargetChanged(journalUI, selectedData)
     chronicler.refreshTooltip(journalUI, selectedData)
 end
 
--- Style for AcquireCustomControl: reuses the BattleScrolls_DeathAttackRow XML template
--- (same pattern as armory tooltips using AcquireCustomControl with ZO_GamepadInteractiveAttributeRow)
+-- The native recap layout needs room for attacker/ability names and exact damage.
+-- Use ESO's wider panel without changing the shared left tooltip's dimensions.
+local DEATH_TOOLTIP = GAMEPAD_QUAD_2_3_TOOLTIP
 local DEATH_ATTACK_ROW_STYLE = {
-    controlTemplate = "BattleScrolls_DeathAttackRow",
-    height = 42,
+    controlTemplate = "BattleScrolls_DeathRecapAttackRow",
+    -- Keep expanded child names below ESO's 127-character limit despite the
+    -- wide tooltip's long parent prefix (IconFrame otherwise becomes Icon).
+    controlTemplateOverrideName = "BSDeath",
     widthPercent = 100,
 }
 
--- Reserve space for 36px killing blow skull + 4px gap on ALL rows so icons stay aligned (matches overview panel)
-local DEATH_TOOLTIP_ICON_OFFSET_X = 40
-
 ---Builds and shows a custom tooltip for death recap entries.
----Uses BattleScrolls_DeathAttackRow custom controls via AcquireCustomControl,
----giving us proper icon frames, killing blow skulls, and right-aligned values
----(same pattern as armorytooltips.lua LayoutArmoryBuildAttributes).
----@param data { title: string, subtitle: string|nil, rows: DetailRow[]|nil }
+---Matches ESO's death recap layout, including its gamepad fonts and damage label.
+---@param data DetailRowsTooltip
 local function showDeathRecapTooltip(data)
-    local tooltip = GAMEPAD_TOOLTIPS:GetTooltip(GAMEPAD_LEFT_TOOLTIP)
-    GAMEPAD_TOOLTIPS:ClearTooltip(GAMEPAD_LEFT_TOOLTIP)
+    local tooltip = GAMEPAD_TOOLTIPS:GetTooltip(DEATH_TOOLTIP)
+    GAMEPAD_TOOLTIPS:ClearTooltip(DEATH_TOOLTIP)
 
     -- Title section
     local headerSection = tooltip:AcquireSection(tooltip:GetStyle("bodyHeader"))
@@ -64,23 +64,17 @@ local function showDeathRecapTooltip(data)
     tooltip:AddSection(headerSection)
 
     -- Timing subtitle (reduced spacing to keep it close to the title)
-    local timingSection = tooltip:AcquireSection({ customSpacing = 5 }, tooltip:GetStyle("bodySection"))
-    timingSection:AddLine(data.subtitle, tooltip:GetStyle("bodyDescription"))
-    tooltip:AddSection(timingSection)
+    if data.subtitle then
+        local timingSection = tooltip:AcquireSection({ customSpacing = 5 }, tooltip:GetStyle("bodySection"))
+        timingSection:AddLine(data.subtitle, tooltip:GetStyle("bodyDescription"))
+        tooltip:AddSection(timingSection)
+    end
 
-    -- Attack rows using BattleScrolls_DeathAttackRow custom controls
-    if data.rows and #data.rows > 0 then
+    if #data.rows > 0 then
         -- Horizontal divider
         local dividerSection = tooltip:AcquireSection(tooltip:GetStyle("bodySection"))
         dividerSection:AddTexture(ZO_GAMEPAD_HEADER_DIVIDER_TEXTURE, tooltip:GetStyle("dividerLine"))
         tooltip:AddSection(dividerSection)
-
-        -- Check if any row is highlighted (killing blow) to reserve skull space on all rows
-        local anyHighlighted = false
-        for _, row in ipairs(data.rows) do
-            if row.isHighlighted then anyHighlighted = true; break end
-        end
-        local iconOffsetX = anyHighlighted and DEATH_TOOLTIP_ICON_OFFSET_X or 0
 
         local attackSection = tooltip:AcquireSection(tooltip:GetStyle("bodySection"))
         for _, row in ipairs(data.rows) do
@@ -92,40 +86,38 @@ local function showDeathRecapTooltip(data)
             local control = tooltip:AcquireCustomControl(DEATH_ATTACK_ROW_STYLE)
             control:SetHidden(false)
 
-            -- Icon at consistent offset (reserves skull space on all rows for alignment)
             local icon = control:GetNamedChild("Icon")
             icon:SetTexture(row.icon)
-            icon:ClearAnchors()
-            icon:SetAnchor(LEFT, control, LEFT, iconOffsetX, 0)
+            control:GetNamedChild("KillingBlow"):SetHidden(not row.isHighlighted)
+            control:GetNamedChild("Damage"):SetText(row.value or "")
 
-            -- Icon frame: square for active abilities, circle for passives
-            local isPassive = journal.utils.isPassiveIcon(row.icon)
-            control:GetNamedChild("EdgeFrame"):SetHidden(isPassive)
-            control:GetNamedChild("CircleFrame"):SetHidden(not isPassive)
-
-            -- Killing blow skull (anchored to icon's left in XML, hidden on non-killing rows)
-            local killingBlowIcon = control:GetNamedChild("KillingBlow")
-            if killingBlowIcon then
-                killingBlowIcon:SetHidden(not row.isHighlighted)
-            end
-
-            -- Ability name and damage value
-            control:GetNamedChild("Name"):SetText(row.label)
-            if row.value then
-                control:GetNamedChild("Value"):SetText(row.value)
+            local attackText = control:GetNamedChild("AttackText")
+            local attackerName = attackText:GetNamedChild("AttackerName")
+            local attackName = attackText:GetNamedChild("AttackName")
+            local hasAttacker = row.sublabel ~= nil and row.sublabel ~= ""
+            attackerName:SetText(row.sublabel or "")
+            attackerName:SetHidden(not hasAttacker)
+            attackName:SetText(zo_strformat(SI_DEATH_RECAP_ATTACK_NAME, row.label))
+            attackName:ClearAnchors()
+            if hasAttacker then
+                attackName:SetAnchor(TOPLEFT, attackerName, BOTTOMLEFT, 0, 2)
+                attackName:SetAnchor(TOPRIGHT, attackerName, BOTTOMRIGHT, 0, 2)
             else
-                control:GetNamedChild("Value"):SetText("")
+                attackName:SetAnchor(TOPLEFT, attackText, TOPLEFT)
+                attackName:SetAnchor(TOPRIGHT, attackText, TOPRIGHT)
             end
 
+            -- Match the native minimum height while accommodating the text height.
+            control:SetHeight(math.max(64, attackText:GetHeight()))
             attackSection:AddCustomControl(control)
         end
         tooltip:AddSection(attackSection)
     end
 
     -- Show tooltip + background fragments
-    SCENE_MANAGER:AddFragment(GAMEPAD_TOOLTIPS:GetTooltipFragment(GAMEPAD_LEFT_TOOLTIP))
-    if GAMEPAD_TOOLTIPS:DoesAutoShowTooltipBg(GAMEPAD_LEFT_TOOLTIP) then
-        SCENE_MANAGER:AddFragment(GAMEPAD_TOOLTIPS:GetTooltipBgFragment(GAMEPAD_LEFT_TOOLTIP))
+    SCENE_MANAGER:AddFragment(GAMEPAD_TOOLTIPS:GetTooltipFragment(DEATH_TOOLTIP))
+    if GAMEPAD_TOOLTIPS:DoesAutoShowTooltipBg(DEATH_TOOLTIP) then
+        SCENE_MANAGER:AddFragment(GAMEPAD_TOOLTIPS:GetTooltipBgFragment(DEATH_TOOLTIP))
     end
 end
 
@@ -553,7 +545,13 @@ function chronicler.computeTabVisibility(decodedEncounter)
         hasAnyEffects = (hasEffectsPlayer or hasEffectsBoss or hasEffectsGroup) or false,
         hasGroupData = decodedEncounter.sharedData ~= nil and #decodedEncounter.sharedData >= 2,
         hasSetup = decodedEncounter.setup ~= nil,
-        hasActivity = (decodedEncounter.procs and #decodedEncounter.procs > 0) or decodedEncounter.weaving ~= nil,
+        hasActivity = (decodedEncounter.procs and #decodedEncounter.procs > 0)
+            or decodedEncounter.weaving ~= nil
+            or decodedEncounter.ultimate ~= nil
+            or decodedEncounter.crux ~= nil
+            or decodedEncounter.zen ~= nil
+            or (decodedEncounter.resurrections or 0) > 0,
+        hasGroupDamage = not ZO_IsTableEmpty(decodedEncounter.damageByUnitIdGroup),
     }
 end
 
@@ -566,6 +564,7 @@ local function getVisibleSubViews(groupKey, tabVis)
     local visibilityChecks = {
         [STATS_TAB.BOSS_DAMAGE_DONE] = tabVis.dealtDamageToBosses,
         [STATS_TAB.DAMAGE_DONE] = tabVis.dealtDamage,
+        [STATS_TAB.GROUP_DAMAGE] = tabVis.hasGroupDamage,
         [STATS_TAB.HEALING_OUT] = tabVis.hasHealingOutToGroup,
         [STATS_TAB.SELF_HEALING] = tabVis.hasSelfHealing,
         [STATS_TAB.HEALING_IN] = tabVis.hasHealingInFromGroup,
@@ -760,6 +759,11 @@ function chronicler.refreshSettingsList(journalUI)
     end)
 end
 
+---@param journalUI BattleScrolls_Journal_Gamepad
+function chronicler.refreshShareList(journalUI)
+    BattleScrolls.journal.shareStepper.render(journalUI.shareList)
+end
+
 ---Get or cache the loading label control
 ---@param journalUI BattleScrolls_Journal_Gamepad
 ---@return Control|nil
@@ -873,8 +877,12 @@ function chronicler.refreshList(journalUI, skipHeaderRefresh)
         chronicler.refreshStatsList(journalUI)
     elseif journalUI.mode == NAVIGATION_MODE.SETTINGS then
         chronicler.refreshSettingsList(journalUI)
+    elseif journalUI.mode == NAVIGATION_MODE.WHATS_NEW then
+        journal.whatsNew.refresh(journalUI)
     elseif journalUI.mode == NAVIGATION_MODE.PIVOT then
         chronicler.refreshPivotList(journalUI)
+    elseif journalUI.mode == NAVIGATION_MODE.SHARE then
+        chronicler.refreshShareList(journalUI)
     end
 
     -- Refresh sub-header on every list refresh (handles show/hide based on tab).

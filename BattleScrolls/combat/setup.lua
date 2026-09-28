@@ -183,13 +183,39 @@ local function captureChampion()
     return result
 end
 
+---Normalizes the volatile condition/charge field (22nd colon segment) of an
+---item link. It decays with durability damage / enchant charge use, so
+---without this the same build produces different links every fight, defeating
+---own-setup pooling. Native item tooltips do display the field, so instead of
+---zeroing it we snap it to full (weapons: max enchant charges; armor:
+---condition 10000 = 100%) - unless it is 0 (fully broken/depleted), which is
+---informative and stable, so it stays.
+---@param link string
+---@return string
+local function normalizeEquipLink(link)
+    local parts = {}
+    for part in link:gmatch("[^:]+") do
+        parts[#parts + 1] = part
+    end
+    if #parts ~= 23 then
+        return link
+    end
+    local current = tonumber(parts[22]) or 0
+    if current == 0 then
+        return link
+    end
+    local maxCharges = GetItemLinkMaxEnchantCharges(link)
+    parts[22] = tostring(maxCharges > 0 and maxCharges or 10000)
+    return table.concat(parts, ":")
+end
+
 ---Captures poison from an equip slot
 ---@param equipSlot number EQUIP_SLOT_POISON or EQUIP_SLOT_BACKUP_POISON
 ---@return PlayerSetupPoison|nil
 local function capturePoison(equipSlot)
     local link = GetItemLink(BAG_WORN, equipSlot, LINK_STYLE_DEFAULT)
     if not link or link == "" then return nil end
-    return { itemLink = link }
+    return { itemLink = normalizeEquipLink(link) }
 end
 
 ---Captures equipment item links from fixed slots (excludes poisons).
@@ -199,7 +225,7 @@ local function captureEquipSlots()
     local result = {}
     for i = 1, #EQUIP_SLOTS do
         local link = GetItemLink(BAG_WORN, EQUIP_SLOTS[i], LINK_STYLE_DEFAULT)
-        result[i] = (link and link ~= "") and link or false
+        result[i] = (link and link ~= "") and normalizeEquipLink(link) or false
     end
     return result
 end
@@ -430,6 +456,10 @@ local function extractFoodsFromEffects(effectsOnPlayer)
             foods[i] = nil
         end
     end
+    -- Deterministic order for build identity: uptime picks the top 3, ability
+    -- id orders them (per-fight uptime must not influence the stored order,
+    -- or identical builds never pool together)
+    table.sort(foods, function(a, b) return a.abilityId < b.abilityId end)
     return foods
 end
 
@@ -467,6 +497,32 @@ end
 ---@class SetupCapture : StateObserver
 local setupCapture = {}
 BattleScrolls.setupCapture = setupCapture
+
+---Normalizes a setup captured before the current determinism rules, in
+---place: item links get their volatile condition/charge field normalized and
+---foods are re-sorted by ability id (old captures sorted by per-fight
+---uptime). New captures already satisfy both; this entry point exists so
+---the storage migration collapses historical setups into the pool.
+---@param setup PlayerSetup
+function setupCapture.normalizeSetup(setup)
+    if setup.equipSlots then
+        for i = 1, #setup.equipSlots do
+            local link = setup.equipSlots[i]
+            if type(link) == "string" then
+                setup.equipSlots[i] = normalizeEquipLink(link)
+            end
+        end
+    end
+    if setup.frontPoison and setup.frontPoison.itemLink then
+        setup.frontPoison.itemLink = normalizeEquipLink(setup.frontPoison.itemLink)
+    end
+    if setup.backPoison and setup.backPoison.itemLink then
+        setup.backPoison.itemLink = normalizeEquipLink(setup.backPoison.itemLink)
+    end
+    if setup.foods and #setup.foods > 1 then
+        table.sort(setup.foods, function(a, b) return a.abilityId < b.abilityId end)
+    end
+end
 
 local EVENT_NAMESPACE = "BattleScrolls_Setup"
 

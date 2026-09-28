@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Privacy policy · Battle Scrolls</title>
+<link rel="stylesheet" href="/fonts.css">
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #0b0b0c; color: #e4e2dc; font: 18px/1.65 'Barlow Semi Condensed', 'Fira Sans Condensed', sans-serif; }
+  main { max-width: 840px; margin: auto; padding: 32px 28px 64px; overflow-wrap: anywhere; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; border-bottom: 1px solid #3a3423; padding-bottom: 20px; }
+  .brand { color: #c9b473; letter-spacing: .08em; }
+  h1 { font-size: 2.2rem; line-height: 1.2; margin: 36px 0 10px; color: #f4f2ea; }
+  h2 { font-size: 1.4rem; color: #e8d9a8; margin: 32px 0 8px; }
+  p { margin: 8px 0 16px; }
+  .muted { color: #aaa69a; font-size: 16px; }
+  address { font-style: normal; border-left: 2px solid #c9b473; padding-left: 18px; margin: 26px 0; }
+  address span, address strong { display: block; }
+  a { color: #e8d9a8; text-underline-offset: 3px; }
+  a:hover { color: #fff5d8; }
+  select { max-width: 100%; font: inherit; font-size: 16px; background: #151516; color: #e4e2dc; border: 1px solid #6f6b60; padding: 6px 10px; border-radius: 3px; }
+  a:focus-visible, select:focus-visible { outline: 2px solid #c9b473; outline-offset: 4px; }
+  footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #3a3423; }
+</style>
+</head>
+<body>
+<main>
+  <header><span class="brand">Battle Scrolls</span>
+    <select id="language" aria-label="Language / Sprache / Idioma / Langue / 言語 / Язык / 语言">
+      <option value="en">English</option><option value="de">Deutsch</option>
+      <option value="es">Español</option><option value="fr">Français</option>
+      <option value="jp">日本語</option><option value="ru">Русский</option><option value="zh">简体中文</option>
+    </select>
+  </header>
+  <h1 id="title">Privacy policy</h1>
+  <p id="updated" class="muted"></p>
+  <address><strong id="operator-label"></strong><span id="operator"></span><a id="contact"></a></address>
+  <div id="content"></div>
+  <footer id="icon-credit" class="muted"></footer>
+</main>
+<script src="/privacy.js" defer></script>
+</body>
+</html>

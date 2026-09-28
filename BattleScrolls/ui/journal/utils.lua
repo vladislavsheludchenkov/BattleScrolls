@@ -1,3 +1,4 @@
+---@diagnostic disable: undefined-field, inject-field -- the ESO Control/ZO_* API stubs are too incomplete for field checking in UI code
 -----------------------------------------------------------
 -- Journal Utilities
 -- Standalone helper functions for journal UI rendering
@@ -93,10 +94,11 @@ end
 ---@param bytes number
 ---@return string
 function utils.formatBytes(bytes)
-    if bytes >= 1000000 then
-        return string.format("%.1f MB", bytes / 1000000)
-    elseif bytes >= 1000 then
-        return string.format("%.1f KB", bytes / 1000)
+    -- Binary units under the game's own labels: its memory display says MB for MiB
+    if bytes >= 1024 * 1024 then
+        return string.format("%.1f MB", bytes / (1024 * 1024))
+    elseif bytes >= 1024 then
+        return string.format("%.1f KB", bytes / 1024)
     else
         return string.format("%d bytes", bytes)
     end
@@ -166,6 +168,9 @@ end
 
 ---@type table<number, number>
 local abilityIconAbilityIdOverrides = {
+    [227116] = 217699, -- arcanist's banner (crux pulse) -> banner bearer grimoire
+    [252143] = 217699, -- arcanist's banner (ult pulse) -> banner bearer grimoire
+    [227381] = 163896, -- spattering disjunction (generic mage icon) -> whirlpool
     [201265] = 186370, -- pragmatic fatecarver shield -> damage
     [69118] = 63956, -- radiant glory heal -> damage
     [201275] = 183006, -- cephaliarch's flail heal -> damage
@@ -185,7 +190,42 @@ local abilityIconAbilityIdOverrides = {
     [39267] = 39266, -- Soul Shatter Rank 1 damage -> Soul Shatter Rank 1 passive
     [45584] = 45583, -- Soul Shatter Rank 2 damage -> Soul Shatter Rank 2 passive
     [107055] = 61919, -- Merciless Resolve heal -> Merciless Resolve active ability
+    [52703] = 31760, -- Light Weaver Ultimate -> Light Weaver passive
+    [36519] = 36514, -- mislabeled Rapid Stroke Passive -> Soul Harvest
+    [61274] = 59517, -- Bloodspawn Ultimate -> Bloodspawn proc
+    [108943] = 85564, -- Nature's Grasp Ultimate (achievement icon) -> active skill
+    [108945] = 85858, -- Nature's Embrace Ultimate (achievement icon) -> active skill
+    [108947] = 85859, -- Bursting Vines Ultimate (achievement icon) -> active skill
+    [124166] = 118623, -- mislabeled Necrotic Potency -> Deaden Pain
+    [151219] = 152673, -- Baron Zaudrus Ultimate -> Zaudrus's Ambition stacks
+    [263621] = 263586, -- Hold the Line -> Devout Guardian mastery
+    [267069] = 263585, -- Missionary of Light -> Bastion of Light mastery
     -- TODO: Grim Focus and Relentless Focus icons
+    -- BEGIN GENERATED ULTIMATE ICON DONORS (web/scripts/mine-icon-overrides.mjs)
+    [29474] = 29473, -- Blessing at the Peak -> Blessing at the Peak
+    [37233] = 32634, -- Insatiable Hunger -> Insatiable Hunger
+    [40495] = 40493, -- Shooting Star -> Shooting Star
+    [45146] = 36587, -- Transfer -> Transfer
+    [45217] = 31744, -- Prism -> Prism
+    [45600] = 35800, -- Banish the Wicked -> Banish the Wicked
+    [45620] = 39252, -- Combat Frenzy -> Combat Frenzy
+    [86357] = 85804, -- Enchanted Forest -> Enchanted Forest
+    [87224] = 86135, -- Crystallized Shield -> Crystallized Shield
+    [88513] = 86062, -- Savage Beast -> Savage Beast
+    [88771] = 86143, -- Shimmering Shield -> Shimmering Shield
+    [120612] = 116284, -- Corpse Consumption -> Corpse Consumption
+    [124136] = 115238, -- Bitter Harvest -> Bitter Harvest
+    [124192] = 118639, -- Necrotic Potency -> Necrotic Potency
+    [185070] = 185050, -- Implacable Outcome -> Implacable Outcome
+    [197510] = 192515, -- Goat -> Goat
+    [216940] = 215731, -- Potent Soul -> Sundering Soul
+    [217512] = 217459, -- Potent Burst -> Magical Burst
+    [238144] = 238141, -- Vengeance Bitter Harvest -> Vengeance Bitter Harvest
+    [263415] = 263412, -- Erudite's Rigor -> Erudite's Rigor
+    [263613] = 263603, -- Nocturnal Inspiration -> Nocturnal Inspiration
+    [263689] = 263607, -- Share the Spoils -> Share the Spoils
+    [267985] = 116284, -- Corpse Consumption -> Corpse Consumption
+    -- END GENERATED ULTIMATE ICON DONORS
 }
 
 ---Gets a UI icon for an ability, applying display-only ability-id remaps.
@@ -211,9 +251,12 @@ function utils.isPassiveIcon(abilityIcon)
     if not abilityIcon then return false end
     return string.find(abilityIcon, "passive", 1, true) ~= nil
         or string.find(abilityIcon, "ability_dragonknight_023", 1, true) ~= nil
+        or string.find(abilityIcon, "ability_dragonknight_024", 1, true) ~= nil -- Blessing at the Peak
         or string.find(abilityIcon, "ability_dragonknight_031", 1, true) ~= nil
+        or string.find(abilityIcon, "ability_dragonknight_034", 1, true) ~= nil -- Banish the Wicked
         or string.find(abilityIcon, "ability_psijic_009", 1, true) ~= nil
         or string.find(abilityIcon, "ability_psijic_010", 1, true) ~= nil
+        or string.find(abilityIcon, "ability_sorcerer_018", 1, true) ~= nil -- Stalwart
         or string.find(abilityIcon, "ability_sorcerer_026", 1, true) ~= nil
         or string.find(abilityIcon, "ability_sorcerer_047", 1, true) ~= nil
         or string.find(abilityIcon, "ability_sorcerer_054", 1, true) ~= nil
@@ -221,11 +264,16 @@ function utils.isPassiveIcon(abilityIcon)
         or string.find(abilityIcon, "ability_templar_012", 1, true) ~= nil
         or string.find(abilityIcon, "ability_templar_013", 1, true) ~= nil
         or string.find(abilityIcon, "ability_templar_014", 1, true) ~= nil
+        or string.find(abilityIcon, "ability_templar_018", 1, true) ~= nil -- Devout Guardian
+        or string.find(abilityIcon, "ability_templar_025", 1, true) ~= nil -- Bastion of Light
         or string.find(abilityIcon, "ability_templar_028", 1, true) ~= nil
+        or string.find(abilityIcon, "ability_templar_031", 1, true) ~= nil -- Prism
         or string.find(abilityIcon, "ability_weapon_001", 1, true) ~= nil
         or string.find(abilityIcon, "ability_weapon_021", 1, true) ~= nil
+        or string.find(abilityIcon, "ability_weapon_023", 1, true) ~= nil -- Combat Frenzy
         or string.find(abilityIcon, "ability_weapon_027", 1, true) ~= nil
         or string.find(abilityIcon, "ability_weapon_028", 1, true) ~= nil
+        or string.find(abilityIcon, "ability_werewolf_007", 1, true) ~= nil -- Insatiable Hunger
         or string.find(abilityIcon, "ability_werewolf_010", 1, true) ~= nil
 end
 

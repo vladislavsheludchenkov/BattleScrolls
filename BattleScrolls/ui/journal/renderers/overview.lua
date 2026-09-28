@@ -95,6 +95,8 @@ local function computeOverviewHealingDeliveryPercents(hotRaw, directRaw, shieldR
     }
 end
 
+-- FIXME: Share healing delivery totals with the Healing renderer through
+-- Arithmancer; keep the compact panel's visibility thresholds in the UI.
 ---@param totals { hot: number, direct: number, shield: number, regen: number }
 ---@param healingData HealingDone|HealingDoneDiffSource
 ---@param abilityInfo table<number, AbilityInfo>

@@ -21,6 +21,7 @@ pivot.configRenderer = configRenderer
 local DOMAIN_LABELS = {
     [pivot.Domain.OVERVIEW] = "BATTLESCROLLS_PIVOT_DOMAIN_OVERVIEW",
     [pivot.Domain.DAMAGE] = "BATTLESCROLLS_PIVOT_DOMAIN_DAMAGE",
+    [pivot.Domain.DAMAGE_GROUP] = "BATTLESCROLLS_TAB_GROUP_DAMAGE",
     [pivot.Domain.DAMAGE_IN] = "BATTLESCROLLS_TAB_DAMAGE_TAKEN",
     [pivot.Domain.HEALING_OUT] = "BATTLESCROLLS_PIVOT_DOMAIN_HEALING_OUT",
     [pivot.Domain.HEALING_IN] = "BATTLESCROLLS_PIVOT_DOMAIN_HEALING_IN",
@@ -190,8 +191,8 @@ function configRenderer.render(list, query, _journalUI)
     })
     domainEntry.pivotField = "domain"
 
-    -- Target filter (Damage domain only)
-    if query.domain == pivot.Domain.DAMAGE then
+    -- Target filter (Damage and Group Damage domains)
+    if query.domain == pivot.Domain.DAMAGE or query.domain == pivot.Domain.DAMAGE_GROUP then
         local targetMode = query.targetMode or pivot.TargetMode.ALL
         local targetEntry = EntryBuilder.addEntry(list, {
             label = getLabel("BATTLESCROLLS_PIVOT_TARGETS"),
@@ -295,6 +296,7 @@ function configRenderer.getFieldOptions(fieldName, query)
         for _, domain in ipairs({
             pivot.Domain.OVERVIEW,
             pivot.Domain.DAMAGE,
+            pivot.Domain.DAMAGE_GROUP,
             pivot.Domain.DAMAGE_IN,
             pivot.Domain.HEALING_OUT,
             pivot.Domain.HEALING_IN,
@@ -306,6 +308,8 @@ function configRenderer.getFieldOptions(fieldName, query)
             local opt = { key = domain, label = getLabel(DOMAIN_LABELS[domain]) }
             if domain == pivot.Domain.OVERVIEW then
                 opt.tooltip = GetString(BATTLESCROLLS_PIVOT_TIP_DOMAIN_OVERVIEW)
+            elseif domain == pivot.Domain.DAMAGE_GROUP then
+                opt.tooltip = GetString(BATTLESCROLLS_TOOLTIP_GROUP_DAMAGE_SCOPE)
             elseif domain == pivot.Domain.GROUP then
                 opt.tooltip = GetString(BATTLESCROLLS_PIVOT_TIP_DOMAIN_GROUP)
             end

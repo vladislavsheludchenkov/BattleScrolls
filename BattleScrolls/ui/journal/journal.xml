@@ -413,6 +413,59 @@
             </Controls>
         </Control>
 
+        <!-- Wide tooltip row with ESO's death recap fonts and textures. -->
+        <Control name="BattleScrolls_DeathRecapAttackRow" virtual="true">
+            <Dimensions y="64"/>
+            <Controls>
+                <Texture name="$(parent)Icon" tier="MEDIUM">
+                    <Dimensions x="56" y="56"/>
+                    <Anchor point="LEFT" offsetX="64"/>
+                </Texture>
+                <Backdrop name="$(parent)IconFrame" tier="LOW" pixelRoundingEnabled="false">
+                    <Anchor point="TOPLEFT" relativeTo="$(parent)Icon" offsetX="-4" offsetY="-4"/>
+                    <Anchor point="BOTTOMRIGHT" relativeTo="$(parent)Icon" offsetX="4" offsetY="4"/>
+                    <Edge file="EsoUI/Art/Miscellaneous/Gamepad/gp_emptyFrame_gold_edge.dds" edgeFileWidth="128" edgeFileHeight="16"/>
+                    <Center file="EsoUI/Art/Miscellaneous/Gamepad/gp_edgeFill.dds"/>
+                </Backdrop>
+                <Texture name="$(parent)KillingBlow"
+                         textureFile="EsoUI/Art/DeathRecap/deathRecap_killingBlow_icon.dds"
+                         hidden="true" tier="HIGH">
+                    <Dimensions x="64" y="64"/>
+                    <Anchor point="RIGHT" relativeTo="$(parent)Icon" relativePoint="LEFT" offsetX="-4"/>
+                </Texture>
+                <Control name="$(parent)Text">
+                    <Anchor point="LEFT" relativeTo="$(parent)Icon" relativePoint="RIGHT" offsetX="20"/>
+                    <Anchor point="RIGHT"/>
+                    <Controls>
+                        <Label name="$(grandparent)DamageLabel" font="ZoFontGamepad27"
+                               modifyTextType="UPPERCASE" text="SI_DEATH_RECAP_DAMAGE_LABEL"
+                               color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL">
+                            <Anchor point="RIGHT"/>
+                        </Label>
+                        <Label name="$(grandparent)Damage" font="ZoFontGamepad42"
+                               color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_SELECTED">
+                            <AnchorToBaseline relativeToLabel="$(grandparent)DamageLabel" side="LEFT" offsetX="-5"/>
+                        </Label>
+                        <Control name="$(grandparent)AttackText" resizeToFitDescendents="true">
+                            <Anchor point="LEFT"/>
+                            <Anchor point="RIGHT" relativeTo="$(grandparent)Damage" relativePoint="LEFT" offsetX="-10" constrains="X"/>
+                            <Controls>
+                                <Label name="$(parent)AttackerName" font="ZoFontGamepad27"
+                                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL"
+                                       maxLineCount="1" wrapMode="ELLIPSIS">
+                                    <Anchor point="TOPLEFT"/>
+                                    <Anchor point="TOPRIGHT"/>
+                                </Label>
+                                <Label name="$(parent)AttackName" font="ZoFontGamepad34"
+                                       color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_SELECTED"
+                                       modifyTextType="UPPERCASE" maxLineCount="1" wrapMode="ELLIPSIS"/>
+                            </Controls>
+                        </Control>
+                    </Controls>
+                </Control>
+            </Controls>
+        </Control>
+
         <!-- Death attack row for group Q3 - icon + ability name + damage value.
              Icon LEFT offset set in Lua to reserve space for killing blow skull. -->
         <Control name="BattleScrolls_DeathAttackRow" virtual="true">
@@ -593,6 +646,18 @@
                         </Label>
                     </Controls>
                 </Control>
+                <Control name="$(parent)Res">
+                    <Dimensions x="60"/>
+                    <Anchor point="LEFT" relativePoint="RIGHT" relativeTo="$(parent)Deaths"
+                            offsetX="ZO_GAMEPAD_INTERACTIVE_FILTER_LIST_HEADER_DOUBLE_PADDING_X"/>
+                    <Controls>
+                        <Label name="$(parent)Label" font="ZoFontGamepad27"
+                               horizontalAlignment="RIGHT" verticalAlignment="CENTER">
+                            <Dimensions x="45"/>
+                            <Anchor point="LEFT"/>
+                        </Label>
+                    </Controls>
+                </Control>
             </Controls>
         </Control>
 
@@ -726,6 +791,11 @@
                                         <Control name="$(parent)Deaths" inherits="ZO_GamepadInteractiveFilterHeader">
                                             <Dimensions x="80"/>
                                             <Anchor point="TOPLEFT" relativeTo="$(parent)Alive" relativePoint="TOPRIGHT"
+                                                    offsetX="ZO_GAMEPAD_INTERACTIVE_FILTER_LIST_HEADER_DOUBLE_PADDING_X"/>
+                                        </Control>
+                                        <Control name="$(parent)Res" inherits="ZO_GamepadInteractiveFilterHeader">
+                                            <Dimensions x="60"/>
+                                            <Anchor point="TOPLEFT" relativeTo="$(parent)Deaths" relativePoint="TOPRIGHT"
                                                     offsetX="ZO_GAMEPAD_INTERACTIVE_FILTER_LIST_HEADER_DOUBLE_PADDING_X"/>
                                         </Control>
                                     </Controls>

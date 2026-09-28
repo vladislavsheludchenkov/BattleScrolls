@@ -29,6 +29,8 @@ journal.NavigationMode = {
     STATS = 3,
     SETTINGS = 4,
     PIVOT = 5,
+    SHARE = 6,
+    WHATS_NEW = 7,
 }
 
 -------------------------
@@ -48,6 +50,7 @@ journal.StatsTab = {
     GROUP = 11,
     SETUP = 12,
     ACTIVITY = 13,
+    GROUP_DAMAGE = 14,
 }
 
 -------------------------
@@ -56,7 +59,7 @@ journal.StatsTab = {
 ---@alias TabGroupKey "DAMAGE"|"HEALING"|"EFFECTS"
 
 journal.TabGroups = {
-    DAMAGE  = { journal.StatsTab.BOSS_DAMAGE_DONE, journal.StatsTab.DAMAGE_DONE },
+    DAMAGE  = { journal.StatsTab.BOSS_DAMAGE_DONE, journal.StatsTab.DAMAGE_DONE, journal.StatsTab.GROUP_DAMAGE },
     HEALING = { journal.StatsTab.HEALING_OUT, journal.StatsTab.SELF_HEALING, journal.StatsTab.HEALING_IN },
     EFFECTS = { journal.StatsTab.EFFECTS_PLAYER, journal.StatsTab.EFFECTS_BOSS, journal.StatsTab.EFFECTS_GROUP },
 }
@@ -74,6 +77,7 @@ end
 journal.SubViewLabels = {
     [journal.StatsTab.BOSS_DAMAGE_DONE] = "BATTLESCROLLS_TAB_BOSS_DAMAGE_DONE",
     [journal.StatsTab.DAMAGE_DONE] = "BATTLESCROLLS_TAB_DAMAGE_DONE",
+    [journal.StatsTab.GROUP_DAMAGE] = "BATTLESCROLLS_TAB_GROUP_DAMAGE",
     [journal.StatsTab.HEALING_OUT] = "BATTLESCROLLS_TAB_HEALING_OUT",
     [journal.StatsTab.SELF_HEALING] = "BATTLESCROLLS_TAB_SELF_HEALING",
     [journal.StatsTab.HEALING_IN] = "BATTLESCROLLS_TAB_HEALING_IN",
@@ -110,6 +114,8 @@ journal.EncounterTab = {
 journal.FilterConstants = {
     SELF_UNIT_ID = -1,           -- Special ID for self in healing filters
     SELF_DISPLAY_NAME = "__SELF__", -- Special key for self in effects filter
+    SIDE_SELF = "self",          -- Group Damage side: the player, their pets and companions
+    SIDE_OTHERS = "others",      -- Group Damage side: everyone else the client observed
 }
 
 -------------------------
@@ -178,6 +184,11 @@ journal.StatIcons = {
     -- AOE vs Single Target
     AOE = "EsoUI/Art/Icons/scribing_primary_multihit.dds",
     SINGLE_TARGET = "EsoUI/Art/Icons/scribing_tertiary_vulnerability.dds",
+
+    -- Ultimate
+    ULTIMATE = "EsoUI/Art/Icons/scribing_primary_gainultimate.dds",
+    COMBAT = "EsoUI/Art/TreeIcons/Gamepad/gp_tutorial_idexIcon_combat.dds",
+    HEROISM = "EsoUI/Art/Icons/scribing_tertiary_heroism.dds",
 
     -- Deaths
     DEATH = "EsoUI/Art/ZoneStories/completionTypeIcon_groupBoss.dds",
@@ -252,6 +263,14 @@ journal.AbilityIconStyle = {
 ---@field targetFilter table<number, boolean>|nil Target unit filter (unitId -> true)
 ---@field sourceFilter table<number, boolean>|nil Source filter (unitId -> true)
 ---@field groupFilter table<string, boolean>|nil Group filter for effects (displayName -> true)
+---@field sourceSides JournalSourceSides|nil Group Damage side filter (nil = self and others)
+
+---Which side of the observed damage the Group Damage tab shows. The game never
+---reports unit ids for other players, so "others" is one pool and cannot be
+---split further.
+---@class JournalSourceSides
+---@field self boolean The player's own damage (pets and companions included)
+---@field others boolean Everything observed from other group members and their pets
 
 ---@alias NavigationMode
 ---| 1 # INSTANCES
@@ -259,6 +278,8 @@ journal.AbilityIconStyle = {
 ---| 3 # STATS
 ---| 4 # SETTINGS
 ---| 5 # PIVOT
+---| 6 # SHARE
+---| 7 # WHATS_NEW
 
 ---@alias StatsTab
 ---| 1 # OVERVIEW
@@ -274,6 +295,7 @@ journal.AbilityIconStyle = {
 ---| 11 # GROUP
 ---| 12 # SETUP
 ---| 13 # ACTIVITY
+---| 14 # GROUP_DAMAGE
 
 ---@alias InstanceTab
 ---| 1 # ALL
@@ -319,6 +341,7 @@ journal.AbilityIconStyle = {
 ---@class SharedDeathRecapAttack
 ---@field abilityId number
 ---@field damage number
+---@field attackerName string|nil Enemy name (local-only; never sent to group members)
 
 ---@class SharedDeathRecap
 ---@field timeOffsetMs number Ms from fight start when death occurred
@@ -341,6 +364,12 @@ journal.AbilityIconStyle = {
 ---@field abilityId number
 ---@field damagePercent number 0-1 fraction of known incoming damage, excluding unknown shielded damage
 
+---@class SharedZenBoss
+---@field bossTag string Boss unit tag ("boss1")
+---@field tagSeq number Sequence number within the tag (different bosses can reuse a tag)
+---@field avgStacksTenths number Average DoT stacks x10 while the Z'en debuff was up on this boss
+---@field timeAt5Ms number Time at 5 DoT stacks with Z'en up, in ms
+
 ---@class SharedEncounterData
 ---@field timestampS number Sender's fight start (Unix epoch)
 ---@field durationMs number Sender's fight duration in ms
@@ -358,6 +387,8 @@ journal.AbilityIconStyle = {
 ---@field topDamageTakenAbilities SharedDamageTakenAbility[] Top 5 damage-taken abilities
 ---@field deaths SharedDeaths|nil Death recap data (nil if player never died)
 ---@field setupHash number|nil 16-bit setup hash; nil only for historical shared data
+---@field resurrections number|nil Successful resurrection casts (v19+/protocol 439; nil from older senders)
+---@field zenByBoss SharedZenBoss[]|nil Per-boss Z'en delivery metrics, only bosses the debuff touched (v19+/protocol 439; nil from older senders or when Z'en never landed)
 
 ---@class SharedDataEntry
 ---@field displayName string Sender's display name (undecorated)
@@ -386,6 +417,9 @@ journal.AbilityIconStyle = {
 ---@field scriptIds number[] 3 script IDs (0 = empty)
 
 ---@class CompactSetup
+---@field _migrationFailed boolean|nil Legacy stored build failed round-trip verification; kept plain and not retried
+---@field _estimatedSize number|nil Cached chunk bytes when stored in the shared setup pool (BattleScrolls.sizeModel)
+---@field _estimatedSizeV number|nil Model version the cache was computed with
 ---@field classId number 4 bits
 ---@field raceId number 4 bits
 ---@field isVengeance boolean|nil True when this is a Vengeance ruleset setup

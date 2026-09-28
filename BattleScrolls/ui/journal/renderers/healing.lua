@@ -1,3 +1,4 @@
+---@diagnostic disable: undefined-field, inject-field -- the ESO Control/ZO_* API stubs are too incomplete for field checking in UI code
 -----------------------------------------------------------
 -- Healing Renderer
 -- Standalone renderer for healing-related stats tabs
@@ -258,6 +259,9 @@ end
 -- Healing Aggregation Helpers
 -------------------------
 
+-- FIXME: Move healing ability/source/unit aggregation and self-healing merges into
+-- Arithmancer, preserving raw/effective values, tick statistics, and async yields.
+
 ---Aggregates healing by source+ability from bySourceUnitIdByAbilityId structure (async with yields)
 ---@param healingData table The healing data with bySourceUnitIdByAbilityId
 ---@param healingField string "raw" or "real"
@@ -450,6 +454,8 @@ end
 
 -- calculateHealingTotals moved to utils.lua as utils.calculateHealingTotals
 
+-- FIXME: Centralize healing delivery aggregation, including self-healing, in
+-- Arithmancer for the list, Healing In/Out panels, and Overview to share.
 ---Aggregates healing delivery breakdown across multiple units
 ---@param healingData table Map of unitId to HealingDone/HealingDoneDiffSource
 ---@param abilityInfo table<number, AbilityInfo> Ability metadata for computing byHotVsDirect
@@ -935,6 +941,8 @@ local function refreshHealingViewAsync(list, durationSec, abilityInfo, unitNames
         local filteredData = config.filterFunc and config.filterFunc(config.groupData, config.filter) or config.groupData
         local includeSelf = not config.filter or config.filter[SELF_UNIT_ID] == true
 
+        -- FIXME: Reuse Arithmancer healing summaries here, preserving the filter's
+        -- self-healing inclusion rule for both raw and effective totals.
         -- Calculate totals
         local groupRaw, groupReal = utils.calculateHealingTotals(filteredData)
         local selfRaw = includeSelf and (config.selfHealing.total.raw or 0) or 0
@@ -1104,6 +1112,9 @@ end
 -------------------------
 -- Overview Panel Data Extraction Helpers
 -------------------------
+
+-- FIXME: Use shared Arithmancer healing aggregates for these panel extractors;
+-- keep localized name merging, sorting, and visible-row limits in the UI.
 
 ---@param abilityTotals table<number, number>
 ---@param maxCount number

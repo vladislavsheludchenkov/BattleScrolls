@@ -7,7 +7,7 @@ Known issues:
 
 Minor changes:
 - Ability tooltips now show the actual ESO ability ID in damage, healing, effects, proc, weaving, and setup views
-- Fixed several wrong or generic ability icons caused by ESO reporting hidden/helper ability IDs, including Pragmatic Fatecarver, Radiant Glory, Cephaliarch's Flail, potions, Essence Drain, Undaunted Command, Purify/Blood Feast synergies, Runeguard, Purifying Light, Practiced Incantation, and Harmony trait
+- Fixed several wrong or generic ability icons caused by ESO reporting hidden/helper ability IDs, including Pragmatic Fatecarver, Radiant Glory, Cephaliarch's Flail, potions, Essence Drain, Undaunted Command, Purify/Blood Feast synergies, Runeguard of Still Waters, Purifying Light, Practiced Incantation, and Harmony trait
 - It takes more HPS now to fill the personal meter bar
 - Healing composition labels now say "Healing by Type" and hide insignificant one-sided breakdowns
 

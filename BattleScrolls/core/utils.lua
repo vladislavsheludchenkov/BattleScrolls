@@ -98,10 +98,29 @@ function utils.countKeys(t)
     return count
 end
 
----Gets the display name of an ability, using base grimoire name if it is a scribed ability
+-- Hidden Ultimate components can retain another skill's name or an old mastery
+-- name. Use the owning skill's localized name without changing recorded IDs.
+---@type table<number, number>
+local abilityNameAbilityIdOverrides = {
+    [36519] = 36514, -- Rapid Stroke Passive -> Soul Harvest
+    [124166] = 118623, -- mislabeled Necrotic Potency -> Deaden Pain
+    [263621] = 263586, -- Hold the Line -> Devout Guardian
+    [267069] = 263585, -- Missionary of Light -> Bastion of Light
+}
+
+-- The Russian active skill still says "U38 Mythic 1". Its owning set effect
+-- has the correct localized name; other languages retain the active name.
+---@type table<number, table<string, number>>
+local localizedAbilityNameAbilityIdOverrides = {
+    [195031] = { ru = 196775 }, -- Crypt Transfer (called U38 Mythic 1 for some reason in Russian) -> Cryptcanon Vestments
+}
+
+---Gets the display name of an ability, using corrected component names and base grimoire names
 ---@param abilityId number The ability ID
 ---@return string The display name of the ability
 function utils.GetScribeAwareAbilityDisplayName(abilityId)
+    local localized = localizedAbilityNameAbilityIdOverrides[abilityId]
+    abilityId = (localized and localized[GetCVar("Language.2")]) or abilityNameAbilityIdOverrides[abilityId] or abilityId
     local craftedAbilityId = GetAbilityCraftedAbilityId(abilityId)
     if craftedAbilityId and craftedAbilityId ~= 0 then
         local craftedAbilityDisplayName = GetCraftedAbilityDisplayName(craftedAbilityId)
@@ -163,4 +182,3 @@ function utils.GetUndecoratedDisplayName(unitTag)
     end
     return UndecorateDisplayName(displayName)
 end
-

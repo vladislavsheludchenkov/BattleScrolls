@@ -191,15 +191,13 @@ end
 -- Color cache (weak keys for GC)
 local colorCache = setmetatable({}, { __mode = "k" })
 
----Generate a stable, vivid color from a display name
----Uses golden ratio to spread hues evenly, keeps saturation and lightness tuned for visibility
----Results are cached for performance
+---Generate the default color, independent of any saved or shared preference.
 ---@param displayName string
 ---@return number r Red (0-1)
 ---@return number g Green (0-1)
 ---@return number b Blue (0-1)
 ---@return number a Alpha (always 1)
-function utils.ColorFromName(displayName)
+function utils.defaultColorFromName(displayName)
     local cached = colorCache[displayName]
     if cached then
         return cached[1], cached[2], cached[3], cached[4]
@@ -218,6 +216,21 @@ function utils.ColorFromName(displayName)
     local r, g, b = utils.HSLToRGB(hue, saturation, lightness)
     colorCache[displayName] = { r, g, b, 1 }
     return r, g, b, 1
+end
+
+---Resolve a member's color, checking preferences before the cached default.
+---@param displayName string
+---@return number r
+---@return number g
+---@return number b
+---@return number a
+function utils.ColorFromName(displayName)
+    local prefsShare = BattleScrolls.prefsShare
+    local chosen = prefsShare and prefsShare.GetColorFor(displayName)
+    if chosen then
+        return chosen.r, chosen.g, chosen.b, 1
+    end
+    return utils.defaultColorFromName(displayName)
 end
 
 -- ==================== Role Icons ====================

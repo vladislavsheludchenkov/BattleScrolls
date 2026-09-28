@@ -15,6 +15,14 @@ BattleScrolls = BattleScrolls or {}
 ---@field maxTick number|nil
 
 ---@class BattleScrollsHealthRecovery : StateObserver
+---@field aliveMs number Time alive accumulated for the estimate window
+---@field rawRegenTotal number Sum of observed regen ticks
+---@field minTick number Smallest observed regen tick
+---@field maxTick number Largest observed regen tick
+---@field estimate HealthRecoveryEstimate|nil Regen estimate being built for the encounter
+---@field appliedRaw number Raw healing applied to the encounter so far
+---@field appliedEffective number Effective healing applied so far
+---@field appliedOverheal number Overheal applied so far
 local healthRecovery = {}
 
 BattleScrolls.healthRecovery = healthRecovery

@@ -1,7 +1,7 @@
 ## Title: Battle Scrolls
 ## Author: Semigroup1329
 ## Description: Combat metrics tracking on consoles with native gamepad UI.
-## APIVersion: 101049 101050
+## APIVersion: 101050 101051
 ## AddOnVersion: {{addon_version}}
 ## Version: {{version}}
 ## IsLibrary: False
@@ -23,6 +23,9 @@ havok/structures.lua
 ; Constants
 constants.lua
 
+; Vendored libraries
+lib/deflate.lua
+
 ; Core infrastructure
 core/utils.lua
 core/effect.lua
@@ -33,6 +36,10 @@ core/log.lua
 combat/arithmancer.lua
 combat/accumulators.lua
 combat/weaving.lua
+combat/ultimate.lua
+combat/crux.lua
+combat/resurrections.lua
+combat/zen.lua
 combat/effects.lua
 combat/effects_events.lua
 combat/effects_reconcile.lua
@@ -49,14 +56,19 @@ combat/setup_analysis.lua
 ; Storage domain
 storage/bitcodec.lua
 storage/binary.lua
+storage/sizemodel.lua
 storage/storage.lua
+storage/migration.lua
 
 ; Network domain
 network/lgb.lua
+network/prefsshare.lua
 network/dpsshare.lua
 network/dpssender.lua
 network/encountershare.lua
 network/setupshare.lua
+network/export.lua
+network/shareurl.lua
 
 ; Entry point
 main.lua
@@ -82,6 +94,7 @@ ui/journal/control_pool.lua
 ui/journal/component_factory.lua
 ui/journal/entry_builder.lua
 ui/journal/tooltips.lua
+ui/journal/color_picker.lua
 ui/journal/renderers/damage.lua
 ui/journal/renderers/healing.lua
 ui/journal/renderers/effects.lua
@@ -90,6 +103,7 @@ ui/journal/renderers/setup.lua
 ui/journal/renderers/overview.lua
 ui/journal/renderers/settings.lua
 ui/journal/renderers/activity.lua
+ui/journal/whats_new.lua
 ui/journal/keybinds.lua
 ui/journal/horizontal_list.lua
 ui/journal/settings_templates.lua
@@ -110,9 +124,11 @@ ui/journal/filters.lua
 ui/journal/overview_panel.lua
 ui/journal/chronicler.lua
 ui/journal/subheader.lua
+ui/journal/share_stepper.lua
 ui/journal/group_table.lua
 ui/journal/journal.xml
 ui/journal/dialogs.xml
+ui/journal/color_picker.xml
 
 ; UI - Onboarding
 ui/onboarding/onboarding.lua
@@ -120,6 +136,9 @@ ui/onboarding/onboarding.xml
 
 ; UI - Character Stats integration
 ui/character/character_stats.lua
+
+; Reclaim load-time garbage before SavedVariables: must be the last file
+core/startup_gc.lua
 
 # This Add-on is not created by, affiliated with, or sponsored by, ZeniMax Media Inc. or its affiliates.
 # The Elder Scrolls® and related logos are registered trademarks or trademarks of ZeniMax Media Inc. in the United States

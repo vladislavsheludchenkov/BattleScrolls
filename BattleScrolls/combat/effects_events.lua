@@ -82,7 +82,7 @@ local function onPlayerEffect(eventCode, changeType, effectSlot, effectName, uni
 end
 
 local function onBossEffect(_eventCode, changeType, effectSlot, _effectName, unitTag, beginTime, _endTime,
-                            stackCount, _iconName, _deprecatedBuffType, effectType, _abilityType,
+                            stackCount, _iconName, _deprecatedBuffType, effectType, abilityType,
                             _statusEffectType, unitName, unitId, abilityId, sourceType)
     local s = BattleScrolls.state
     if not s then return end
@@ -97,6 +97,8 @@ local function onBossEffect(_eventCode, changeType, effectSlot, _effectName, uni
         s:CorrelateBossUnitId(unitTag, unitId, unitName)
     end
     if trackBossEffectsThisCombat then
+        -- Z'en/DoT-count tracking rides the same gate as boss debuff tracking
+        BattleScrolls.zen.handleBossEffect(s, changeType, effectSlot, unitTag, effectType, abilityType, abilityId, sourceType)
         effects.handleBossEffect(s, changeType, effectSlot, unitTag, effectType, stackCount, abilityId, unitId, sourceType, beginTime)
     end
 end
@@ -137,8 +139,10 @@ local function onBossDeathState(_eventCode, unitTag, isDead)
     if not s then return end
     if isDead then
         effects.handleUnitDeath(s, unitTag)
+        BattleScrolls.zen.handleUnitDeath(s, unitTag)
     else
         effects.handleUnitAlive(s, unitTag)
+        BattleScrolls.zen.handleUnitAlive(s, unitTag)
     end
 end
 
@@ -158,6 +162,7 @@ local function onBossDestroyed(_eventCode, unitTag)
     local s = BattleScrolls.state
     if not s then return end
     effects.handleUnitDeath(s, unitTag)
+    BattleScrolls.zen.handleUnitDeath(s, unitTag)
 end
 
 local function onGroupDestroyed(_eventCode, unitTag)

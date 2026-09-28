@@ -1,3 +1,4 @@
+---@diagnostic disable: undefined-field, inject-field -- the ESO Control/ZO_* API stubs are too incomplete for field checking in UI code
 -----------------------------------------------------------
 -- Effects Renderer
 -- Standalone renderer for effects stats tab
@@ -234,6 +235,9 @@ end
 -------------------------
 -- Shared Aggregation Helpers
 -------------------------
+
+-- FIXME: Move group buff/boss debuff aggregation and uptime/contribution metrics
+-- into Arithmancer, preserving alive-time weighting and concurrent-instance handling.
 
 ---@class GroupBuffAggregation
 ---@field totalActiveTimeMs number Sum of active time across all members

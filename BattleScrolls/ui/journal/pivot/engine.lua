@@ -84,10 +84,25 @@ local function filterToBossTargets(damageByUnitId, bossTagSeqByUnitId)
     return filtered
 end
 
+---Appends every per-ability breakdown of a nested damage map to a flat list
+---@param damageTable table<number, table<number, DamageDoneStorage>>|nil
+---@param into DamageBreakdown[]
+local function collectDamageBreakdowns(damageTable, into)
+    for _, byTarget in pairs(damageTable or {}) do
+        for _, byAbility in pairs(byTarget) do
+            for _, bd in pairs(byAbility) do
+                table.insert(into, bd)
+            end
+        end
+    end
+end
+
 --- Maximum number of value columns (row label column is separate)
 local MAX_VALUE_COLUMNS = 10
 --- Maximum number of result rows to prevent memory exhaustion on large queries
 local MAX_RESULT_ROWS = 500
+--- Encounters processed between awaited collections
+local GC_ENCOUNTER_BATCH_SIZE = 5
 
 -------------------------
 -- Scope Resolution
@@ -813,14 +828,20 @@ function engine.runDecodeQueryAsync(query, scopedEncounters, onProgress)
                 end
             end
 
-            -- Decode encounter
-            local decoded = binaryStorage.decodeEncounterAsync(se.encounter):Await()
+            -- Decode encounter (the storage wrapper resolves the instance's
+            -- ability/name registry for v17+ encounters)
+            local decoded = BattleScrolls.storage.DecodeEncounterAsync(se.encounter, se.instance):Await()
             if decoded then
-                -- Boss-only target filter: replace damageByUnitId with filtered copy
-                if query.targetMode == pivot.TargetMode.BOSSES
-                    and decoded.damageByUnitId and decoded.bossTagSeqByUnitId then
-                    decoded.damageByUnitId = filterToBossTargets(
-                        decoded.damageByUnitId, decoded.bossTagSeqByUnitId)
+                -- Boss-only target filter: replace the damage maps with filtered copies
+                if query.targetMode == pivot.TargetMode.BOSSES and decoded.bossTagSeqByUnitId then
+                    if decoded.damageByUnitId then
+                        decoded.damageByUnitId = filterToBossTargets(
+                            decoded.damageByUnitId, decoded.bossTagSeqByUnitId)
+                    end
+                    if query.domain == pivot.Domain.DAMAGE_GROUP and decoded.damageByUnitIdGroup then
+                        decoded.damageByUnitIdGroup = filterToBossTargets(
+                            decoded.damageByUnitIdGroup, decoded.bossTagSeqByUnitId)
+                    end
                 end
 
                 local durationS = decoded.durationMs / 1000
@@ -859,21 +880,12 @@ function engine.runDecodeQueryAsync(query, scopedEncounters, onProgress)
                         -- Collect all breakdowns for the domain into a flat list
                         local allBreakdowns = {}
                         if query.domain == pivot.Domain.DAMAGE then
-                            for _, byTarget in pairs(decoded.damageByUnitId or {}) do
-                                for _, byAbility in pairs(byTarget) do
-                                    for _, bd in pairs(byAbility) do
-                                        table.insert(allBreakdowns, bd)
-                                    end
-                                end
-                            end
+                            collectDamageBreakdowns(decoded.damageByUnitId, allBreakdowns)
+                        elseif query.domain == pivot.Domain.DAMAGE_GROUP then
+                            collectDamageBreakdowns(decoded.damageByUnitId, allBreakdowns)
+                            collectDamageBreakdowns(decoded.damageByUnitIdGroup, allBreakdowns)
                         elseif query.domain == pivot.Domain.DAMAGE_IN then
-                            for _, byTarget in pairs(decoded.damageTakenByUnitId or {}) do
-                                for _, byAbility in pairs(byTarget) do
-                                    for _, bd in pairs(byAbility) do
-                                        table.insert(allBreakdowns, bd)
-                                    end
-                                end
-                            end
+                            collectDamageBreakdowns(decoded.damageTakenByUnitId, allBreakdowns)
                         elseif query.domain == pivot.Domain.HEALING_OUT
                             or query.domain == pivot.Domain.HEALING_IN then
                             local hs = decoded.healingStats
@@ -1002,7 +1014,12 @@ function engine.runDecodeQueryAsync(query, scopedEncounters, onProgress)
                     end
                 end
             end
-            -- decoded goes out of scope, GC can collect
+            -- Release decoded data before collecting each batch, including
+            -- the final partial batch before building the result.
+            decoded = nil
+            if idx % GC_ENCOUNTER_BATCH_SIZE == 0 or idx == #scopedEncounters then
+                BattleScrolls.gc:CollectFullAsync():Await()
+            end
 
             if onProgress then onProgress(idx, #scopedEncounters) end
         end

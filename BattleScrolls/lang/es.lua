@@ -59,7 +59,7 @@ local strings = {
     [BATTLESCROLLS_STAT_TIME_LOST] = "Tiempo perdido",
     [BATTLESCROLLS_STAT_LIGHT_ATTACKS] = "Ataques ligeros",
     [BATTLESCROLLS_STAT_HEAVY_ATTACKS] = "Ataques pesados",
-    [BATTLESCROLLS_STAT_SKILL_ACTIVATIONS] = "Habilidades",
+    [BATTLESCROLLS_STAT_SKILL_ACTIVATIONS] = "Habilidades lanzadas",
     [BATTLESCROLLS_STAT_CASTS] = "Lanzamientos",
     [BATTLESCROLLS_STAT_WEAVING_ERRORS] = "Errores de weaving",
     [BATTLESCROLLS_STAT_MISSED_LA] = "Ligeros perdidos",
@@ -68,9 +68,9 @@ local strings = {
     [BATTLESCROLLS_TOOLTIP_DELAY_BEFORE] = "Retraso antes de lanzar",
     [BATTLESCROLLS_FORMAT_SECONDS] = "<<1>>s",
     [BATTLESCROLLS_FORMAT_MILLISECONDS] = "<<1>>ms",
-    [BATTLESCROLLS_TOOLTIP_INTER_CAST_DESC] = "Retraso medio entre lanzamientos. Se mide desde que termina el GCD o el tiempo de lanzamiento de una habilidad hasta que comienza la siguiente acción. También conocido como Weaving Average en CMX.",
-    [BATTLESCROLLS_TOOLTIP_TIME_LOST_DESC] = "Tiempo total entre lanzamientos durante el encuentro. También conocido como Weaving Total en CMX.",
-    [BATTLESCROLLS_TOOLTIP_MISSED_LA_DESC] = "Habilidad lanzada directamente tras otra habilidad, sin un ataque ligero entre medias.",
+    [BATTLESCROLLS_TOOLTIP_INTER_CAST_DESC] = "Hueco medio entre lanzamientos, medido desde que acaba el tiempo de reutilización global o el tiempo de lanzamiento de una habilidad hasta tu siguiente acción. En Combat Metrics se llama Weaving Average.",
+    [BATTLESCROLLS_TOOLTIP_TIME_LOST_DESC] = "La suma de los retrasos cortos de lanzamiento, sin pausas de 3 segundos o más (tiempo inactivo). En Combat Metrics se llama Weaving Total.",
+    [BATTLESCROLLS_TOOLTIP_MISSED_LA_DESC] = "Habilidades lanzadas justo después de otra habilidad, sin un ataque ligero entre medias.",
     [BATTLESCROLLS_TOOLTIP_DOUBLE_LA_DESC] = "Dos ataques ligeros seguidos, sin una habilidad entre medias.",
 
     -------------------------
@@ -93,7 +93,7 @@ local strings = {
 
     [BATTLESCROLLS_SETTINGS_PERSONAL_METER] = "Medidor personal",
     [BATTLESCROLLS_SETTINGS_GROUP_METER] = "Medidor de grupo",
-    [BATTLESCROLLS_SETTINGS_GROUP_METER_TEXT] = "Los miembros de tu grupo aún podrán ver tu DPS si tienen el addon instalado.",
+    [BATTLESCROLLS_SETTINGS_GROUP_METER_TEXT] = "Los miembros de tu grupo aún podrán ver tu DPS si tienen el complemento instalado.",
     [BATTLESCROLLS_SETTINGS_ENABLED] = "Activado",
     [BATTLESCROLLS_SETTINGS_MODE] = "Modo",
     [BATTLESCROLLS_SETTINGS_DESIGN] = "Diseño",
@@ -163,17 +163,18 @@ local strings = {
     [BATTLESCROLLS_SETTINGS_STORAGE_SIZE_YOLO] = "¿Qué podría salir mal?",
     -- Storage tooltip
     [BATTLESCROLLS_SETTINGS_STORAGE_TT_DESC] = "Cuánto historial de combate guardar. Cuando se supera el límite, las zonas más antiguas no bloqueadas se eliminan automáticamente. Puedes bloquear zonas individuales para protegerlas de la limpieza.",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_NOTE] = "Este límite se aplica solo al historial guardado. El addon también usa memoria para el combate actual y la interfaz, por lo que el uso total será mayor.",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_NOTE] = "Este límite se aplica solo a los datos guardados: combates, arquetipos y ajustes. El complemento también usa memoria para el combate actual y la interfaz, por lo que el uso total será mayor.",
     [BATTLESCROLLS_SETTINGS_STORAGE_TT_CURRENT] = "Historial: <<1>> MB de <<2>> MB (<<3>>%)",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_PRESETS] = "Presets (prueba ~0.5-1 MB, mazmorra ~0.25-0.5 MB):",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_XS] = "  Extra pequeño: 5 MB - unas pocas partidas recientes",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_SMALL] = "  Pequeño: 8 MB - una noche de prog",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_MEDIUM] = "  Medio: 12 MB - una semana de juego casual",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_LARGE] = "  Grande: 18 MB - un par de semanas",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_XL] = "  Extra grande: 25 MB - un mes de recuerdos",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_CAUTION] = "  Ten cuidado: 40 MB - te gustan mucho los datos",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_YOLO] = "  ¿Qué podría salir mal?: 60 MB - viviendo peligrosamente",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_WARNING] = "Sobre los límites de memoria de ESO: todos los addons comparten 100 MB. A 70 MB, ESO muestra una advertencia. A 100 MB, la interfaz se reinicia y todo se desactiva. Si usas muchos addons, elige un preset más pequeño. Consejo: escribe /addonmemdisplay en el chat para ver un monitor en tiempo real.",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_PROTECTED] = "Solo los combates bloqueados, los arquetipos y los ajustes ya superan el límite: la limpieza no puede bajar de él.",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_PRESETS] = "Presets (prueba completa ~0.3 MB, mazmorra ~0.15 MB, una noche de prog ~1 MB):",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_XS] = "  Extra pequeño: 5 MB - solo los pergaminos más recientes",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_SMALL] = "  Pequeño: 8 MB - una buena pila de pergaminos",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_MEDIUM] = "  Medio: 12 MB - un diario bien llevado",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_LARGE] = "  Grande: 18 MB - una biblioteca personal",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_XL] = "  Extra grande: 25 MB - un gran archivo",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_CAUTION] = "  Ten cuidado: 35 MB - te gustan mucho los datos",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_YOLO] = "  ¿Qué podría salir mal?: 50 MB - tú te lo has buscado",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_WARNING] = "Sobre los límites de memoria de ESO: todos los complementos comparten 100 MB. A 70 MB, ESO muestra una advertencia. A 100 MB, la interfaz se reinicia y todo se desactiva. Si usas muchos complementos, elige un preset más pequeño. Consejo: escribe /addonmemdisplay en el chat para ver un monitor en tiempo real.",
 
     -------------------------
     -- Effect Tracking Settings
@@ -239,7 +240,6 @@ local strings = {
     -- Proc Tracking
     [BATTLESCROLLS_HEADER_PROC_TRACKING] = "Seguimiento de procs",
     [BATTLESCROLLS_STAT_TOTAL_PROCS] = "<<1[$d proc/$d procs]>>",
-    [BATTLESCROLLS_STAT_MEDIAN_INTERVAL] = "mediana",
 
     -------------------------
     -- Damage Stats Details
@@ -251,6 +251,8 @@ local strings = {
     [BATTLESCROLLS_STAT_DPS] = "DPS",
 
     [BATTLESCROLLS_HEADER_BY_ABILITY] = "Por habilidad",
+
+    [BATTLESCROLLS_HEADER_CASTS] = "Lanzamientos",
     [BATTLESCROLLS_HEADER_BY_DAMAGE_TYPE] = "Por tipo de daño",
     [BATTLESCROLLS_HEADER_DIRECT_VS_DOT] = "Directo vs DoT",
     [BATTLESCROLLS_HEADER_DAMAGE_DELIVERY] = "Aplicación de daño",
@@ -334,6 +336,7 @@ local strings = {
     [BATTLESCROLLS_TOOLTIP_AVG_TICK] = "Tick promedio",
     [BATTLESCROLLS_TOOLTIP_MIN_TICK] = "Tick mín",
     [BATTLESCROLLS_TOOLTIP_MAX_TICK] = "Tick máx",
+    [BATTLESCROLLS_TOOLTIP_TICKS] = "Ticks",
 
     [BATTLESCROLLS_TOOLTIP_BY_TARGET] = "Por objetivo",
     [BATTLESCROLLS_TOOLTIP_MEAN_INTERVAL] = "Intervalo promedio",
@@ -406,8 +409,8 @@ local strings = {
     -------------------------
     -- LibHarvensAddonSettings Integration
     -------------------------
-    [BATTLESCROLLS_LIBHARVENS_OPEN_BUTTON] = "Abrir Battle Scrolls",
-    [BATTLESCROLLS_LIBHARVENS_TOOLTIP] = "Battle Scrolls también es accesible desde el menú <<1>>.",
+    [BATTLESCROLLS_LIBHARVENS_OPEN_BUTTON] = "Abrir Pergaminos de Batalla",
+    [BATTLESCROLLS_LIBHARVENS_TOOLTIP] = "También puedes abrir Pergaminos de Batalla desde el menú <<1>>.",
 
     -------------------------
     -- Misc
@@ -518,13 +521,13 @@ local strings = {
     [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_SMOOTH] = "Fluido",
     [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_CUSTOM] = "Personalizado (<<1>> FPS)",
     [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_TITLE] = "Velocidad de procesamiento",
-    [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_TEXT] = "Controla la velocidad de procesamiento de tareas en segundo plano. Afecta principalmente la interfaz del Diario y el tiempo entre el fin del combate y la aparición del encuentro en la lista.\n\nRendimiento: Procesamiento más rápido. Puede causar breves tirones.\nFluido: Gameplay más fluido, procesamiento más lento. Puede causar que los encuentros se queden cargando o no aparezcan en el Diario.\n\nEsta configuración afecta a TODOS los addons que usan LibAsync.",
+    [BATTLESCROLLS_SETTINGS_ASYNC_SPEED_TEXT] = "Controla la velocidad de procesamiento de tareas en segundo plano. Afecta principalmente la interfaz del Diario y el tiempo entre el fin del combate y la aparición del encuentro en la lista.\n\nRendimiento: Procesamiento más rápido. Puede causar breves tirones.\nFluido: Gameplay más fluido, procesamiento más lento. Puede causar que los encuentros se queden cargando o no aparezcan en el Diario.\n\nEsta configuración afecta a TODOS los complementos que usan LibAsync.",
 
     -------------------------
     -- Onboarding
     -------------------------
-    [BATTLESCROLLS_ONBOARDING_WELCOME_TITLE] = "Bienvenido a Battle Scrolls",
-    [BATTLESCROLLS_ONBOARDING_WELCOME_TEXT] = "Battle Scrolls graba tus encuentros de combate y te permite revisarlos después en el Diario.\n\nCaracterísticas:\n- Medidores DPS/HPS en tiempo real\n- Desglose detallado de daño y curación\n- Seguimiento de tiempo activo de buffs/debuffs\n- Monitoreo de debuffs en jefes\n\nVamos a configurar algunas cosas.",
+    [BATTLESCROLLS_ONBOARDING_WELCOME_TITLE] = "Bienvenido a Pergaminos de Batalla",
+    [BATTLESCROLLS_ONBOARDING_WELCOME_TEXT] = "Con Pergaminos de Batalla puedes registrar tus combates y revisarlos después en el Diario.\n\nCaracterísticas:\n- Medidores DPS/HPS en tiempo real\n- Desglose detallado de daño y curación\n- Seguimiento de tiempo activo de buffs/debuffs\n- Monitoreo de debuffs en jefes\n\nVamos a configurar algunas cosas.",
     [BATTLESCROLLS_ONBOARDING_GET_STARTED] = "Empezar",
     [BATTLESCROLLS_ONBOARDING_GET_STARTED_DESC] = "Guíame por las opciones de configuración",
     [BATTLESCROLLS_ONBOARDING_SKIP] = "Saltar",
@@ -546,11 +549,11 @@ local strings = {
     -- Storage options
     [BATTLESCROLLS_ONBOARDING_STORAGE_QUESTION] = "¿Cuánto historial guardar?",
     [BATTLESCROLLS_ONBOARDING_STORAGE_MINIMAL] = "Mínimo (5 MB)",
-    [BATTLESCROLLS_ONBOARDING_STORAGE_MINIMAL_DESC] = "Aproximadamente 6 pruebas",
+    [BATTLESCROLLS_ONBOARDING_STORAGE_MINIMAL_DESC] = "Aproximadamente 15 pruebas",
     [BATTLESCROLLS_ONBOARDING_STORAGE_MODERATE] = "Moderado (12 MB)",
-    [BATTLESCROLLS_ONBOARDING_STORAGE_MODERATE_DESC] = "Aproximadamente 16 pruebas",
+    [BATTLESCROLLS_ONBOARDING_STORAGE_MODERATE_DESC] = "Aproximadamente 40 pruebas",
     [BATTLESCROLLS_ONBOARDING_STORAGE_GENEROUS] = "Generoso (25 MB)",
-    [BATTLESCROLLS_ONBOARDING_STORAGE_GENEROUS_DESC] = "Aproximadamente 36 pruebas",
+    [BATTLESCROLLS_ONBOARDING_STORAGE_GENEROUS_DESC] = "Aproximadamente 80 pruebas",
     -- Effects tracking
     [BATTLESCROLLS_ONBOARDING_EFFECTS_QUESTION] = "¿Cuánto seguimiento de buff/debuff quieres?",
     [BATTLESCROLLS_ONBOARDING_EFFECTS_FULL] = "Seguimiento completo",
@@ -561,8 +564,8 @@ local strings = {
     [BATTLESCROLLS_ONBOARDING_EFFECTS_DISABLED_DESC] = "Sin seguimiento de buff/debuff. Menor uso de memoria, pero sin datos de tiempo activo en informes.",
     -- Completion
     [BATTLESCROLLS_ONBOARDING_COMPLETE_TITLE] = "¡Todo listo!",
-    [BATTLESCROLLS_ONBOARDING_COMPLETE_TEXT] = "Battle Scrolls está listo para rastrear tu combate.\n\n¡Ahora ve a luchar!\n\nTus encuentros aparecerán aquí en el Diario. Puedes ajustar estos ajustes en cualquier momento desde la pestaña de Ajustes.",
-    [BATTLESCROLLS_ONBOARDING_CHAT_MESSAGE] = "[Battle Scrolls] ¡Gracias por instalar! Abre Diario > Battle Scrolls para configurar y activar.",
+    [BATTLESCROLLS_ONBOARDING_COMPLETE_TEXT] = "Todo listo para registrar tus combates con Pergaminos de Batalla.\n\n¡Ahora ve a luchar!\n\nTus encuentros aparecerán aquí en el Diario. Puedes ajustar estos ajustes en cualquier momento desde la pestaña de Ajustes.",
+    [BATTLESCROLLS_ONBOARDING_CHAT_MESSAGE] = "[Pergaminos de Batalla] ¡Gracias por instalar! Abre Diario > Pergaminos de Batalla para configurar y activar.",
     [BATTLESCROLLS_ONBOARDING_CONTINUE] = "Continuar",
     [BATTLESCROLLS_ONBOARDING_FINISH] = "Finalizar configuración",
     [BATTLESCROLLS_ONBOARDING_LETS_GO] = "¡Vamos!",
@@ -922,3 +925,466 @@ local strings = {
 for stringId, stringValue in pairs(strings) do
     SafeAddString(stringId, stringValue, 1)
 end
+
+-- v17 storage migration
+local migrationStrings = {
+    [BATTLESCROLLS_MIGRATION_START] = "Actualización única de almacenamiento en curso - puede haber tirones durante unos minutos",
+    [BATTLESCROLLS_MIGRATION_DONE] = "¡Actualización de almacenamiento completada! <<1>> combates recodificados, <<2>> MB liberados",
+    [BATTLESCROLLS_MIGRATION_TIP] = "Ya puedes bajar el preset de memoria en los ajustes; el nuevo formato guarda mucho más historial en cada MB.",
+}
+for stringId, stringValue in pairs(migrationStrings) do
+    SafeAddString(stringId, stringValue, 1)
+end
+
+-- Online sharing
+local shareStrings = {
+    [BATTLESCROLLS_SHARE_FIGHT] = "Compartir combate",
+    [BATTLESCROLLS_SHARE_INSTANCE] = "Subir todos los combates",
+    [BATTLESCROLLS_SHARE_PREPARING] = "Preparando el enlace...",
+    [BATTLESCROLLS_SHARE_TITLE] = "Compartir",
+    [BATTLESCROLLS_SHARE_PROGRESS_HEADER] = "Partes",
+    [BATTLESCROLLS_SHARE_PART_SENT] = "Parte <<1>> — enviada",
+    [BATTLESCROLLS_SHARE_PART_READY] = "Parte <<1>> — lista para enviar",
+    [BATTLESCROLLS_SHARE_PART_PENDING] = "Parte <<1>>",
+    [BATTLESCROLLS_SHARE_SEND_PART] = "Enviar parte <<1>> de <<2>>",
+    [BATTLESCROLLS_SHARE_HINT_HEADER] = "Cómo funciona",
+    [BATTLESCROLLS_SHARE_PRIVACY_TITLE] = "Los nombres y datos de combate se guardarán en línea",
+    [BATTLESCROLLS_SHARE_PRIVACY_NOTICE] = "La subida incluye tu nombre y los de otros jugadores, plataforma, servidor, estadísticas de combate y configuraciones. Los informes no caducan automáticamente y cualquiera con el enlace puede verlos o descargarlos. Informa a los jugadores afectados antes de compartir. Privacidad y solicitudes de eliminación: <<1>>",
+    [BATTLESCROLLS_SHARE_TT_READY] = "Confirma el aviso del juego: la página del navegador que se abre envía esta parte de los datos de combate al sitio, y después puedes cerrar el navegador. Vuelve al juego y envía la siguiente parte; el progreso se conserva aunque salgas de esta pantalla. Cuando lleguen todas las partes, la página mostrará tu enlace no listado y un código QR.",
+    [BATTLESCROLLS_SHARE_TT_SENT] = "Esta parte ya se entregó al navegador. Si la página del navegador indica que falta (una pestaña que se cierra inesperadamente pierde su parte), selecciona esta fila y pulsa la tecla de reenvío.",
+    [BATTLESCROLLS_SHARE_TT_PENDING] = "Las partes se envían una a una, en orden: esta se desbloqueará cuando le toque.",
+    [BATTLESCROLLS_SHARE_TT_DONE] = "La página del navegador muestra ahora el enlace no listado y el código QR: solo quien tenga el enlace puede abrirlo. Si la página indica partes que faltan, selecciónalas arriba y reenvíalas. «Terminar el envío» descarta la subida en el juego.",
+    [BATTLESCROLLS_SHARE_CHOICE_HEADER] = "Qué enviar",
+    [BATTLESCROLLS_SHARE_CHOICE_FULL] = "Todos los combates (<<1>>)",
+    [BATTLESCROLLS_SHARE_CHOICE_BOSSES] = "Solo jefes (<<1>>)",
+    [BATTLESCROLLS_SHARE_CHOICE_PARTS] = "Partes a enviar: <<1>>",
+    [BATTLESCROLLS_SHARE_TT_CHOICE_FULL] = "Todos los combates registrados de esta instancia, incluida la morralla. Más datos: más partes que enviar por el navegador.",
+    [BATTLESCROLLS_SHARE_TT_CHOICE_BOSSES] = "Solo los combates contra jefes. La morralla suele ocupar la mayor parte del tamaño, así que habrá bastantes menos partes.",
+    [BATTLESCROLLS_SHARE_DONE_HEADER] = "Todas las partes enviadas",
+    [BATTLESCROLLS_SHARE_DONE_HINT] = "El enlace y el código QR están en la página del navegador.",
+    [BATTLESCROLLS_SHARE_CONTINUE] = "Seguir compartiendo",
+    [BATTLESCROLLS_SHARE_CANCEL] = "Cancelar envío",
+    [BATTLESCROLLS_SHARE_FAILED] = "No se pudo preparar el enlace.",
+    [BATTLESCROLLS_SHARE_RESEND_PART] = "Reenviar parte <<1>>",
+    [BATTLESCROLLS_SHARE_PART_RESENDING] = "Parte <<1>> — reenviando…",
+    [BATTLESCROLLS_SHARE_FINISH] = "Terminar de compartir",
+}
+for id, str in pairs(shareStrings) do
+    SafeAddString(id, str, 1)
+end
+
+-- Nuevas funciones: renombrar, daño de banda, resurrecciones, color de barra, habilidad máxima, Crux, Z'en
+local featureStrings = {
+    [BATTLESCROLLS_RENAME] = "Renombrar",
+    [BATTLESCROLLS_RENAME_TEXT] = "Introduce un nombre nuevo. Introduce el nombre original (<<1>>) para restablecerlo.",
+
+    [BATTLESCROLLS_TAB_GROUP_DAMAGE] = "Daño del grupo",
+    [BATTLESCROLLS_FILTER_GROUP_DAMAGE] = "Filtrar daño del grupo",
+    [BATTLESCROLLS_FILTER_OTHERS] = "Otros",
+    [BATTLESCROLLS_TOOLTIP_GROUP_DAMAGE_SCOPE] = "Todo el daño que ha registrado tu cliente del juego: el tuyo, incluidas mascotas y compañeros, y el de otros jugadores cercanos. ESO no identifica a esos otros jugadores, por lo que su daño se agrupa en «Otros».",
+
+    [BATTLESCROLLS_GROUP_COL_RES] = "Res",
+
+    [BATTLESCROLLS_SETTINGS_BAR_COLOR] = "Color de tu barra",
+    [BATTLESCROLLS_SETTINGS_BAR_COLOR_TEXT] = "Los miembros del grupo que usan Pergaminos de Batalla con el diseño «Barras» ven tu barra de este color, aunque uses otro diseño o desactives tu propio medidor de grupo.",
+    [BATTLESCROLLS_COLOR_DEFAULT] = "Predeterminado",
+    [BATTLESCROLLS_COLOR_WHEEL] = "Tono y saturación",
+    [BATTLESCROLLS_COLOR_BRIGHTNESS] = "Brillo",
+    [BATTLESCROLLS_COLOR_HEX] = "Código hex",
+    [BATTLESCROLLS_COLOR_HEX_INVALID] = "Introduce seis dígitos hex, por ejemplo #3EB6FF.",
+    [BATTLESCROLLS_COLOR_SAVE] = "Guardar",
+    [BATTLESCROLLS_COLOR_SAVE_HINT] = "Tu barra tendrá este color en Pergaminos de Batalla para quienes usen «Barras», sea cual sea tu diseño.",
+
+    [BATTLESCROLLS_HEADER_ULTIMATE] = "Habilidad máxima",
+    [BATTLESCROLLS_STAT_ULT_AT_ENTRY] = "Máxima al entrar en combate",
+    [BATTLESCROLLS_STAT_ULT_GENERATED] = "Máxima generada",
+    [BATTLESCROLLS_STAT_ULT_SPENT_DRAINED] = "Máxima gastada y drenada",
+    [BATTLESCROLLS_STAT_ULT_SPENT] = "Máxima gastada",
+    [BATTLESCROLLS_STAT_ULT_LOST] = "Perdida al lanzar",
+    [BATTLESCROLLS_STAT_ULT_LOST_TT] = "Lanzar una habilidad máxima vacía toda la reserva, así que se pierde todo lo que supere su coste.",
+    [BATTLESCROLLS_STAT_ULT_DRAINED] = "Máxima drenada",
+    [BATTLESCROLLS_HEADER_ULT_SOURCES] = "Generación de máxima por fuente",
+    [BATTLESCROLLS_ULT_BASE_GENERATION] = "Generación base",
+    [BATTLESCROLLS_ULT_HEROISM_LINE] = "Incluye <<C:1>>: <<2>>% de tiempo activo, aprox. <<3>>",
+    [BATTLESCROLLS_HEADER_ULT_CASTS] = "Máximas usadas",
+
+    [BATTLESCROLLS_HEADER_CRUX] = "Crux",
+    [BATTLESCROLLS_STAT_CRUX_GENERATORS] = "Lanzamientos generadores",
+    [BATTLESCROLLS_STAT_CRUX_AT_FULL] = "Lanzados con Crux lleno",
+    [BATTLESCROLLS_STAT_CRUX_SPENDERS] = "Lanzamientos consumidores",
+    [BATTLESCROLLS_STAT_CRUX_UNDER] = "Lanzados con menos de 3 Crux",
+    [BATTLESCROLLS_CRUX_AT_N] = "Con <<1>> Crux: <<2>>",
+    [BATTLESCROLLS_HEADER_CRUX_BY_ABILITY] = "Uso de Crux por habilidad",
+
+    [BATTLESCROLLS_HEADER_ZEN] = "Acumulación de DoT (Z'en)",
+    [BATTLESCROLLS_ZEN_AVG_DOTS] = "DoTs medios",
+    [BATTLESCROLLS_ZEN_UPTIME] = "Tu tiempo activo de Z'en",
+    [BATTLESCROLLS_ZEN_PEAK_TIME] = "Tiempo en <<1>>",
+    [BATTLESCROLLS_ZEN_DOTS_LABEL] = "<<1>> DoTs",
+    [BATTLESCROLLS_ZEN_SHARE_LINE] = "media <<1>> — <<2>> con 5 DoTs",
+    [BATTLESCROLLS_ZEN_SHORT] = "Z'en",
+    [BATTLESCROLLS_ZEN_NOTE] = "Tus DoTs se registran aunque no lleves Z'en. Muestran la bonificación que podrías aportar si tu perjuicio de Z'en estuviera activo. El tiempo sin tu Z'en solo representa ese potencial.",
+    [BATTLESCROLLS_ZEN_DISTRIBUTION_NOTE] = "Cada fila de DoTs muestra su proporción del tiempo registrado. El porcentaje de Z'en indica durante qué parte del tiempo de esa fila estuvo activo tu propio perjuicio.",
+
+    [BATTLESCROLLS_HEADER_SUPPORT] = "Apoyo",
+    [BATTLESCROLLS_STAT_RESURRECTIONS] = "Resurrecciones",
+}
+for id, str in pairs(featureStrings) do
+    SafeAddString(id, str, 1)
+end
+
+local cruxPassiveStrings = {
+    [BATTLESCROLLS_STAT_CRUX_PASSIVE] = "Perdidos fuera de lanzamientos",
+    [BATTLESCROLLS_STAT_CRUX_PASSIVE_TT] = "Crux que se desvanecieron solos, sin ningún lanzamiento consumidor ni muerte cerca. Los Crux caducan a los 30 segundos.",
+    [BATTLESCROLLS_STAT_CRUX_DEATH] = "Perdidos por muerte",
+    [BATTLESCROLLS_STAT_CRUX_PROC_WASTED] = "Ganancias pasivas con Crux lleno",
+    [BATTLESCROLLS_STAT_CRUX_PROC_WASTED_TT] = "Ganancias pasivas que se activaron cuando ya tenías 3 Crux, así que no dieron nada. «<<1>>» y sus variantes y <<2>> solo dan Crux cuando no tienes ninguno, por eso nunca se cuentan aquí.",
+    [BATTLESCROLLS_STAT_CRUX_CONDITIONAL_TT] = "Crux que esta fuente generó de forma pasiva, sin ningún lanzamiento.",
+    [BATTLESCROLLS_STAT_CRUX_OTHER] = "Otras ganancias de crux",
+    [BATTLESCROLLS_STAT_CRUX_OTHER_TT] = "Crux obtenidos sin que ninguna fuente registrada aquí se activara en ese momento.",
+    [BATTLESCROLLS_HEADER_CRUX_GAINED] = "Crux obtenidos por habilidad",
+}
+for id, str in pairs(cruxPassiveStrings) do
+    SafeAddString(id, str, 1)
+end
+
+local activityOverviewStrings = {
+    [BATTLESCROLLS_STAT_DOWNTIME] = "Tiempo inactivo",
+    [BATTLESCROLLS_TOOLTIP_DOWNTIME_DESC] = "Huecos de 3 segundos o más entre lanzamientos, por ejemplo mecánicas, resucitar o estar muerto. No cuentan en el retraso de lanzamiento.",
+    [BATTLESCROLLS_STAT_PER_MINUTE] = "<<1>>/min",
+    [BATTLESCROLLS_DETAIL_MEDIAN] = "mediana <<1>>",
+    [BATTLESCROLLS_DETAIL_DELAY] = "<<1>> de retraso",
+    [BATTLESCROLLS_DETAIL_AT_FULL] = "<<1>> al máximo",
+    [BATTLESCROLLS_DETAIL_LOST] = "<<1>> perdidos",
+    [BATTLESCROLLS_DETAIL_AVG_DOTS] = "media <<1>> DoTs",
+    [BATTLESCROLLS_DETAIL_AT_DOTS] = "<<1>> con <<2>>",
+}
+for id, str in pairs(activityOverviewStrings) do
+    SafeAddString(id, str, 1)
+end
+
+-- Release history
+SafeAddString(BATTLESCROLLS_WHATS_NEW, "Novedades", 1)
+SafeAddString(BATTLESCROLLS_WHATS_NEW_DESC, "Consulta los cambios de Pergaminos de Batalla, desde la última actualización hasta el primer lanzamiento público.", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_6_0_0, [=[
+|cD4AF37Nuevas funciones:|r
+
+- |cD4AF37¡Tus pergaminos ya pueden salir de Tamriel!|r Comparte un combate o una sesión completa desde el diario y abre el enlace en el navegador. Escanea el código QR de tu televisor para obtener el enlace en el móvil. Desde ahí, explora el combate o compártelo donde quieras
+
+- Explora los mismos datos de combate y de |cFFFFFFarquetipo|r que en el complemento, con exportación a |cFFFFFFCSV y JSON|r para tus propios análisis
+
+- |cFFFFFFActividad|r registra la generación y el gasto de puntos de habilidad máxima, el uso de |cFFFFFFCrux|r del arcanista, la acumulación de efectos de daño prolongado para Z'en y las resurrecciones. El número de DoTs muestra la bonificación potencial de Z'en, incluso sin llevar el conjunto. Las estadísticas de weaving distinguen los pequeños retrasos entre lanzamientos del tiempo inactivo prolongado
+
+- Los resúmenes de tus muertes ahora muestran los |cFFFFFFnombres de los atacantes|r cuando están disponibles
+
+- |cFFFFFFDaño del grupo|r muestra todo el daño observado por tu cliente, incluso de jugadores sin Pergaminos de Batalla. ESO no identifica esas otras fuentes, por lo que se agrupan en «|cFFFFFFOtros|r»
+
+- Elige el |cFFFFFFcolor de tu barra|r en el medidor Barras de todos los miembros del grupo y cambia el nombre de las sesiones y combates del historial
+
+- El diario tiene una sección |cFFFFFFNovedades|r con fechas y notas de versiones en los siete idiomas. Por si se te escapó algún pergamino
+
+|cD4AF37Cambios importantes:|r
+
+- El nuevo almacenamiento permite guardar muchos |cFFFFFFmás combates|r en el mismo espacio. El nuevo formato también debería reducir los |cFFFFFFtirones|r tras combates grandes y permitir abrirlos |cFFFFFFmucho más rápido|r en el diario. El historial existente se convierte |cFFFFFFautomáticamente|r en segundo plano tras iniciar sesión; puede haber pequeños tirones durante este proceso único. Cada combate se compara con el original antes de sustituirlo
+
+|cD4AF37Correcciones:|r
+
+- Los combates deberían |cFFFFFFterminar antes de tiempo con mucha menos frecuencia|r al morir mientras el grupo sigue luchando, especialmente en el último combate de la Ciudadela Luciente
+
+- Corregidos cálculos de |cFFFFFFcuración|r que ignoraban filtros, venenos ausentes en los arquetipos de otros miembros del grupo y varios casos de intercambio de datos y limpieza del historial
+
+- Resúmenes de combate y arquetipos del grupo |cFFFFFFmás fiables|r, con menos datos ausentes tras cruzar puertas o pasar por pantallas de carga
+
+|cE6B566Problemas conocidos:|r
+
+- Puede ser necesario recargar la interfaz para que el indicador de |cFFFFFFmemoria|r de ESO refleje el espacio liberado por la conversión
+
+- Con los |cFFFFFFcambios de alquimia de la actualización 51|r, los nombres de los efectos de los venenos en los arquetipos pueden faltar o ser incorrectos. Los efectos de los venenos creados no se muestran en el visor web
+
+- La función de compartir en la web no se ha probado en |cFFFFFFPlayStation|r. Por favor, informa de cualquier problema, incluso si no te funciona en absoluto]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_5_3_1, [=[|cD4AF37Correcciones:|r
+
+- La |cFFFFFFmaestría de clase|r y las líneas de habilidades de otros jugadores se muestran correctamente al consultar sus arquetipos en la pestaña |cFFFFFFGrupo|r]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_5_3_0, [=[|cD4AF37Nuevas funciones:|r
+
+- Compatibilidad con pasivas de |cFFFFFFmaestría de clase|r: sustituyen la lista de líneas de habilidades cuando se ha comprado al menos una
+
+- Compatibilidad con |cFFFFFFVengeance|r: el |cFFFFFFresumen|r del arquetipo muestra la configuración y las ventajas elegidas, y oculta los datos que no se aplican a este modo
+
+|cD4AF37Cambios menores:|r
+
+- En inglés, los enemigos comunes pasan de «trash» a «basepop», siguiendo la terminología de los desarrolladores]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_5_2_0, [=[|cD4AF37Nuevas funciones:|r
+
+- La |cFFFFFFrecuperación de salud|r se registra como una categoría de |cFFFFFFcuración|r. La cantidad bruta se estima con tu recuperación en combate; la efectiva y la sobrecuración, con los cambios reales de salud
+
+- La |cFFFFFFabsorción de curación|r aplicada al jugador cuenta como un tipo de daño recibido
+
+- El daño saliente y entrante absorbido por |cFFFFFFescudos|r cuenta en los totales y DPS/DTPS, pero no en los desgloses por habilidad o tipo
+
+- La |cFFFFFFcuración|r absorbida se incluye en los totales de |cFFFFFFcuración|r a otros, autocuración y curación recibida, así como en sus HPS
+
+|cD4AF37Cambios menores:|r
+
+- Las listas detalladas muestran siempre hasta 50 habilidades y 20 objetivos/fuentes, frente a los anteriores 25/15/10 según el contexto
+
+|cD4AF37Correcciones:|r
+
+- Las agregaciones de |cFFFFFFcuración|r saliente por modalidad incluyen la autocuración, como las demás vistas
+
+|cE6B566Problemas conocidos:|r
+
+- La |cFFFFFFcuración|r bruta de la |cFFFFFFrecuperación de salud|r se estima a partir del tiempo con vida, porque ESO no indica el momento exacto de cada pulso. Si estás perdiendo salud a la vez, puede que parte de la curación efectiva no se detecte]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_5_1_0, [=[|cD4AF37Nuevas funciones:|r
+
+- Los |cFFFFFFescudos|r aplicados a ti y a tu grupo se registran como |cFFFFFFcuración|r: su aplicación cuenta como curación bruta y el daño que absorben como efectiva
+
+- Los |cFFFFFFescudos|r tienen su propia categoría junto a |cFFFFFFcuración|r directa y prolongada en pestañas, resúmenes y agregaciones de curación saliente
+
+|cE6B566Problemas conocidos:|r
+
+- Si se aplican varios |cFFFFFFescudos|r al mismo objetivo en menos de 50 ms, algún pulso puede atribuirse a la habilidad equivocada
+
+|cD4AF37Cambios menores:|r
+
+- Las descripciones muestran el ID real de habilidad de ESO en daño, |cFFFFFFcuración|r, efectos, activaciones, |cFFFFFFweaving|r y arquetipo
+
+- Corregidos iconos erróneos o genéricos de Forjador del destino pragmático, Gloria radiante, Flagelo del Cefaliarca, pociones, Absorción de esencia, Autoridad intrépida, las sinergias Purificar y Festín de sangre, Protección rúnica de aguas calmadas, Luz purificadora, Conjuro experto y el rasgo Armonía
+
+- Hace falta más HPS para llenar la barra del medidor personal
+
+- La composición pasa a llamarse «Curación por tipo» y oculta desgloses de una sola categoría que no aportan información
+
+|cD4AF37Correcciones:|r
+
+- Se reducen los casos en los que el |cFFFFFFweaving|r detectaba por error ataques ligeros omitidos o dobles
+
+- Mejor identificación de jefes sin seguimiento de efectos
+
+- La |cFFFFFFcuración|r media por pulso ya no aparece por debajo del mínimo en algunas descripciones]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_5_0_0, [=[|cD4AF37Nuevas funciones:|r
+
+- ¡Seguimiento del |cFFFFFFweaving|r! Tiempo medio y total perdido entre lanzamientos, ataques ligeros y habilidades omitidos, en conjunto y por habilidad
+
+- Nueva pestaña |cFFFFFFActividad|r para estos datos
+
+- Datos de |cFFFFFFweaving|r disponibles en agregaciones con el dominio Resumen
+
+|cD4AF37Cambios menores:|r
+
+- Las activaciones pasan de Resumen a |cFFFFFFActividad|r. ¿Te habías dado cuenta de que estaban ahí?
+
+- Mejor rendimiento y uso de |cFFFFFFmemoria|r dentro y fuera del combate, especialmente con el seguimiento de efectos desactivado total o parcialmente
+
+|cD4AF37Correcciones:|r
+
+- El grupo muestra el porcentaje real de tiempo con vida al desactivar los efectos, en lugar de un 100% fijo]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_4_0_0, [=[|cD4AF37Nuevas funciones:|r
+
+- ¿Has pensado alguna vez que a tu MMORPG de fantasía le faltaban |cFFFFFFhojas de cálculo|r? Probablemente no, pero aquí están. Agrega los datos que quieras de cualquier cantidad de combates, con |cFFFFFFtablas dinámicas|r
+
+|cD4AF37Cambios menores:|r
+
+- Cada combate muestra la versión del juego, por ejemplo 11.3.5
+
+- Los demás te ven leyendo un pergamino mientras usas Pergaminos de Batalla. ¿Qué otra cosa iba a ser?
+
+- El nombre de la zona encabeza la lista de combates
+
+|cD4AF37Correcciones:|r
+
+- El encantamiento prismático de reducción de coste se muestra correctamente en los arquetipos del grupo
+
+- Los arquetipos se presentan de la misma forma en las pestañas |cFFFFFFGrupo|r y Arquetipo]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_3_1_0, [=[|cD4AF37Nuevas funciones:|r
+
+- |cFFFFFFBúsqueda|r en |cFFFFFFEfectos|r, similar a la del inventario
+
+|cD4AF37Correcciones:|r
+
+- Al consultar el |cFFFFFFarquetipo|r de otros miembros del grupo que juegan como arcanistas, ya no falta la línea de raza, clase y piedra de Mundus
+
+- Menos |cFFFFFFparpadeos|r en el menú de grupo, otra vez]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_3_0_2, "|cFFFFFFReduce los parpadeos del menú de grupo|r", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_3_0_1, [=[|cD4AF37Correcciones:|r
+
+- Los |cFFFFFFpuntos de campeón|r del grupo no se asignan a constelaciones incorrectas cuando hay espacios vacíos. Es un arreglo del emisor: tu compañero también debe actualizar
+
+- Al pasar de un jugador con |cFFFFFFarquetipo|r a otro sin él, ya no se intenta mostrar información inexistente]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_3_0_0, [=[|cD4AF37Registro de arquetipos|r
+
+- Cada combate guarda tu |cFFFFFFarquetipo|r y lo muestra en una nueva pestaña, para recordar exactamente qué llevabas
+
+- El |cFFFFFFresumen|r también muestra buena parte de él, para presumir de tus resultados más fácilmente
+
+- El menú de |cFFFFFFpersonaje|r incluye un |cFFFFFFresumen|r rápido del arquetipo
+
+- |cFFFFFFGrupo|r registra los arquetipos de otros miembros del grupo que usan Pergaminos de Batalla]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_2_1_2, "|cFFFFFFSin cambios visibles; preparación para la versión 3|r", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_2_1_1, "|cFFFFFFCálculos de daño de área y a un objetivo adaptados al caballero dragón actualizado. El cambio es retroactivo.|r", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_2_1_0, [=[- Nueva navegación por |cFFFFFFsubcategorías|r: las vistas relacionadas comparten pestaña y se cambian con izquierda/derecha de la cruceta o del stick izquierdo
+  - Daño causado y daño a jefes pasan a ser |cFFFFFFsubcategorías|r de Daño
+  - Curación a otros, propia y recibida se agrupan en Curación
+  - |cFFFFFFEfectos|r sobre ti, jefes y grupo tienen |cFFFFFFsubcategorías|r independientes en vez de una lista larga
+
+- Se ocultan los errores «Attempt to read past end of buffer». Tras una pantalla de carga al terminar el combate los datos de grupo pueden seguir siendo incorrectos, pero al menos el error no te salta a la cara]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_2_0_1, [=[|cD4AF37Diario del grupo|r
+
+Nueva pestaña para combates con compañeros que tienen Pergaminos de Batalla.
+
+|cD4AF37Resumen:|r
+
+- Tabla ordenable: cada jefe, DPS, críticos, DTPS, HPS, tiempo con vida y muertes
+
+|cD4AF37Por jugador:|r
+
+- Daño: DPS, total, críticos, golpe máximo, directo, área, tipos de daño, puesto por DPS y comparación con la media de los DD
+
+- Supervivencia: DTPS, tiempo con vida, muertes, principales habilidades recibidas y recapitulaciones de muerte
+
+- Curación: HPS bruto y efectivo, sobrecuración y autocuración
+
+- Barras por jefe con composición del daño y daño recibido
+
+|cD4AF37Contexto del grupo en las descripciones existentes cuando hay datos:|r
+
+- Objetivos jefe: DPS y contribución de cada miembro; filas de DPS y DPS a jefes: desglose por miembro
+
+- DTPS y fuentes de daño recibido: DTPS por miembro
+
+- Composición del daño: comparación con la media de los DD
+
+- HPS bruto y sobrecuración en |cFFFFFFcuración|r saliente y propia: desglose por miembro
+
+|cD4AF37Muertes:|r
+
+- Las recapitulaciones se guardan con el combate
+
+- Resumen: recuento en daño recibido
+
+- Daño recibido: marcas de tiempo y detalles en la descripción
+
+- |cFFFFFFGrupo|r: primera y última muerte con todas las habilidades
+
+|cD4AF37Cambios menores:|r
+
+- El |cFFFFFFresumen|r muestra daño directo en lugar de periódico
+
+- Nueva opción para grabar todos los combates del |cFFFFFFMercado Nocturno|r, independientemente de los filtros de zona habituales
+
+- Los medidores DPS se sitúan detrás de otros elementos, como el historial de botín
+
+- Resumen se selecciona por defecto en todas las pestañas. Usa algo más de |cFFFFFFmemoria|r, pero no la querías libre, ¿verdad?
+
+- Nombres sin @
+
+- Los medidores Hodor y Barras muestran la duración del combate en la cabecera
+
+- Nuevos sonidos para diálogos de filtros y zonas
+
+|cD4AF37Localización:|r
+
+- Corregidos plurales
+
+- En ruso y alemán, el término para las acumulaciones coincide ahora con el de las descripciones de los conjuntos de equipo]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_3_6, "|cFFFFFFCorrige un error de interfaz al entrar sin LibGroupBroadcast|r", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_3_5, "|cFFFFFFLibGroupBroadcast pasa a ser opcional temporalmente para sortear el apocalipsis de complementos en consola|r", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_3_4, "|cFFFFFFSin cambios visibles; preparando la consulta del DPS del grupo en el diario|r", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_3_3, "|cFFFFFFSin cambios visibles; preparando la consulta del DPS del grupo en el diario|r", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_3_2, [=[|cD4AF37Correcciones:|r
+
+- Ya no intenta enviar datos DPS al grupo cuando no estás en uno. Gracias a DakJaniels]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_3_1, [=[|cD4AF37Correcciones:|r
+
+- Detección de jefes más fiable en el último combate de la Ciudadela Luciente y al alejarse del jefe, por ejemplo para entrar en portales
+
+- Ya no debería aparecer «|cFFFFFF1000ms limit hit|r» tras combates complejos, como el último de la Ciudadela Luciente o el primero de la Jaula de Oseína]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_3_0, [=[|cD4AF37Nuevas funciones:|r
+
+- Marca efectos como |cFFFFFFfavoritos|r para fijarlos arriba en todas sus listas
+
+|cD4AF37Correcciones:|r
+
+- La duración de efectos de quienes se incorporan a mitad del combate usa solo el tiempo que estuvieron presentes
+
+- Eliminados elementos vacíos que aparecían arriba a la izquierda al entrar en combate por primera vez con ciertos medidores de grupo
+
+|cD4AF37Cambios menores:|r
+
+- La fila de DPS total aparece aunque solo haya una persona en la sección de DD]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_2_0, [=[|cD4AF37Nuevas funciones:|r
+
+- Bloquea zonas con |cFFFFFFX/cuadrado|r en la lista para protegerlas de la limpieza automática al superar el límite. La zona más reciente también está siempre protegida
+
+|cD4AF37Localización:|r
+
+- Terminología de zonas más coherente en alemán y ruso
+
+|cD4AF37Correcciones:|r
+
+- El modo Fluido ya no queda atascado cargando ni impide añadir combates al diario. Tras actualizar, sus usuarios vuelven al modo Rendimiento predeterminado]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_1_0, [=[|cD4AF37Nuevas funciones:|r
+
+- Elimina zonas y combates individuales del historial
+
+|cD4AF37Correcciones:|r
+
+- Corregida la carga infinita o ausencia del menú al combinar el modo Fluido del complemento con el modo gráfico Fidelidad. Quienes ya estuvieran afectados quizá necesiten otro |cFFFFFF/reloadui|r tras actualizar
+
+- Los diálogos del juego, como destruir objetos, ya no fallan después de usar filtros
+
+- Corregida la animación inversa al salir de Pergaminos de Batalla al diario]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_0_3, "|cFFFFFFUn intento a ciegas de corregir los datos guardados corruptos en PS5|r", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_0_2, [=[|cD4AF37Mejoras de almacenamiento y efectos|r
+
+|cD4AF37Almacenamiento:|r
+
+- Codificación y descodificación optimizadas para cargar el diario más rápido
+
+- Menor consumo de |cFFFFFFmemoria|r al procesar combates
+
+|cD4AF37Efectos:|r
+
+- Duraciones corregidas cuando miembros del grupo se desconectan durante el combate
+
+- Mejor gestión de quienes se reconectan a mitad del combate]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_0_1, "|cFFFFFFUna corrección|r", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_0_0, [=[|cD4AF37Primer lanzamiento público|r
+
+|cD4AF37Medidor DPS:|r
+
+- Daño en tiempo real
+
+- Diseños personales: predeterminado, mínimo y barra
+
+- Diseños de grupo: texto, estilo Hodor y barras
+
+- Posición, escala y persistencia tras el combate configurables
+
+|cD4AF37Diario:|r
+
+- Zona -> combate -> estadísticas
+
+- Filtros por tipo de zona y combate
+
+- Límites de almacenamiento configurables
+
+|cD4AF37Daño:|r
+
+- Desglose por objetivo y habilidad
+
+- Daño directo y periódico, críticos
+
+- Daño de área y a un objetivo
+
+|cD4AF37Curación:|r
+
+- Causada y recibida, por fuente y objetivo
+
+|cD4AF37Efectos:|r
+
+- Duración de beneficios y perjuicios del jugador y grupo, perjuicios en jefes y activaciones
+
+DPS compartido mediante |cFFFFFFLibGroupBroadcast|r
+
+|cD4AF37Idiomas:|r inglés, alemán, francés, español, ruso, japonés y chino]=], 1)

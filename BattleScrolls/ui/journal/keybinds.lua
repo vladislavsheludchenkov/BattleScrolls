@@ -1,3 +1,4 @@
+---@diagnostic disable: undefined-field, inject-field -- the ESO Control/ZO_* API stubs are too incomplete for field checking in UI code
 if not SemisPlaygroundCheckAccess() then
     return
 end
@@ -11,13 +12,244 @@ local journal = BattleScrolls.journal
 local keybinds = {}
 journal.keybinds = keybinds
 
+-- =============================================================================
+-- BROWSER-EXIT LEAK GUARD
+-- =============================================================================
+-- Closing the console browser with B can deliver that same B to our keybind
+-- strip as the game returns (the app-switcher return path delivers nothing).
+-- Three independent detectors cover the platform-dependent delivery paths:
+--   1. Suspend gap: a wall-clock heartbeat spots frozen update ticks. Only
+--      works if the console actually suspends the game while the browser is
+--      up - if it merely constrains it, no clock ever looks anomalous.
+--   2. Focus: EVENT_GAME_FOCUS_CHANGED brackets the browser trip when the
+--      engine reports it; a press while unfocused or right after regaining
+--      focus belongs to the exit, not the user.
+--   3. First-B-after-trip: once a part's URL confirm has come and gone, the
+--      next B is presumed the browser exit until some press passes the
+--      other guards (that press proves the user is back). Covers the case
+--      where neither clock nor focus shows anything. Cost: returning via
+--      the app switcher and immediately pressing Back eats one press.
+local RESUME_GAP_S = 2
+local RESUME_GUARD_MS = 300
+local GAME_GAP_MS = 1500
+local FOCUS_GUARD_MS = 1000
+local lastBeatWallS = GetTimeStamp()
+local lastBeatGameMs = GetGameTimeMilliseconds()
+local resumeGuardUntilMs = 0
+local hasGameFocus = true
+local focusGuardUntilMs = 0
+
+EVENT_MANAGER:RegisterForUpdate("BattleScrollsShareResumeBeat", 100, function()
+    local nowWallS = GetTimeStamp()
+    local nowMs = GetGameTimeMilliseconds()
+    local wallGap = nowWallS - lastBeatWallS
+    local gameGap = nowMs - lastBeatGameMs
+    if wallGap >= RESUME_GAP_S or gameGap >= GAME_GAP_MS then
+        resumeGuardUntilMs = nowMs + RESUME_GUARD_MS
+    end
+    lastBeatWallS = nowWallS
+    lastBeatGameMs = nowMs
+end)
+
+EVENT_MANAGER:RegisterForEvent("BattleScrollsShareFocus", EVENT_GAME_FOCUS_CHANGED, function(_, hasFocus)
+    hasGameFocus = hasFocus
+    if hasFocus then
+        focusGuardUntilMs = GetGameTimeMilliseconds() + FOCUS_GUARD_MS
+    end
+end)
+
+---Guard wrapper for share-strip callbacks: swallows presses that
+---belong to the browser-exit return. A press that passes clears the
+---one-shot - the user is demonstrably back and interacting.
+---@param isNegative boolean
+---@return boolean swallowed
+local function swallowLeakedPress(isNegative)
+    local nowMs = GetGameTimeMilliseconds()
+    if GetTimeStamp() - lastBeatWallS >= RESUME_GAP_S
+        or nowMs < resumeGuardUntilMs
+        or not hasGameFocus
+        or nowMs < focusGuardUntilMs
+        or (isNegative and BattleScrolls.shareUrl.consumeBrowserReturnGuard()) then
+        if isNegative then
+            -- The leaked B has been accounted for either way
+            BattleScrolls.shareUrl.consumeBrowserReturnGuard()
+        end
+        return true
+    end
+    BattleScrolls.shareUrl.clearBrowserReturnGuard()
+    return false
+end
+
 ---Initializes all keybind strip descriptors and assigns them to the journalUI
 ---@param journalUI BattleScrolls_Journal_Gamepad
 function keybinds.initializeKeybindStripDescriptors(journalUI)
-    local NAVIGATION_MODE = BattleScrolls_Journal_NavigationMode
-    local STATS_TAB = BattleScrolls_Journal_StatsTab
-    local INSTANCE_TAB = BattleScrolls_Journal_InstanceTab
-    local ENCOUNTER_TAB = BattleScrolls_Journal_EncounterTab
+    local NAVIGATION_MODE = journal.NavigationMode
+    local STATS_TAB = journal.StatsTab
+    local INSTANCE_TAB = journal.InstanceTab
+    local ENCOUNTER_TAB = journal.EncounterTab
+
+    -- =========================================================================
+    -- SHARE STEPPER (survives the browser round-trip; back keeps the chain)
+    -- =========================================================================
+
+    ---Returns to the view the stepper was entered from. The upload chain (if
+    ---unfinished) stays alive - the share keybind there reads "Continue".
+    local function leaveShareStepper()
+        ZO_ConveyorSceneFragment_SetMovingBackward()
+        if journalUI.shareSourceMode == NAVIGATION_MODE.STATS
+            and journalUI.selectedEncounter and journalUI.selectedInstance then
+            journalUI.mode = NAVIGATION_MODE.STATS
+            journalUI:SetCurrentList(journalUI.statsList)
+            journalUI:RefreshList()
+            journalUI:SetActiveKeybinds(journalUI.statsKeybindStripDescriptor)
+        elseif journalUI.selectedInstance then
+            journalUI.mode = NAVIGATION_MODE.ENCOUNTERS
+            journalUI:SetCurrentList(journalUI.encounterList)
+            journalUI:RefreshList()
+            journalUI:SetActiveKeybinds(journalUI.encounterKeybindStripDescriptor)
+        else
+            journalUI:NavigateToInstanceList()
+        end
+    end
+
+    ---Any dialog currently owns input - including the cross-environment URL
+    ---confirm, which ZO_Dialogs_IsShowingDialog cannot see. The dialog sync
+    ---object is shared by name across GUI environments, so it covers both.
+    local function dialogOwnsInput()
+        return ZO_DIALOG_SYNC_OBJECT:IsShown()
+    end
+
+    ---Enters the share stepper view, remembering where to return.
+    ---@param sourceMode NavigationMode
+    local function enterShareStepper(sourceMode)
+        journalUI.shareSourceMode = sourceMode
+        journalUI.mode = NAVIGATION_MODE.SHARE
+        ZO_ConveyorSceneFragment_SetMovingForward()
+        journalUI:SetCurrentList(journalUI.shareList)
+        journalUI:RefreshList()
+        journalUI:SetActiveKeybinds(journalUI.shareKeybindStripDescriptor)
+    end
+    journalUI.enterShareStepper = enterShareStepper
+
+    ---Selected part row eligible for a resend, or nil. Any already-sent
+    ---part can be re-fired (a crashed browser tab loses its chunk; the
+    ---upload page reports which ones are missing).
+    ---@return number|nil
+    local function resendableTargetSeq()
+        local state = BattleScrolls.shareUrl.getState()
+        local target = journalUI.shareList:GetTargetData()
+        if target and target.partSeq and target.partSeq <= state.sentCount then
+            return target.partSeq
+        end
+        return nil
+    end
+
+    journalUI.shareKeybindStripDescriptor = {
+        alignment = KEYBIND_STRIP_ALIGN_LEFT,
+        {
+            keybind = "UI_SHORTCUT_PRIMARY",
+            name = function()
+                if BattleScrolls.shareUrl.getState().phase == "choosing" then
+                    return GetString(SI_GAMEPAD_SELECT_OPTION)
+                end
+                local resendSeq = resendableTargetSeq()
+                if resendSeq then
+                    return zo_strformat(GetString(BATTLESCROLLS_SHARE_RESEND_PART), resendSeq)
+                end
+                local state = BattleScrolls.shareUrl.getState()
+                return zo_strformat(GetString(BATTLESCROLLS_SHARE_SEND_PART),
+                    state.sentCount + 1, state.total)
+            end,
+            callback = function()
+                if BattleScrolls.shareUrl.isSendBlocked()
+                    or swallowLeakedPress(false) then
+                    return
+                end
+                if BattleScrolls.shareUrl.getState().phase == "choosing" then
+                    local target = journalUI.shareList:GetTargetData()
+                    if target and target.shareVariant then
+                        -- Starts the chain; the observer re-renders the
+                        -- stepper in "sending" with part 1 selected. No B
+                        -- sink needed - nothing has been fired yet.
+                        BattleScrolls.shareUrl.chooseVariant(target.shareVariant)
+                    end
+                    return
+                end
+                local resendSeq = resendableTargetSeq()
+                if resendSeq then
+                    BattleScrolls.shareUrl.resendPart(resendSeq)
+                elseif BattleScrolls.shareUrl.getState().phase == "sending" then
+                    BattleScrolls.shareUrl.sendNextPart()
+                else
+                    return
+                end
+                -- The URL confirm lives in another GUI environment: it draws
+                -- its own keybind strip over this spot and its buttons can
+                -- reach ours. Swap in the B sink while the part is in
+                -- flight; the share observer in journal.lua restores the
+                -- real strip once the outcome settles.
+                journalUI:SetActiveKeybinds(journalUI.shareInFlightKeybindStripDescriptor)
+            end,
+            visible = function()
+                local state = BattleScrolls.shareUrl.getState()
+                if state.phase == "choosing" then
+                    local target = journalUI.shareList:GetTargetData()
+                    return target ~= nil and target.shareVariant ~= nil
+                end
+                if state.phase == "sending" then
+                    return true
+                end
+                return state.phase == "done" and resendableTargetSeq() ~= nil
+            end,
+            sound = SOUNDS.DIALOG_ACCEPT,
+        },
+        {
+            keybind = "UI_SHORTCUT_NEGATIVE",
+            name = GetString(SI_GAMEPAD_BACK_OPTION),
+            callback = function()
+                if dialogOwnsInput() or swallowLeakedPress(true) then
+                    return
+                end
+                leaveShareStepper()
+            end,
+            sound = SOUNDS.GAMEPAD_MENU_BACK,
+        },
+        {
+            keybind = "UI_SHORTCUT_SECONDARY",
+            name = function()
+                return BattleScrolls.shareUrl.getState().phase == "done"
+                    and GetString(BATTLESCROLLS_SHARE_FINISH)
+                    or GetString(BATTLESCROLLS_SHARE_CANCEL)
+            end,
+            callback = function()
+                if dialogOwnsInput() or swallowLeakedPress(false) then
+                    return
+                end
+                BattleScrolls.shareUrl.stop()
+                leaveShareStepper()
+            end,
+            visible = function()
+                return BattleScrolls.shareUrl.isBusy()
+            end,
+            sound = SOUNDS.DIALOG_DECLINE,
+        },
+    }
+
+    -- While a part's URL confirm round trip is unsettled the real strip is
+    -- swapped for this sink. The cross-environment dialog's buttons can
+    -- reach our strip (the reason the strip used to be pulled entirely),
+    -- but a bare do-nothing Back leaves A/X nothing to double-fire AND
+    -- catches a browser-exit B that arrives before the round trip settles -
+    -- with no strip at all, that B would dispatch to whatever else listens.
+    -- An enabled ethereal binding consumes the press even without a callback
+    -- and never renders over the URL confirm dialog's own keybind bar.
+    journalUI.shareInFlightKeybindStripDescriptor = {
+        alignment = KEYBIND_STRIP_ALIGN_LEFT,
+        {
+            keybind = "UI_SHORTCUT_NEGATIVE",
+            ethereal = true,
+        },
+    }
 
     -- Instance list keybinds
     journalUI.instanceKeybindStripDescriptor = {
@@ -28,7 +260,12 @@ function keybinds.initializeKeybindStripDescriptors(journalUI)
             callback = function()
                 local targetData = journalUI.instanceList:GetTargetData()
                 ZO_ConveyorSceneFragment_SetMovingForward()
-                if targetData and targetData.isSettings then
+                if targetData and targetData.isWhatsNew then
+                    journalUI.mode = NAVIGATION_MODE.WHATS_NEW
+                    journalUI:SetCurrentList(journalUI.whatsNewList)
+                    journalUI:RefreshList()
+                    journalUI:SetActiveKeybinds(journalUI.whatsNewKeybindStripDescriptor)
+                elseif targetData and targetData.isSettings then
                     -- Navigate to settings
                     journalUI.mode = NAVIGATION_MODE.SETTINGS
                     journalUI:SetCurrentList(journalUI.settingsList)
@@ -60,7 +297,7 @@ function keybinds.initializeKeybindStripDescriptors(journalUI)
             end,
             enabled = function()
                 local targetData = journalUI.instanceList:GetTargetData()
-                return targetData ~= nil and (targetData.data ~= nil or targetData.isSettings or targetData.isPivot)
+                return targetData ~= nil and (targetData.data ~= nil or targetData.isSettings or targetData.isPivot or targetData.isWhatsNew)
             end,
             sound = SOUNDS.GAMEPAD_MENU_FORWARD,
         },
@@ -96,6 +333,17 @@ function keybinds.initializeKeybindStripDescriptors(journalUI)
             end,
             callback = function()
                 journalUI:ToggleInstanceLock()
+            end,
+            visible = function()
+                local targetData = journalUI.instanceList:GetTargetData()
+                return targetData ~= nil and targetData.data ~= nil and not targetData.isSettings
+            end,
+        },
+        {
+            keybind = "UI_SHORTCUT_TERTIARY",
+            name = GetString(BATTLESCROLLS_RENAME),
+            callback = function()
+                journalUI:ShowRenameInstanceDialog()
             end,
             visible = function()
                 local targetData = journalUI.instanceList:GetTargetData()
@@ -186,6 +434,42 @@ function keybinds.initializeKeybindStripDescriptors(journalUI)
             end,
             sound = SOUNDS.DIALOG_ACCEPT,
         },
+        {
+            keybind = "UI_SHORTCUT_SECONDARY",
+            name = function()
+                -- "Continue" only for THIS instance's upload; a chain left
+                -- over from anything else reads (and behaves) like no share
+                return BattleScrolls.shareUrl.isChainForInstance(journalUI.selectedInstance)
+                    and GetString(BATTLESCROLLS_SHARE_CONTINUE)
+                    or GetString(BATTLESCROLLS_SHARE_INSTANCE)
+            end,
+            callback = function()
+                if not journalUI.selectedInstance then
+                    return
+                end
+                if not BattleScrolls.shareUrl.isChainForInstance(journalUI.selectedInstance) then
+                    -- Silently supersede whatever other chain is lingering
+                    BattleScrolls.shareUrl.stop()
+                    BattleScrolls.shareUrl.uploadInstance(journalUI.selectedInstance)
+                end
+                enterShareStepper(NAVIGATION_MODE.ENCOUNTERS)
+            end,
+            visible = function()
+                return journalUI.selectedInstance ~= nil
+            end,
+            sound = SOUNDS.DIALOG_ACCEPT,
+        },
+        {
+            keybind = "UI_SHORTCUT_TERTIARY",
+            name = GetString(BATTLESCROLLS_RENAME),
+            callback = function()
+                journalUI:ShowRenameEncounterDialog()
+            end,
+            visible = function()
+                local targetData = journalUI.encounterList:GetTargetData()
+                return targetData ~= nil and targetData.data ~= nil
+            end,
+        },
     }
 
     -- Stats view keybinds
@@ -258,6 +542,7 @@ function keybinds.initializeKeybindStripDescriptors(journalUI)
                 -- Only show on tabs that support filtering
                 return journalUI.selectedTab == STATS_TAB.DAMAGE_DONE
                     or journalUI.selectedTab == STATS_TAB.BOSS_DAMAGE_DONE
+                    or journalUI.selectedTab == STATS_TAB.GROUP_DAMAGE
                     or journalUI.selectedTab == STATS_TAB.DAMAGE_TAKEN
                     or journalUI.selectedTab == STATS_TAB.HEALING_OUT
                     or journalUI.selectedTab == STATS_TAB.HEALING_IN
@@ -307,6 +592,35 @@ function keybinds.initializeKeybindStripDescriptors(journalUI)
                 return journalUI.statsRefreshPending or false
             end,
             sound = SOUNDS.GROUP_FINDER_REFRESH_SEARCH,
+        },
+        -- Share the viewed fight via the browser (view profile export)
+        {
+            keybind = "UI_SHORTCUT_LEFT_STICK",
+            name = function()
+                -- "Continue" only for THIS fight's share; a chain left over
+                -- from anything else reads (and behaves) like no share
+                return BattleScrolls.shareUrl.isChainForEncounter(
+                        journalUI.selectedInstance, journalUI.selectedEncounter)
+                    and GetString(BATTLESCROLLS_SHARE_CONTINUE)
+                    or GetString(BATTLESCROLLS_SHARE_FIGHT)
+            end,
+            callback = function()
+                if not journalUI.selectedInstance or not journalUI.selectedEncounter then
+                    return
+                end
+                if not BattleScrolls.shareUrl.isChainForEncounter(
+                        journalUI.selectedInstance, journalUI.selectedEncounter) then
+                    -- Silently supersede whatever other chain is lingering
+                    BattleScrolls.shareUrl.stop()
+                    BattleScrolls.shareUrl.shareEncounter(
+                        journalUI.selectedInstance, journalUI.selectedEncounter)
+                end
+                enterShareStepper(NAVIGATION_MODE.STATS)
+            end,
+            visible = function()
+                return journalUI.selectedInstance ~= nil and journalUI.selectedEncounter ~= nil
+            end,
+            sound = SOUNDS.DIALOG_ACCEPT,
         },
         -- Enter group table
         {
@@ -429,6 +743,23 @@ function keybinds.initializeKeybindStripDescriptors(journalUI)
         return nil
     end
 
+    journalUI.whatsNewKeybindStripDescriptor = {
+        alignment = KEYBIND_STRIP_ALIGN_LEFT,
+        {
+            keybind = "UI_SHORTCUT_NEGATIVE",
+            name = GetString(SI_GAMEPAD_BACK_OPTION),
+            callback = function()
+                journalUI.mode = NAVIGATION_MODE.INSTANCES
+                journalUI.pendingTabIndex = journalUI.selectedInstanceTab or INSTANCE_TAB.ALL
+                ZO_ConveyorSceneFragment_SetMovingBackward()
+                journalUI:SetCurrentList(journalUI.instanceList)
+                journalUI:RefreshList()
+                journalUI:SetActiveKeybinds(journalUI.instanceKeybindStripDescriptor)
+            end,
+            sound = SOUNDS.GAMEPAD_MENU_BACK,
+        },
+    }
+
     -- Settings view keybinds
     journalUI.settingsKeybindStripDescriptor = {
         alignment = KEYBIND_STRIP_ALIGN_LEFT,
@@ -484,7 +815,10 @@ function keybinds.initializeKeybindStripDescriptors(journalUI)
                 local targetData = journalUI.settingsList:GetTargetData()
                 return targetData ~= nil and (targetData.toggleFunction ~= nil or targetData.callback ~= nil)
             end,
-            sound = SOUNDS.DEFAULT_CLICK,
+            sound = function()
+                local targetData = journalUI.settingsList:GetTargetData()
+                return targetData and targetData.sound or SOUNDS.DEFAULT_CLICK
+            end,
         },
         {
             keybind = "UI_SHORTCUT_NEGATIVE",

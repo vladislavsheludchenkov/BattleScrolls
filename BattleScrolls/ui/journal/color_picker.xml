@@ -1,0 +1,124 @@
+<GuiXml>
+    <Controls>
+        <TopLevelControl name="BattleScrolls_ColorPicker" hidden="true" tier="HIGH" level="150" mouseEnabled="true">
+            <!-- Leave the native keybind strip visible and clickable below the modal. -->
+            <Anchor point="TOPLEFT"/>
+            <Anchor point="BOTTOMRIGHT" relativeTo="ZO_KeybindStripControl" relativePoint="TOPRIGHT"/>
+            <OnInitialized>
+                if BattleScrolls and BattleScrolls.journal and BattleScrolls.journal.colorPicker then
+                    BattleScrolls.journal.colorPicker:initialize(self)
+                end
+            </OnInitialized>
+            <Controls>
+                <Texture name="$(parent)Shade" color="000000" alpha="0.6" layer="BACKGROUND">
+                    <AnchorFill/>
+                </Texture>
+                <Control name="$(parent)Panel" resizeToFitDescendents="true" resizeToFitConstrains="Y">
+                    <Dimensions x="930"/>
+                    <!-- Auto-fit measures from the inset title: include its 38px top inset and 34px below the hint. -->
+                    <ResizeToFitPadding height="72"/>
+                    <Anchor point="CENTER"/>
+                    <Controls>
+                        <!-- Native centered gamepad dialog framing, with our own input lifecycle. -->
+                        <Texture name="$(parent)Background" color="000000" alpha="1" layer="BACKGROUND" level="1" excludeFromResizeToFitExtents="true">
+                            <AnchorFill/>
+                        </Texture>
+                        <Backdrop name="$(parent)Frame" inherits="ZO_GamepadNormalOutlineHighlight" layer="BACKGROUND" level="2" excludeFromResizeToFitExtents="true">
+                            <Anchor point="TOPLEFT" offsetX="-4" offsetY="-4"/>
+                            <Anchor point="BOTTOMRIGHT" offsetX="4" offsetY="4"/>
+                            <Center file="EsoUI/Art/Miscellaneous/Gamepad/gp_edgeFill.dds"/>
+                        </Backdrop>
+                        <Label name="$(parent)Title" font="ZoFontGamepad42" horizontalAlignment="CENTER" modifyTextType="UPPERCASE" text="BATTLESCROLLS_SETTINGS_BAR_COLOR">
+                            <Anchor point="TOP" offsetY="38"/>
+                            <Dimensions x="810"/>
+                        </Label>
+                        <Control name="$(parent)Divider" inherits="ZO_GamepadHeaderHorizontalDivider">
+                            <Anchor point="TOP" offsetY="108"/>
+                            <Dimensions x="810" y="8"/>
+                        </Control>
+                        <!-- Match the native color picker's preview / wheel / brightness arrangement. -->
+                        <Label name="$(parent)ColorLabel" font="ZoFontGamepad25" color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" horizontalAlignment="CENTER" verticalAlignment="CENTER" modifyTextType="UPPERCASE" text="BATTLESCROLLS_COLOR_WHEEL">
+                            <Anchor point="TOPLEFT" offsetX="488" offsetY="132"/>
+                            <Dimensions x="244" y="60"/>
+                        </Label>
+                        <ColorSelect name="$(parent)ColorSelect" mouseEnabled="true">
+                            <Anchor point="TOPLEFT" offsetX="508" offsetY="202"/>
+                            <Dimensions x="204" y="204"/>
+                            <Controls>
+                                <Texture name="$(parent)Thumb" textureFile="EsoUI/Art/Miscellaneous/Gamepad/gp_colorPicker_pip.dds" layer="OVERLAY" excludeFromResizeToFitExtents="true" pixelRoundingEnabled="false">
+                                    <Dimensions x="32" y="32"/>
+                                </Texture>
+                            </Controls>
+                        </ColorSelect>
+                        <Label name="$(parent)BrightnessLabel" font="ZoFontGamepad25" color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" horizontalAlignment="CENTER" verticalAlignment="CENTER" modifyTextType="UPPERCASE" text="BATTLESCROLLS_COLOR_BRIGHTNESS">
+                            <Anchor point="TOPLEFT" offsetX="736" offsetY="132"/>
+                            <Dimensions x="160" y="60"/>
+                        </Label>
+                        <Slider name="$(parent)Brightness" orientation="VERTICAL" mouseEnabled="true" dragFromThumb="false">
+                            <Anchor point="TOPLEFT" offsetX="809" offsetY="209"/>
+                            <Dimensions x="14" y="190"/>
+                            <Limits min="0" max="1"/>
+                            <ThumbTexture textureFile="EsoUI/Art/Miscellaneous/Gamepad/gp_colorPicker_slider_vertical.dds" thumbWidth="64" thumbHeight="32" flushWithSliderExtents="false"/>
+                            <Controls>
+                                <Backdrop name="$(parent)Background" inherits="ZO_DefaultBackdrop_Gamepad" layer="CONTROLS">
+                                    <Anchor point="TOPLEFT" offsetX="-6" offsetY="-6"/>
+                                    <Anchor point="BOTTOMRIGHT" offsetX="6" offsetY="6"/>
+                                </Backdrop>
+                                <Texture name="$(parent)Texture" layer="CONTROLS" level="1">
+                                    <AnchorFill/>
+                                </Texture>
+                            </Controls>
+                        </Slider>
+                        <Texture name="$(parent)ColorBinding" layer="CONTROLS">
+                            <Anchor point="TOP" relativeTo="$(parent)ColorSelect" relativePoint="BOTTOM" offsetY="10"/>
+                            <Dimensions x="64" y="64"/>
+                            <OnInitialized>
+                                ZO_GamepadTypeBasedControl_OnInitialized(self)
+                                self:SetTextureSource(GetGamepadLeftStickSlideAndScrollIcon)
+                            </OnInitialized>
+                        </Texture>
+                        <Texture name="$(parent)BrightnessBinding" layer="CONTROLS">
+                            <Anchor point="TOP" relativeTo="$(parent)Brightness" relativePoint="BOTTOM" offsetY="16"/>
+                            <Dimensions x="64" y="64"/>
+                            <OnInitialized>
+                                ZO_GamepadTypeBasedControl_OnInitialized(self)
+                                self:SetTextureSource(GetGamepadRightStickScrollIcon)
+                            </OnInitialized>
+                        </Texture>
+                        <Label name="$(parent)NewLabel" font="ZoFontGamepad25" color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" horizontalAlignment="CENTER" verticalAlignment="CENTER" modifyTextType="UPPERCASE" text="SI_COLOR_PICKER_NEW">
+                            <Anchor point="TOPLEFT" offsetX="60" offsetY="132"/>
+                            <Dimensions x="388" y="60"/>
+                        </Label>
+                        <Label name="$(parent)CurrentLabel" font="ZoFontGamepad25" color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" horizontalAlignment="CENTER" modifyTextType="UPPERCASE" text="SI_COLOR_PICKER_CURRENT">
+                            <Anchor point="TOPLEFT" offsetX="60" offsetY="256"/>
+                            <Dimensions x="388"/>
+                        </Label>
+                        <Label name="$(parent)HexLabel" font="ZoFontGamepad25" color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" horizontalAlignment="LEFT" verticalAlignment="CENTER" modifyTextType="UPPERCASE" text="BATTLESCROLLS_COLOR_HEX">
+                            <Anchor point="TOPLEFT" offsetX="60" offsetY="360"/>
+                            <Dimensions y="46"/>
+                        </Label>
+                        <Backdrop name="$(parent)HexBackground" inherits="ZO_EditBackdrop_Gamepad" layer="CONTROLS">
+                            <Anchor point="TOPLEFT" relativeTo="$(parent)HexLabel" relativePoint="TOPRIGHT" offsetX="18"/>
+                            <Anchor point="RIGHT" relativeTo="$(parent)CurrentLabel" relativePoint="RIGHT" constrains="X"/>
+                            <Dimensions y="46"/>
+                            <Controls>
+                                <Backdrop name="$(parent)Highlight" inherits="ZO_GamepadWhiteOutlineHighlight" layer="OVERLAY" hidden="true">
+                                    <AnchorFill/>
+                                </Backdrop>
+                                <EditBox name="$(parent)Edit" inherits="ZO_DefaultEditForBackdrop_Gamepad"/>
+                            </Controls>
+                        </Backdrop>
+                        <Label name="$(parent)Error" font="ZoFontGamepad25" color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_FAILED" horizontalAlignment="CENTER" hidden="true" text="BATTLESCROLLS_COLOR_HEX_INVALID">
+                            <Anchor point="TOPLEFT" offsetX="60" offsetY="416"/>
+                            <Dimensions x="388"/>
+                        </Label>
+                        <Label name="$(parent)Hint" font="ZoFontGamepad27" color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" horizontalAlignment="CENTER" text="BATTLESCROLLS_COLOR_SAVE_HINT">
+                            <Anchor point="TOP" offsetY="496"/>
+                            <Dimensions x="810"/>
+                        </Label>
+                    </Controls>
+                </Control>
+            </Controls>
+        </TopLevelControl>
+    </Controls>
+</GuiXml>

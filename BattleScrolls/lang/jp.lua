@@ -68,10 +68,10 @@ local strings = {
     [BATTLESCROLLS_TOOLTIP_DELAY_BEFORE] = "キャスト前の遅延",
     [BATTLESCROLLS_FORMAT_SECONDS] = "<<1>>秒",
     [BATTLESCROLLS_FORMAT_MILLISECONDS] = "<<1>>ミリ秒",
-    [BATTLESCROLLS_TOOLTIP_INTER_CAST_DESC] = "キャスト間の平均遅延時間。スキルのGCDまたはキャスト時間終了から次のアクション開始までを計測します。CMXのWeaving Averageに相当します。",
-    [BATTLESCROLLS_TOOLTIP_TIME_LOST_DESC] = "戦闘中のキャスト間の合計ロス時間。CMXのWeaving Totalに相当します。",
+    [BATTLESCROLLS_TOOLTIP_INTER_CAST_DESC] = "キャスト間の平均の空き時間。スキルのグローバルクールダウンまたはキャスト時間が終わってから、次の行動までを計測します。Combat Metricsでは Weaving Average と呼ばれます。",
+    [BATTLESCROLLS_TOOLTIP_TIME_LOST_DESC] = "戦闘中の短いキャスト遅延の合計。3秒以上の間隔（空白時間）は除きます。Combat MetricsではWeaving Totalです。",
     [BATTLESCROLLS_TOOLTIP_MISSED_LA_DESC] = "軽攻撃を挟まずにスキルを連続で使用した回数。",
-    [BATTLESCROLLS_TOOLTIP_DOUBLE_LA_DESC] = "スキルを挟まずに軽攻撃を連続で入力した回数。",
+    [BATTLESCROLLS_TOOLTIP_DOUBLE_LA_DESC] = "スキルを挟まずに軽攻撃を2回続けた回数。",
 
     -------------------------
     -- Time Headers
@@ -163,16 +163,17 @@ local strings = {
     [BATTLESCROLLS_SETTINGS_STORAGE_SIZE_YOLO] = "まあ大丈夫でしょ",
     -- Storage tooltip
     [BATTLESCROLLS_SETTINGS_STORAGE_TT_DESC] = "戦闘履歴の保存量を設定します。制限を超えると、ロックされていない古いゾーンが自動的に削除されます。個別のゾーンをロックして保護することができます。",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_NOTE] = "この制限は保存された履歴のみに適用されます。アドオンは現在の戦闘の追跡やUIの描画にもメモリを使用するため、実際の使用量はここに表示されているより高くなります。",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_NOTE] = "この制限は保存データ（戦闘、ビルド、設定）のみに適用されます。アドオンは現在の戦闘の追跡やUIの描画にもメモリを使用するため、実際の使用量はここに表示されているより高くなります。",
     [BATTLESCROLLS_SETTINGS_STORAGE_TT_CURRENT] = "履歴: <<1>> MB / <<2>> MB (<<3>>%)",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_PRESETS] = "プリセット (トライアル ~0.5-1 MB、ダンジョン ~0.25-0.5 MB):",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_XS] = "  極小: 5 MB - 最近の数回分",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_SMALL] = "  小: 8 MB - 一晩のプログ分",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_MEDIUM] = "  中: 12 MB - 1週間のカジュアルプレイ分",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_LARGE] = "  大: 18 MB - 2週間分",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_XL] = "  極大: 25 MB - 1ヶ月の思い出",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_CAUTION] = "  注意: 40 MB - データ好きですね",
-    [BATTLESCROLLS_SETTINGS_STORAGE_TT_YOLO] = "  まあ大丈夫でしょ: 60 MB - 危険を恐れない",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_PROTECTED] = "ロック済みの戦闘、ビルド、設定だけで上限を超えています。クリーンアップでは上限内に収まりません。",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_PRESETS] = "プリセット (トライアル1周 ~0.3 MB、ダンジョン ~0.15 MB、プログ一晩 ~1 MB):",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_XS] = "  極小: 5 MB - 最新の巻物だけ",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_SMALL] = "  小: 8 MB - 巻物ひと山",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_MEDIUM] = "  中: 12 MB - しっかりした戦闘日誌",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_LARGE] = "  大: 18 MB - 個人書庫",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_XL] = "  極大: 25 MB - 大書庫",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_CAUTION] = "  注意: 35 MB - データ好きですね",
+    [BATTLESCROLLS_SETTINGS_STORAGE_TT_YOLO] = "  まあ大丈夫でしょ: 50 MB - 自業自得です",
     [BATTLESCROLLS_SETTINGS_STORAGE_TT_WARNING] = "ESOのメモリ制限について: 全アドオンで100 MBを共有します。70 MBで警告が表示されます。100 MBでUIがリロードされ、全て無効化されます。多くのアドオンを使用している場合は、小さいプリセットを選択してください。ヒント: チャットで /addonmemdisplay と入力するとリアルタイムでメモリ使用量を確認できます。",
 
     -------------------------
@@ -239,7 +240,6 @@ local strings = {
     -- Proc Tracking
     [BATTLESCROLLS_HEADER_PROC_TRACKING] = "プロック追跡",
     [BATTLESCROLLS_STAT_TOTAL_PROCS] = "<<1>>発動",
-    [BATTLESCROLLS_STAT_MEDIAN_INTERVAL] = "中央値",
 
     -------------------------
     -- Damage Stats Details
@@ -251,6 +251,8 @@ local strings = {
     [BATTLESCROLLS_STAT_DPS] = "DPS",
 
     [BATTLESCROLLS_HEADER_BY_ABILITY] = "スキル別",
+
+    [BATTLESCROLLS_HEADER_CASTS] = "発動",
     [BATTLESCROLLS_HEADER_BY_DAMAGE_TYPE] = "ダメージタイプ別",
     [BATTLESCROLLS_HEADER_DIRECT_VS_DOT] = "直接攻撃 vs 継続",
     [BATTLESCROLLS_HEADER_DAMAGE_DELIVERY] = "ダメージ方式",
@@ -334,6 +336,7 @@ local strings = {
     [BATTLESCROLLS_TOOLTIP_AVG_TICK] = "平均ティック",
     [BATTLESCROLLS_TOOLTIP_MIN_TICK] = "最小ティック",
     [BATTLESCROLLS_TOOLTIP_MAX_TICK] = "最大ティック",
+    [BATTLESCROLLS_TOOLTIP_TICKS] = "ティック数",
 
     [BATTLESCROLLS_TOOLTIP_BY_TARGET] = "ターゲット別",
     [BATTLESCROLLS_TOOLTIP_MEAN_INTERVAL] = "平均間隔",
@@ -546,11 +549,11 @@ local strings = {
     -- Storage options
     [BATTLESCROLLS_ONBOARDING_STORAGE_QUESTION] = "履歴をどのくらい保持しますか？",
     [BATTLESCROLLS_ONBOARDING_STORAGE_MINIMAL] = "最小 (5 MB)",
-    [BATTLESCROLLS_ONBOARDING_STORAGE_MINIMAL_DESC] = "約6回のトライアル分",
+    [BATTLESCROLLS_ONBOARDING_STORAGE_MINIMAL_DESC] = "約15回のトライアル分",
     [BATTLESCROLLS_ONBOARDING_STORAGE_MODERATE] = "中程度 (12 MB)",
-    [BATTLESCROLLS_ONBOARDING_STORAGE_MODERATE_DESC] = "約16回のトライアル分",
+    [BATTLESCROLLS_ONBOARDING_STORAGE_MODERATE_DESC] = "約40回のトライアル分",
     [BATTLESCROLLS_ONBOARDING_STORAGE_GENEROUS] = "多め (25 MB)",
-    [BATTLESCROLLS_ONBOARDING_STORAGE_GENEROUS_DESC] = "約36回のトライアル分",
+    [BATTLESCROLLS_ONBOARDING_STORAGE_GENEROUS_DESC] = "約80回のトライアル分",
     -- Effects tracking
     [BATTLESCROLLS_ONBOARDING_EFFECTS_QUESTION] = "バフ/デバフ追跡のレベルは？",
     [BATTLESCROLLS_ONBOARDING_EFFECTS_FULL] = "フル追跡",
@@ -924,3 +927,466 @@ for stringId, stringValue in pairs(strings) do
 end
 
 BATTLESCROLLS_KEYBIND_ICON_SCALE = 109  -- CJK: 180 * 17/28
+
+-- v17 storage migration
+local migrationStrings = {
+    [BATTLESCROLLS_MIGRATION_START] = "一回限りのストレージアップグレードを実行中 - 数分間カクつく場合があります",
+    [BATTLESCROLLS_MIGRATION_DONE] = "ストレージのアップグレード完了！<<1>>件の戦闘を再エンコードし、<<2>> MBを解放しました",
+    [BATTLESCROLLS_MIGRATION_TIP] = "設定でメモリプリセットを下げられるようになりました。新形式では1MBあたりに保存できる履歴が大幅に増えています。",
+}
+for stringId, stringValue in pairs(migrationStrings) do
+    SafeAddString(stringId, stringValue, 1)
+end
+
+-- Online sharing
+local shareStrings = {
+    [BATTLESCROLLS_SHARE_FIGHT] = "戦闘を共有",
+    [BATTLESCROLLS_SHARE_INSTANCE] = "全戦闘をアップロード",
+    [BATTLESCROLLS_SHARE_PREPARING] = "共有の準備中...",
+    [BATTLESCROLLS_SHARE_TITLE] = "共有",
+    [BATTLESCROLLS_SHARE_PROGRESS_HEADER] = "パート",
+    [BATTLESCROLLS_SHARE_PART_SENT] = "パート<<1>> — 送信済み",
+    [BATTLESCROLLS_SHARE_PART_READY] = "パート<<1>> — 送信可能",
+    [BATTLESCROLLS_SHARE_PART_PENDING] = "パート<<1>>",
+    [BATTLESCROLLS_SHARE_SEND_PART] = "パート<<1>>/<<2>>を送信",
+    [BATTLESCROLLS_SHARE_HINT_HEADER] = "使い方",
+    [BATTLESCROLLS_SHARE_PRIVACY_TITLE] = "プレイヤー名と戦闘データがオンラインに保存されます",
+    [BATTLESCROLLS_SHARE_PRIVACY_NOTICE] = "自分や他のプレイヤーの名前、プラットフォーム、ゲームサーバー、戦闘統計、ビルドが送信されます。レポートに自動の保存期限はなく、リンクを知っている人は誰でも閲覧・ダウンロードできます。共有前に対象プレイヤーに知らせてください。プライバシーと削除請求：<<1>>",
+    [BATTLESCROLLS_SHARE_TT_READY] = "ゲームの確認ダイアログを承認してください。開いたブラウザページが戦闘データのこのパートを共有サイトへ転送します。その後ブラウザは閉じて構いません。ゲームに戻って次のパートを送信してください。この画面を離れても進行状況は保持されます。すべてのパートが届くと、ページに非公開の共有リンクとQRコードが表示されます。",
+    [BATTLESCROLLS_SHARE_TT_SENT] = "このパートはすでにブラウザへ渡されています。ブラウザのページで不足と表示された場合（クラッシュしたタブはそのパートを失います）、この行を選択して再送信キーを押してください。",
+    [BATTLESCROLLS_SHARE_TT_PENDING] = "パートは順番に1つずつ送信されます。このパートは順番が来ると送信できるようになります。",
+    [BATTLESCROLLS_SHARE_TT_DONE] = "ブラウザのページに非公開の共有リンクとQRコードが表示されています。リンクを知っている人だけが開けます。不足しているパートが表示された場合は、上で選択して再送信してください。「送信を完了」でゲーム側のアップロード情報を破棄します。",
+    [BATTLESCROLLS_SHARE_CHOICE_HEADER] = "送信内容の選択",
+    [BATTLESCROLLS_SHARE_CHOICE_FULL] = "すべての戦闘（<<1>>）",
+    [BATTLESCROLLS_SHARE_CHOICE_BOSSES] = "ボスのみ（<<1>>）",
+    [BATTLESCROLLS_SHARE_CHOICE_PARTS] = "送信パート数: <<1>>",
+    [BATTLESCROLLS_SHARE_TT_CHOICE_FULL] = "このインスタンスで記録したすべての戦闘（雑魚戦を含む）。データが多いほど、ブラウザで送るパート数も増えます。",
+    [BATTLESCROLLS_SHARE_TT_CHOICE_BOSSES] = "ボス戦のみ。通常は雑魚戦が容量の大半を占めるため、送信パート数が大幅に減ります。",
+    [BATTLESCROLLS_SHARE_DONE_HEADER] = "すべてのパートを送信しました",
+    [BATTLESCROLLS_SHARE_DONE_HINT] = "リンクとQRコードはブラウザのページにあります。",
+    [BATTLESCROLLS_SHARE_CONTINUE] = "共有を続ける",
+    [BATTLESCROLLS_SHARE_CANCEL] = "共有を中止",
+    [BATTLESCROLLS_SHARE_FAILED] = "共有を準備できませんでした。",
+    [BATTLESCROLLS_SHARE_RESEND_PART] = "パート<<1>>を再送",
+    [BATTLESCROLLS_SHARE_PART_RESENDING] = "パート<<1>> — 再送中…",
+    [BATTLESCROLLS_SHARE_FINISH] = "共有を完了",
+}
+for id, str in pairs(shareStrings) do
+    SafeAddString(id, str, 1)
+end
+
+-- 新機能：名前変更、レイドダメージ、蘇生、バーの色、アルティメット、クルックス、ズェン
+local featureStrings = {
+    [BATTLESCROLLS_RENAME] = "名前を変更",
+    [BATTLESCROLLS_RENAME_TEXT] = "新しい名前を入力してください。元の名前（<<1>>）を入力するとリセットされます。",
+
+    [BATTLESCROLLS_TAB_GROUP_DAMAGE] = "グループダメージ",
+    [BATTLESCROLLS_FILTER_GROUP_DAMAGE] = "グループダメージのフィルター",
+    [BATTLESCROLLS_FILTER_OTHERS] = "その他",
+    [BATTLESCROLLS_TOOLTIP_GROUP_DAMAGE_SCOPE] = "ゲームクライアントが確認したすべてのダメージです。自分のダメージ（ペットとコンパニオンを含む）と、周囲の他プレイヤーのダメージが含まれます。ESOは他プレイヤーを個別に識別しないため、そのダメージは「その他」にまとめて表示します。",
+
+    [BATTLESCROLLS_GROUP_COL_RES] = "蘇生",
+
+    [BATTLESCROLLS_SETTINGS_BAR_COLOR] = "自分のバーの色",
+    [BATTLESCROLLS_SETTINGS_BAR_COLOR_TEXT] = "Battle Scrollsの「バー」デザインを使うグループメンバーには、あなたのバーがこの色で表示されます。自分が別のデザインを使っていても、グループメーターを無効にしていても適用されます。",
+    [BATTLESCROLLS_COLOR_DEFAULT] = "デフォルト",
+    [BATTLESCROLLS_COLOR_WHEEL] = "色相と彩度",
+    [BATTLESCROLLS_COLOR_BRIGHTNESS] = "明るさ",
+    [BATTLESCROLLS_COLOR_HEX] = "16進数コード",
+    [BATTLESCROLLS_COLOR_HEX_INVALID] = "6桁の16進数を入力してください（例：#3EB6FF）。",
+    [BATTLESCROLLS_COLOR_SAVE] = "保存",
+    [BATTLESCROLLS_COLOR_SAVE_HINT] = "自分のデザインに関係なく、Battle Scrollsの「バー」を使う全員にあなたのバーがこの色で表示されます。",
+
+    [BATTLESCROLLS_HEADER_ULTIMATE] = "アルティメット",
+    [BATTLESCROLLS_STAT_ULT_AT_ENTRY] = "戦闘開始時のアルティメット",
+    [BATTLESCROLLS_STAT_ULT_GENERATED] = "獲得したアルティメット",
+    [BATTLESCROLLS_STAT_ULT_SPENT_DRAINED] = "消費・喪失したアルティメット",
+    [BATTLESCROLLS_STAT_ULT_SPENT] = "消費したアルティメット",
+    [BATTLESCROLLS_STAT_ULT_LOST] = "使用時の損失",
+    [BATTLESCROLLS_STAT_ULT_LOST_TT] = "アルティメットを使うとゲージ全体が空になるため、そのコストを超えた分はすべて失われます。",
+    [BATTLESCROLLS_STAT_ULT_DRAINED] = "喪失したアルティメット",
+    [BATTLESCROLLS_HEADER_ULT_SOURCES] = "アルティメット獲得源",
+    [BATTLESCROLLS_ULT_BASE_GENERATION] = "基本獲得",
+    [BATTLESCROLLS_ULT_HEROISM_LINE] = "<<C:1>>を含む：維持率<<2>>%、約<<3>>",
+    [BATTLESCROLLS_HEADER_ULT_CASTS] = "使用したアルティメット",
+
+    [BATTLESCROLLS_HEADER_CRUX] = "クラッツ",
+    [BATTLESCROLLS_STAT_CRUX_GENERATORS] = "生成スキル使用回数",
+    [BATTLESCROLLS_STAT_CRUX_AT_FULL] = "クラッツ満杯時の使用",
+    [BATTLESCROLLS_STAT_CRUX_SPENDERS] = "消費スキル使用回数",
+    [BATTLESCROLLS_STAT_CRUX_UNDER] = "クラッツ3未満での使用",
+    [BATTLESCROLLS_CRUX_AT_N] = "クラッツ<<1>>時：<<2>>",
+    [BATTLESCROLLS_HEADER_CRUX_BY_ABILITY] = "スキル別クラッツ使用状況",
+
+    [BATTLESCROLLS_HEADER_ZEN] = "継続ダメージの重ね掛け（ズェン）",
+    [BATTLESCROLLS_ZEN_AVG_DOTS] = "平均DoT数",
+    [BATTLESCROLLS_ZEN_UPTIME] = "自分のズェンの維持率",
+    [BATTLESCROLLS_ZEN_PEAK_TIME] = "<<1>>の時間",
+    [BATTLESCROLLS_ZEN_DOTS_LABEL] = "DoT <<1>>個",
+    [BATTLESCROLLS_ZEN_SHARE_LINE] = "平均<<1>> — DoT5個で<<2>>",
+    [BATTLESCROLLS_ZEN_SHORT] = "ズェン",
+    [BATTLESCROLLS_ZEN_NOTE] = "ズェンのセットを装備していなくても、自分のDoTを記録します。自分のズェンのデバフが有効なら、どの程度のボーナスを与えられるかが分かります。自分のズェンが付与されていない時間は、あくまで可能性を示します。",
+    [BATTLESCROLLS_ZEN_DISTRIBUTION_NOTE] = "各DoT行は、記録時間に占めるそのDoT数の時間の割合を示します。ズェンの割合は、その行の時間のうち自分のデバフが有効だった割合です。",
+
+    [BATTLESCROLLS_HEADER_SUPPORT] = "サポート",
+    [BATTLESCROLLS_STAT_RESURRECTIONS] = "蘇生",
+}
+for id, str in pairs(featureStrings) do
+    SafeAddString(id, str, 1)
+end
+
+local cruxPassiveStrings = {
+    [BATTLESCROLLS_STAT_CRUX_PASSIVE] = "スキル外での喪失",
+    [BATTLESCROLLS_STAT_CRUX_PASSIVE_TT] = "消費スキルの使用も死亡もないまま、自然に消えたクラッツ。クラッツは30秒で消滅します。",
+    [BATTLESCROLLS_STAT_CRUX_DEATH] = "死亡による喪失",
+    [BATTLESCROLLS_STAT_CRUX_PROC_WASTED] = "クラッツ満杯時のパッシブ獲得",
+    [BATTLESCROLLS_STAT_CRUX_PROC_WASTED_TT] = "すでにクラッツが3つある状態で発動し、何も得られなかったパッシブ獲得。「<<1>>」とその派生、および<<2>>はクラッツが0のときにしか付与しないため、ここには含まれません。",
+    [BATTLESCROLLS_STAT_CRUX_CONDITIONAL_TT] = "この発生源がスキルの使用なしに、受動的に生成したクラッツ。",
+    [BATTLESCROLLS_STAT_CRUX_OTHER] = "その他のクラッツ増加",
+    [BATTLESCROLLS_STAT_CRUX_OTHER_TT] = "その時点で追跡中の発生源が何も発動していないのに得たクラッツ。",
+    [BATTLESCROLLS_HEADER_CRUX_GAINED] = "スキル別クラッツ獲得",
+}
+for id, str in pairs(cruxPassiveStrings) do
+    SafeAddString(id, str, 1)
+end
+
+local activityOverviewStrings = {
+    [BATTLESCROLLS_STAT_DOWNTIME] = "空白時間",
+    [BATTLESCROLLS_TOOLTIP_DOWNTIME_DESC] = "キャスト間の3秒以上の空白。ギミック処理、蘇生、死亡中などです。キャスト遅延には含まれません。",
+    [BATTLESCROLLS_STAT_PER_MINUTE] = "<<1>>/分",
+    [BATTLESCROLLS_DETAIL_MEDIAN] = "中央値 <<1>>",
+    [BATTLESCROLLS_DETAIL_DELAY] = "遅延 <<1>>",
+    [BATTLESCROLLS_DETAIL_AT_FULL] = "満杯時 <<1>>",
+    [BATTLESCROLLS_DETAIL_LOST] = "損失 <<1>>",
+    [BATTLESCROLLS_DETAIL_AVG_DOTS] = "平均<<1>>DoT",
+    [BATTLESCROLLS_DETAIL_AT_DOTS] = "<<2>>で<<1>>",
+}
+for id, str in pairs(activityOverviewStrings) do
+    SafeAddString(id, str, 1)
+end
+
+-- Release history
+SafeAddString(BATTLESCROLLS_WHATS_NEW, "更新情報", 1)
+SafeAddString(BATTLESCROLLS_WHATS_NEW_DESC, "最新の更新から最初の公開版まで、Battle Scrollsの変更履歴を確認できます。", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_6_0_0, [=[
+|cD4AF37新機能：|r
+
+- |cD4AF37巻物がタムリエルの外へ！|r ジャーナルから戦闘単体や攻略全体を共有し、ブラウザで開けます。テレビのQRコードを読み取って、スマートフォンでリンクを開きましょう。そこから自分で戦闘を詳しく確認したり、好きな場所で共有したりできます
+
+- アドオンと同じ戦闘・|cFFFFFFビルド|rデータを確認でき、|cFFFFFFCSVやJSON|rに出力して自分で分析することもできます
+
+- |cFFFFFFアクティビティ|rに|cFFFFFFアルティメット|rの獲得と消費、アルカニストのクラッツ使用、ズェンの接触に必要な継続ダメージの重なり、蘇生を追加。DoT数から、セットを装備していなくてもズェンで与えられるボーナスの目安が分かります。ウィービングでは短い発動の遅れと長い空白時間を分けて確認できます
+
+- 自分の死亡時の詳細情報に、取得できた|cFFFFFF攻撃者の名前|rが表示されるようになりました
+
+- |cFFFFFFグループダメージ|rには、Battle Scrollsを使っていないプレイヤーも含め、クライアントが観測したすべてのダメージを表示。ESOは他者の発生源を特定しないため、「|cFFFFFFその他|r」にまとめます
+
+- 全員の「バー」メーターに表示される自分の|cFFFFFFバーの色|rを選択でき、履歴の攻略や戦闘の名前も変更できます
+
+- ジャーナルに日付付きの|cFFFFFF更新情報|rを追加。過去の履歴も全7言語で読めます。読み逃した巻物がある方へ
+
+|cD4AF37大きな変更：|r
+
+- 保存形式を改良し、同じ容量でより|cFFFFFF多くの戦闘|rを保存できるようになりました。新しい形式では、大規模な戦闘後の|cFFFFFFカクつきが減り|r、ジャーナルで戦闘を開く際の|cFFFFFF読み込みも大幅に速くなる|rはずです。既存の履歴はログイン後にバックグラウンドで|cFFFFFF自動変換|rします。一度限りの処理中は一時的に動作が重くなる場合があります。置き換える前に各戦闘を元データと照合します
+
+|cD4AF37不具合修正：|r
+
+- 死亡時にグループがまだ戦っているのに戦闘記録が早く終了する問題は、|cFFFFFF大幅に起こりにくくなるはずです|r。特にルーセント要塞の最終戦で目立っていた問題です
+
+- |cFFFFFF回復計算|rで一部のフィルターが無視される問題、他のグループメンバーの|cFFFFFFビルド|rで毒が表示されない問題、グループ共有と履歴整理の一部の問題を修正
+
+- グループの戦闘|cFFFFFF概要|rと|cFFFFFFビルド|rの共有を改善し、扉を通った後やロード画面の後にデータが欠ける問題を軽減しました
+
+|cE6B566既知の問題：|r
+
+- 保存形式の更新で空いた容量がESOのアドオン|cFFFFFFメモリー|r表示に反映されるまで、UIのリロードが必要な場合があります
+
+- |cFFFFFFアップデート51の錬金術の変更|rにより、ビルド内の毒の効果名が表示されない、または誤って表示される場合があります。作成した毒の効果はウェブ版には表示されません
+
+- |cFFFFFFPlayStation|rではウェブ共有をテストしていません。まったく動作しない場合も含め、問題があればぜひご報告ください]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_5_3_1, [=[|cD4AF37不具合修正：|r
+
+- グループの|cFFFFFFビルド|rで、他のプレイヤーの|cFFFFFFクラスマスタリー|rとスキルラインが正しく表示されるようになりました]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_5_3_0, [=[|cD4AF37新機能：|r
+
+- |cFFFFFFクラスマスタリー|rのパッシブに対応。1つ以上購入していれば、スキルラインの一覧の代わりに表示します
+
+- |cFFFFFF復讐|rに対応。専用の|cFFFFFFビルド|r概要で不要な情報を隠し、兵装と固有のスキルを表示します
+
+|cD4AF37小さな変更：|r
+
+- 英語では通常の敵集団を開発者の表現に合わせてtrashからbasepopに変更]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_5_2_0, [=[|cD4AF37新機能：|r
+
+- |cFFFFFF体力回復|rを独立した回復タイプとして記録。総回復量は戦闘中の|cFFFFFF体力回復|r値から、実効回復と過剰回復は実際の体力変化から推定します
+
+- プレイヤーに付与された|cFFFFFF回復吸収|rを、独立した被ダメージタイプとして記録
+
+- シールドに吸収された与ダメージと被ダメージを、合計とDPS/DTPSに含めます。ただしスキル別・タイプ別内訳には含めません
+
+- 吸収された与回復と被回復を、他者への回復、自己回復、被回復およびHPSに含めます
+
+|cD4AF37小さな変更：|r
+
+- 詳細一覧は常に最大50スキル、20対象/発生源を表示。以前は状況により25/15/10でした
+
+|cD4AF37不具合修正：|r
+
+- 与回復の方式別集計でも、他の集計と同様に自己回復を含めます
+
+|cE6B566既知の問題：|r
+
+- ESOは|cFFFFFF体力回復|rの正確なタイミングを通知しないため、生存時間から総回復量を推定します。同時にダメージを受けて体力が減っている場合、実効回復の一部を検出できないことがあります]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_5_1_0, [=[|cD4AF37新機能：|r
+
+- 自分とグループに付与したシールドを回復として記録。付与量が総回復量、実際に吸収したダメージが実効回復です
+
+- シールドを直接回復・継続回復と並ぶ独立したタイプとして、各タブ、|cFFFFFF概要|r、与回復の集計に表示
+
+|cE6B566既知の問題：|r
+
+- 同じ対象に50ミリ秒以内に複数のシールドが付与されると、まれに別スキルの回復として記録されることがあります
+
+|cD4AF37小さな変更：|r
+
+- ダメージ、回復、効果、発動、|cFFFFFFウィービング|r、|cFFFFFFビルド|rの各画面で、ツールチップにESOのスキルIDを表示
+
+- 一部のスキルで誤ったアイコンや汎用アイコンが表示される問題を修正。対象は「実用的な運命の彫刻家」「輝く栄光」「セファリアークのフレイル」、薬、「エッセンスドレイン」「統率力」、シナジー「浄化」「血の宴」、「静かな海のルーンガード」「浄化の光」「熟練の魔術」、特性「信頼」などです
+
+- 個人メーターを満たすために必要なHPSを引き上げ
+
+- 回復構成を「タイプ別回復」と表示し、意味のない単一タイプの内訳を省略
+
+|cD4AF37不具合修正：|r
+
+- |cFFFFFFウィービング|rで軽攻撃の欠落・連続入力の誤判定を軽減
+
+- 効果追跡を無効にした場合のボス判定を改善
+
+- 一部の回復説明で平均値が最小値を下回る問題を修正]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_5_0_0, [=[|cD4AF37新機能：|r
+
+- |cFFFFFFウィービング|r追跡を追加！ 発動間の平均・合計ロス時間と、抜けた軽攻撃やスキルを全体・スキル別に表示
+
+- データを確認する新しい「|cFFFFFFアクティビティ|r」タブ
+
+- 集計でも、対象領域が「|cFFFFFF概要|r」の場合に|cFFFFFFウィービング|rデータを利用できます
+
+|cD4AF37小さな変更：|r
+
+- 発動追跡を|cFFFFFF概要|rから|cFFFFFFアクティビティ|rへ移動。ずっとあったことに気づいていましたか？
+
+- 戦闘中・戦闘外の|cFFFFFFメモリー|r使用量と性能を改善。特に効果追跡を一部または全部無効にしている場合に有効です
+
+|cD4AF37不具合修正：|r
+
+- 効果追跡を無効にしたプレイヤーの生存率が常に100%になる問題を修正]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_4_0_0, [=[|cD4AF37新機能：|r
+
+- 「ファンタジーMMORPGにも|cFFFFFF表計算|rがほしい」と思ったことはありますか？ たぶんないでしょうが、実装しました。任意の数の過去の戦闘から必要なデータを集計し、|cFFFFFFピボットテーブル|rにもできます
+
+|cD4AF37小さな変更：|r
+
+- 各戦闘に11.3.5などのゲームバージョンを表示
+
+- Battle Scrollsを開いている間、他のプレイヤーには巻物を読んでいるように見えます。やはり巻物ですよね
+
+- 戦闘一覧の見出しにエリア名を表示
+
+|cD4AF37不具合修正：|r
+
+- グループのプリズム消費低減付呪を正しく表示
+
+- グループと|cFFFFFFビルド|rのタブで|cFFFFFFビルド|rのレイアウトを統一]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_3_1_0, [=[|cD4AF37新機能：|r
+
+- 所持品と同様に使える|cFFFFFF検索|rを|cFFFFFF効果タブ|rに追加
+
+|cD4AF37不具合修正：|r
+
+- 他のグループメンバーが使うアルカニストの|cFFFFFFビルド|rで、種族・クラス・ムンダスの行が欠ける問題を修正
+
+- グループメニューの|cFFFFFFちらつき|rを再び軽減]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_3_0_2, "|cFFFFFFグループメニューのちらつきを軽減|r", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_3_0_1, [=[|cD4AF37不具合修正：|r
+
+- 空きスロットがある場合にグループメンバーの|cFFFFFFチャンピオンポイント|rが別の星座に入る問題を修正。送信側の修正なので、相手も更新する必要があります
+
+- |cFFFFFFビルド|rがあるプレイヤーから、データがないプレイヤーへ移動した際に、存在しない情報を表示しようとする問題を修正]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_3_0_0, [=[|cD4AF37ビルド記録|r
+
+- 各戦闘で|cFFFFFFビルド|rを保存し、新しい|cFFFFFFビルド|rタブに表示。何を使って戦っていたか正確に振り返れます
+
+- |cFFFFFF概要|rにも|cFFFFFFビルド|rの大部分を表示し、結果を披露しやすくしました
+
+- |cFFFFFFキャラクターメニュー|rに簡潔な|cFFFFFFビルド|r概要を追加
+
+- |cFFFFFFグループタブ|rでもBattle Scrollsを使う他のグループメンバーの|cFFFFFFビルド|rを記録します]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_2_1_2, "|cFFFFFF見た目の変更なし。バージョン3への準備です|r", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_2_1_1, "|cFFFFFF更新されたドラゴンナイトに合わせて範囲・単体ダメージの計算を変更。過去の戦闘にも適用されます。|r", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_2_1_0, [=[- 新しいナビゲーション階層「|cFFFFFFサブカテゴリ|r」を追加。関連する表示を同じタブにまとめ、方向パッドか左スティックの左右で切り替えます
+  - 与ダメージとボスへのダメージを「ダメージ」に統合
+  - 他者への回復、自己回復、被回復を「回復」に統合
+  - 自分、ボス、グループの効果を、長い一覧ではなく別々の|cFFFFFFサブカテゴリ|rに分割
+
+- 「Attempt to read past end of buffer」エラーを抑制。戦闘終了後にロード画面を通るとグループデータが不正確になる場合は残りますが、少なくともエラーが突然画面を塞ぐことはありません]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_2_0_1, [=[|cD4AF37グループジャーナル|r
+
+Battle Scrollsを使うグループメンバーが参加した戦闘に、新しい|cFFFFFFグループタブ|rを追加。
+
+|cD4AF37概要：|r
+
+- 各ボス、DPS、クリティカル率、DTPS、HPS、生存率、死亡数で並べ替え可能な比較表
+
+|cD4AF37プレイヤー別詳細：|r
+
+- ダメージ：DPS、合計、クリティカル率、最大ヒット、直接・範囲ダメージ、タイプ別内訳、DPS順位とDD平均との比較
+
+- 生存：DTPS、生存時間、死亡数、主な被ダメージスキル、死亡状況
+
+- 回復：総HPS、実効HPS、過剰回復、自己回復
+
+- ボス別の与ダメージ、構成、被ダメージ
+
+|cD4AF37データがある場合、既存の説明にもグループ情報を表示：|r
+
+- ボス対象にメンバー別DPSと貢献率。DPS・ボスDPS行にもメンバー別内訳
+
+- DTPSと被ダメージの発生源にメンバー別DTPS
+
+- ダメージ構成にDD平均との比較
+
+- 与回復・自己回復の総HPSと過剰回復にメンバー別内訳
+
+|cD4AF37死亡追跡：|r
+
+- 死亡状況を戦闘と一緒に保存
+
+- |cFFFFFF概要|r：被ダメージ欄に死亡数
+
+- 被ダメージ：死亡時刻と説明内の詳細
+
+- グループ：最初と最後の死亡について全攻撃を表示
+
+|cD4AF37小さな変更：|r
+
+- |cFFFFFF概要|rは継続ダメージ率ではなく直接ダメージ率を表示
+
+- |cFFFFFF夜の市場|rの戦闘を、通常のエリアフィルターに関係なくすべて記録する設定を追加
+
+- DPSメーターを戦利品履歴など他のUIの背面に配置
+
+- すべてのタブで|cFFFFFF概要|rを初期選択。少し|cFFFFFFメモリー|rが増えますが、空きメモリーなんて必要ありませんよね？
+
+- プレイヤー名の@を省略
+
+- Hodorと「バー」の見出しに戦闘時間
+
+- フィルター・エリアのダイアログ音を変更
+
+|cD4AF37翻訳：|r
+
+- 複数形の修正
+
+- ロシア語とドイツ語で、スタックを表す用語を装備セットの説明に合わせました]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_3_6, "|cFFFFFFLibGroupBroadcastがない状態でログインすると発生するUIエラーを修正|r", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_3_5, "|cFFFFFFコンソール版アドオンの混乱への暫定対応として、LibGroupBroadcastを任意依存に変更|r", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_3_4, "|cFFFFFF見た目の変更なし。ジャーナルでグループのDPSを表示するための準備です|r", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_3_3, "|cFFFFFF見た目の変更なし。ジャーナルでグループのDPSを表示するための準備です|r", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_3_2, [=[|cD4AF37不具合修正：|r
+
+- グループにいないときにDPSデータを送信しなくなりました。DakJanielsによる修正です]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_3_1, [=[|cD4AF37不具合修正：|r
+
+- ルーセント要塞の最終戦や、ポータルなどで一時的にボスから離れる戦闘でボス判定を改善
+
+- ルーセント要塞の最終戦やオセインの檻の初戦など、複雑な戦闘後に発生する「|cFFFFFF1000ms limit hit|r」エラーを修正]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_3_0, [=[|cD4AF37新機能：|r
+
+- 効果を|cFFFFFFお気に入り|rにすると、登場するすべての一覧の先頭に固定されます
+
+|cD4AF37不具合修正：|r
+
+- 途中参加したグループメンバーの効果時間は、実際に参加していた時間だけで計算
+
+- 一部のグループメーターで、最初の戦闘開始時に左上へ空の要素が一瞬出る問題を修正
+
+|cD4AF37小さな変更：|r
+
+- DD欄が1人でも合計DPS行を表示]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_2_0, [=[|cD4AF37新機能：|r
+
+- エリア一覧で|cFFFFFFX/四角|rを押すとロックできます。保存容量を超えても自動|cFFFFFF削除|rされません。最新エリアも常に保護されます
+
+|cD4AF37翻訳：|r
+
+- ドイツ語とロシア語のエリア表現を統一
+
+|cD4AF37不具合修正：|r
+
+- スムーズ設定で読み込みが止まる、または戦闘がジャーナルに追加されない問題を修正。更新時、この設定を使っていた方は標準のパフォーマンス設定に戻ります]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_1_0, [=[|cD4AF37新機能：|r
+
+- 履歴から個別のエリアや戦闘を|cFFFFFF削除|rできます
+
+|cD4AF37不具合修正：|r
+
+- アドオンのスムーズ設定と画質モード「フィデリティ」の組み合わせで読み込みが終わらない、またはメニューに表示されない問題を修正。すでに影響を受けた場合、更新後に追加で|cFFFFFF/reloadui|rが必要なことがあります
+
+- フィルター使用後にアイテム破壊などのゲーム内ダイアログでエラーになる問題を修正
+
+- Battle Scrollsからジャーナルに戻る際のアニメーション方向を修正]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_0_3, "|cFFFFFFPS5のセーブデータ破損に対する、手探りでの修正の試み|r", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_0_2, [=[|cD4AF37保存と効果追跡の改善|r
+
+|cD4AF37保存：|r
+
+- エンコード・デコードを最適化し、ジャーナル読み込みを高速化
+
+- 戦闘処理時の|cFFFFFFメモリー|r使用量を削減
+
+|cD4AF37効果：|r
+
+- 戦闘中にメンバーが切断した場合の効果時間を修正
+
+- 戦闘途中の再接続への対応を改善]=], 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_0_1, "|cFFFFFF不具合修正|r", 1)
+SafeAddString(BATTLESCROLLS_RELEASE_1_0_0, [=[|cD4AF37最初の公開版|r
+
+|cD4AF37DPSメーター：|r
+
+- 戦闘ダメージをリアルタイム表示
+
+- 個人向け：標準、最小、バー
+
+- グループ向け：テキスト、Hodor風、バー
+
+- 位置、倍率、戦闘後の表示時間を設定可能
+
+|cD4AF37戦闘ジャーナル：|r
+
+- エリア -> 戦闘 -> 指標の3段階ナビゲーション
+
+- エリア・戦闘タイプ別フィルター
+
+- 保存容量の上限を設定可能
+
+|cD4AF37ダメージ：|r
+
+- 対象・スキル別内訳
+
+- 直接ダメージ、継続ダメージ、クリティカル
+
+- 単体・範囲ダメージ
+
+|cD4AF37回復：|r
+
+- 与回復と被回復を発生源・対象別に表示
+
+|cD4AF37効果：|r
+
+- 自分とグループのバフ・デバフ時間、ボスのデバフ、発動追跡
+
+|cFFFFFFLibGroupBroadcast|rによるグループDPS共有
+
+|cD4AF37対応言語：|r英語、ドイツ語、フランス語、スペイン語、ロシア語、日本語、中国語]=], 1)

@@ -8,6 +8,17 @@
 -- hstructures and strings
 -- See: https://www.esoui.com/forums/showthread.php?t=11507
 --
+-- The Add-On Memory gauge accounts for allocator backing memory
+-- and some native resources, not just live Lua objects. Prompt
+-- GC makes freed space reusable and limits further growth:
+-- unpaced dry runs approached 90 MB, while CollectFullAsync
+-- pacing held the gauge flat.
+--
+-- Freeing objects need not immediately lower the gauge. Allocator
+-- fragmentation leaves free space mixed with live allocations,
+-- and even empty segments may be returned later. Freed space can
+-- be reused while those segments remain charged to the gauge.
+--
 -- Instead of scattered collectgarbage() calls, this module
 -- provides a RequestGC() API that performs incremental GC
 -- in small steps, yielding between each. Cooldown equals
@@ -107,6 +118,61 @@ function GC:_StartCycle()
     end
 
     self._fiber = gcCycleEffect:Run()
+end
+
+---Max GC stepping time per frame for CollectFullAsync. NOT redundant with
+---LibAsync's stall-threshold budgeting: measured in-game, a task Call gets
+---roughly one resume per frame, and a single step per frame is OUTPACED by
+---ambient allocation on a large heap - the cycle never closes, marking
+---outgrows stepping, and the heap runs away to the addon memory kill limit.
+---The inner loop is the actual throughput source.
+local COLLECT_FULL_FRAME_BUDGET_MS = 10
+
+---Hard deadline per collect call: if reclamation cannot be confirmed within
+---this window something is off (pinned sentinel, extreme heap); bail and let
+---the caller proceed rather than spin while memory climbs.
+local COLLECT_FULL_DEADLINE_MS = 3000
+
+---Steps the collector until garbage that existed BEFORE the call is
+---confirmed reclaimed, then resolves. A cycle-boundary return from
+---collectgarbage("step") is NOT that proof - boundaries can land immediately
+---or be crossed by other addons stepping the shared VM - so this waits for
+---the weak sentinel to actually die (a complete mark+sweep over
+---pre-existing objects). No cooldown sleep. For allocation-heavy loops that
+---must not start the next burst until the previous one is reclaimed.
+---@return Effect<boolean> True when the sentinel is reclaimed; false when the deadline expires
+function GC:CollectFullAsync()
+    return LibEffect.Async(function()
+        -- Zero remaining cycles BEFORE cancelling: the cancelled fiber's
+        -- Ensure decrements and would otherwise restart a background cycle
+        -- underneath us
+        self._remainingCycles = 0
+        if self._fiber then
+            self._fiber:Cancel()
+            self._fiber = nil
+        end
+
+        -- Only two exits: the sentinel dies (reclamation PROVEN) or the
+        -- deadline passes. No boundary-count exit: collectgarbage("step")
+        -- returning true is not proof of reclamation, and exiting on it
+        -- reintroduces the leak this function exists to prevent.
+        plantGarbage()
+        local startMs = GetGameTimeMilliseconds()
+        while not isGarbageCollected() do
+            local frameStartMs = GetGameTimeMilliseconds()
+            if frameStartMs - startMs >= COLLECT_FULL_DEADLINE_MS then
+                return false
+            end
+            repeat
+                collectgarbage("step", GC_STEP_SIZE)
+            until isGarbageCollected()
+                or GetGameTimeMilliseconds() - frameStartMs >= COLLECT_FULL_FRAME_BUDGET_MS
+            if not isGarbageCollected() then
+                LibEffect.Yield():Await()
+            end
+        end
+        return true
+    end)
 end
 
 ---Request garbage collection cycles

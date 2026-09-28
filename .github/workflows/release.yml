@@ -4,66 +4,154 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version (e.g., 1.0.0)'
+        description: 'Version (e.g., 6.0.0; releases the selected ref)'
         required: true
         type: string
   push:
     tags:
       - 'v*.*.*'
 
+# Keep each web/addon pair together, including manually dispatched releases.
+concurrency:
+  group: public-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
 jobs:
-  release:
-    name: Build and Release
+  deploy-web:
+    name: Check and deploy web
     runs-on: ubuntu-latest
-    permissions: write-all
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set version variables
+      - name: Validate release version and notes
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          # Get version from tag or manual input
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION="${{ github.event.inputs.version }}"
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            VERSION="$INPUT_VERSION"
           else
-            # Extract version from tag (v1.0.0 -> 1.0.0)
             VERSION="${GITHUB_REF#refs/tags/v}"
           fi
 
-          # AddOnVersion: incrementing integer (avoids semver comparison issues)
-          ADDON_VERSION=${{ github.run_number }}
+          if [[ ! "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "::error::Version must be a stable release such as 6.0.0"
+            exit 1
+          fi
 
-          # Release notes file for this version
           RELEASE_NOTES="release-notes/v${VERSION}.txt"
-
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "ADDON_VERSION=$ADDON_VERSION" >> $GITHUB_ENV
-          echo "ZIP_FULL_NAME=BattleScrolls-${VERSION}.zip" >> $GITHUB_ENV
-          echo "RELEASE_NOTES=$RELEASE_NOTES" >> $GITHUB_ENV
-
-      - name: Show computed values
-        run: |
-          echo "VERSION=$VERSION"
-          echo "ADDON_VERSION=$ADDON_VERSION"
-          echo "ZIP_FULL_NAME=$ZIP_FULL_NAME"
-          echo "RELEASE_NOTES=$RELEASE_NOTES"
-
-      - name: Verify release notes exist
-        run: |
-          if [ ! -f "${{ env.RELEASE_NOTES }}" ]; then
-            echo "::error::Release notes not found: ${{ env.RELEASE_NOTES }}"
+          if [ ! -s "$RELEASE_NOTES" ]; then
+            echo "::error::Release notes not found or empty: $RELEASE_NOTES"
             echo "Create the file before tagging a release."
             exit 1
           fi
-          echo "Release notes found:"
-          cat "${{ env.RELEASE_NOTES }}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          cat "$RELEASE_NOTES"
+
+      - name: Verify Cloudflare configuration
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::Set the CLOUDFLARE_API_TOKEN secret and CLOUDFLARE_ACCOUNT_ID variable in repository Actions settings."
+            exit 1
+          fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install Lua for addon tests and web fixtures
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua5.4
+
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Check out ESO test dependency
+        uses: actions/checkout@v4
+        with:
+          repository: esoui/esoui
+          ref: b8e5666e237ebb6fe5cf4a18edd5790df8137584
+          path: esoui
+          sparse-checkout: |
+            esoui/libraries/utility/baseobject.lua
+            esoui/libraries/zo_parametricscrolllist/zo_parametricscrolllist.lua
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      # Match the deserialization-error fix used by the recovery tests.
+      - name: Check out LibGroupBroadcast test dependency
+        uses: actions/checkout@v4
+        with:
+          repository: vladislavsheludchenkov/ESO-LibGroupBroadcast
+          ref: 3c07711ce9d4221f7971594524477fc76a1ef934
+          path: .test-deps/LibGroupBroadcast
+          persist-credentials: false
+
+      - name: Link LibGroupBroadcast sources
+        run: ln -s .test-deps/LibGroupBroadcast/src LibGroupBroadcast
+
+      - name: Run Lua tests
+        run: ./scripts/test.sh
+
+      - name: Check, test, and build web
+        working-directory: web
+        run: |
+          npm run check
+          npm test
+          npm run build
+
+      - name: Apply production database migrations
+        working-directory: web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --no-install wrangler d1 migrations apply DB --remote
+
+      - name: Deploy web to Cloudflare
+        working-directory: web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        # Already checked and built above, before touching production.
+        run: npx --no-install wrangler deploy --tag "v${RELEASE_VERSION}"
+
+  release:
+    name: Build and release addon
+    needs: deploy-web
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.deploy-web.outputs.version }}
+      # Keep the existing monotonically increasing ESO version scheme.
+      ADDON_VERSION: ${{ github.run_number }}
+      ZIP_FULL_NAME: BattleScrolls-${{ needs.deploy-web.outputs.version }}.zip
+      RELEASE_NOTES: release-notes/v${{ needs.deploy-web.outputs.version }}.txt
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
 
       - name: Replace version placeholders in manifest
         run: |
           # Replace {{addon_version}} with integer for ESO's version comparison
-          sed -i "s/{{addon_version}}/${{ env.ADDON_VERSION }}/g" BattleScrolls/BattleScrolls.addon
+          sed -i "s/{{addon_version}}/$ADDON_VERSION/g" BattleScrolls/BattleScrolls.addon
           # Replace {{version}} with semver for human-readable display
-          sed -i "s/{{version}}/${{ env.VERSION }}/g" BattleScrolls/BattleScrolls.addon
+          sed -i "s/{{version}}/$VERSION/g" BattleScrolls/BattleScrolls.addon
 
           echo "Manifest after replacement:"
           head -15 BattleScrolls/BattleScrolls.addon
@@ -74,9 +162,8 @@ jobs:
 
       - name: Create ZIP archive
         run: |
-          rm -f "${{ env.ZIP_FULL_NAME }}" || true
-          zip -r --quiet "${{ env.ZIP_FULL_NAME }}" BattleScrolls
-          ls -lh "${{ env.ZIP_FULL_NAME }}"
+          zip -r --quiet "$ZIP_FULL_NAME" BattleScrolls
+          ls -lh "$ZIP_FULL_NAME"
 
       - name: Upload to Bethesda.net
         uses: m00nyONE/bnet-upload@a5bc28415932bf614f092bd04515ed333da1359f

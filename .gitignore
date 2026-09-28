@@ -1,4 +1,9 @@
-.idea
-eso-api-lua-intellij-baertram_API101048_2
-LibAsync
-LibGroupBroadcast
+.DS_Store
+.idea/
+.test-deps/
+esoui/
+eso-api-lua-*/
+LibAsync/
+LibGroupBroadcast/
+LibHarvensAddonSettings/
+*.zip

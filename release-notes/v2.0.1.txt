@@ -27,7 +27,7 @@ Death recaps are now saved with encounters and displayed in:
 
 Minor changes:
 - Overview panel now shows Direct % instead of DoT %
-- Event Zone override toggle in settings when Night Market is active
+- Night Market option to record all fights there regardless of zone filters
 - DPS meters now appear behind other UI elements such as loot history
 - "Overview" item is always selected by default on all tabs. This increases memory usage a bit, but you didn't want to have free memory anyway, did you?
 - Gamertags displayed without @ symbol

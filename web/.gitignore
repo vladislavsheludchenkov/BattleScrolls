@@ -1,0 +1,11 @@
+node_modules/
+.wrangler/
+.env
+.env.*
+.dev.vars
+.dev.vars.*
+.DS_Store
+# esbuild outputs (sources live in src/client/)
+public/app.js
+public/upload.js
+public/privacy.js

@@ -1,0 +1,17 @@
+## Title: BattleScrolls Ability Dump
+## Author: Semigroup1329
+## APIVersion: 101050 101051
+## Version: 2
+## IsLibrary: False
+## SavedVariables: BattleScrollsAbilityDumpSV
+
+; In-client data miner (the uespLog approach): abilities, items (via
+; synthesized links, which also yield enchant names), champion skills, scribing
+; scripts, Vengeance perks, skill lines and item sets, in the client's language.
+; Not part of the Battle Scrolls addon - install separately.
+; Run /bsabilitydump passes across languages/classes, /reloadui to persist, then run
+; scripts/import-abilities.sh from the repo.
+
+main.lua
+
+# This Add-on is not created by, affiliated with, or sponsored by, ZeniMax Media Inc. or its affiliates.
