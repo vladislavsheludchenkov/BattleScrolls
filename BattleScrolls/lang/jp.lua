@@ -940,6 +940,8 @@ end
 
 -- Online sharing
 local shareStrings = {
+    [BATTLESCROLLS_SETTINGS_SHARE_PART_SIZE] = "共有パートのサイズ",
+    [BATTLESCROLLS_SETTINGS_SHARE_PART_SIZE_TEXT] = "ブラウザーを開くたびに送信する戦闘データの文字数です。共有を確認してもブラウザーが開かない場合は、小さくすると改善する可能性があります。大きくすると確認回数は減りますが、ブラウザーが開かなくなる場合があります。初期値は7000です。変更を反映するには、進行中の共有をキャンセルして、最初から共有し直してください。",
     [BATTLESCROLLS_SHARE_FIGHT] = "戦闘を共有",
     [BATTLESCROLLS_SHARE_INSTANCE] = "全戦闘をアップロード",
     [BATTLESCROLLS_SHARE_PREPARING] = "共有の準備中...",
@@ -1068,6 +1070,19 @@ end
 -- Release history
 SafeAddString(BATTLESCROLLS_WHATS_NEW, "更新情報", 1)
 SafeAddString(BATTLESCROLLS_WHATS_NEW_DESC, "最新の更新から最初の公開版まで、Battle Scrollsの変更履歴を確認できます。", 1)
+
+SafeAddString(BATTLESCROLLS_RELEASE_6_0_1, [=[
+|cD4AF37不具合修正：|r
+
+- ログイン時に、各サーバーの履歴が自動で統合され、ジャーナルでまとめて確認できるようになりました。別サーバーの履歴は、ジャーナルに表示されていなくても、以前からメモリと保存領域を使用していました。
+
+- 保存容量の上限と設定は全サーバー共通になりました。以前の上限のうち大きい方を引き継ぎ、その他の設定は更新後に最初にログインしたサーバーから引き継ぎました。お気に入り、保存した集計クエリ、ロックした記録、変更した名前、自分のビルド記録は保持されます。
+
+- 自動整理は全サーバーの記録をまとめて対象とするようになりました。
+
+- PlayStationでは、共有時にブラウザーが開かない問題に対処するため、戦闘データをより小さなパートに分けて送信するようになりました。データ量の多い戦闘では手順が増える場合があります。「設定」の「共有パートのサイズ」で、別のサイズを試すことができます。
+]=], 1)
+
 SafeAddString(BATTLESCROLLS_RELEASE_6_0_0, [=[
 |cD4AF37新機能：|r
 

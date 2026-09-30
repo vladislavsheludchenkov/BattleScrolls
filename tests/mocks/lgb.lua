@@ -22,11 +22,6 @@ return function(sourceRoot)
     }, { __index = _G })
     env.GetGameTimeMilliseconds = function() return env.now end
     env.IsUnitGrouped = function() return env.grouped end
-    env.ZO_ShallowTableCopy = function(source, dest)
-        dest = dest or {}
-        for key, value in pairs(source) do dest[key] = value end
-        return dest
-    end
     env.zo_mixin = function(dest, ...)
         for _, source in ipairs({ ... }) do env.ZO_ShallowTableCopy(source, dest) end
     end

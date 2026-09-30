@@ -14,7 +14,7 @@
 --   body (compressed when bit0 is set):
 --     varint createdAtS               (export time)
 --     u8 platform                     (device: 1 PC/Mac, 2 Xbox, 3 PlayStation)
---     string worldName                (GetWorldName; not the player's location)
+--     string worldName                (recorded server; not the player's location)
 --     string instanceName             (string = varint byte length + bytes)
 --     varint instanceTimestampS       (when the run started)
 --     u8 instanceFlags: bit0 overland, bit1 house, bit2 PvP,
@@ -643,7 +643,7 @@ local function buildStreamAsync(instance, encounters, profile)
         local platform = uiPlatform == UI_PLATFORM_XBOX and 2
             or (uiPlatform == UI_PLATFORM_PS4 or uiPlatform == UI_PLATFORM_PS5) and 3 or 1
         body:writeByte(platform)
-        body:writeString(GetWorldName())
+        body:writeString(instance.worldName or GetWorldName())
         -- The journal titles instances by zone; instanceName on the wire is
         -- the same string ("Earthen Root Enclave", "Sunspire", ...). A local
         -- rename travels as "custom (real)".

@@ -1,0 +1,5 @@
+Bugfixes:
+- Your server histories were merged automatically on login and are now visible together in the Journal. History from other servers has always used memory and storage, even when it wasn't visible in the Journal.
+- Storage and settings are shared across servers. The larger of your previous storage limits was kept; other settings were taken from the server you first logged into after updating. Favorites, saved Aggregate queries, locked runs, custom names and personal build snapshots are preserved.
+- Automatic cleanup now considers runs from all servers together.
+- PlayStation shares now use smaller parts to help with fights that would not open in the browser. Larger fights may take more steps; you can experiment with Share Part Size in Settings.

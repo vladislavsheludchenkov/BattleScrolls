@@ -71,7 +71,7 @@ BattleScrolls = BattleScrolls or {}
 ---@field _v number Schema version (3+)
 ---@field _data string[] Array of base64-encoded data chunks
 ---@field _shared CompactSharedEntry[]|nil Binary-encoded shared group entries (v17+; pre-v17 encounters use the plain sharedData field)
----@field _setupHash number|nil 16-bit hash referencing the own-setup pool when the setup section was deduplicated out of _data (v17+)
+---@field _setupHash number|nil Personal pool key (unsigned 16-bit hash with collision resolution); independent of the sharing hash
 ---@field displayName string|nil Pre-computed display name for encounter list UI
 ---@field location string|nil Location within the zone
 ---@field timestampS number Absolute timestamp when encounter started
@@ -136,6 +136,7 @@ BattleScrolls = BattleScrolls or {}
 ---@field encounters Encounter[] Array of encounters in this instance
 
 ---@class InstanceStorage
+---@field worldName string|nil Originating server; stamped on legacy instances by the server merge
 ---@field isHouse boolean|nil True when the zone is a player house
 ---@field isPvP boolean|nil True when an AvA/battleground zone
 ---@field isAdventureZone boolean|nil True when an adventure zone (night market)
@@ -195,6 +196,7 @@ BattleScrolls = BattleScrolls or {}
 ---@field trackBossDebuffs boolean
 ---@field effectReconciliationPreset "max"|"high"|"normal"|"low"|"off"
 ---@field storageSizePreset "xs"|"small"|"medium"|"large"|"xl"|"caution"|"yolo"
+---@field playstationShareChunkChars number Base64 data characters per browser share part on PlayStation
 ---@field favoriteEffects table<number, boolean>
 ---@field pivotQueries table<string, PivotQuery>|nil Saved pivot queries
 ---@field hasCompletedOnboarding boolean
@@ -212,8 +214,8 @@ BattleScrolls = BattleScrolls or {}
 ---@field nextInstanceIndex number|nil High-water mark for instance.index assignment (auto-initialized from history)
 ---@field settings StorageSettings User settings
 ---@field sharedSetups table<string, table<number, StoredSharedSetup>>|nil Encoded shared builds by player and hash; plain entries remain readable until migration
----@field ownSetups table<number, OwnSetupPoolEntry>|nil Player's own full setups deduplicated by 16-bit setup hash (v17+; referenced by CompactEncounter._setupHash)
----@field migrationDoneV20Setups boolean|nil True once encounters and shared setups are migrated (failed entries excluded). Never in defaults: ZO_SavedVars would apply it to existing installations
+---@field ownSetups table<number, OwnSetupPoolEntry>|nil Full personal setups keyed by encoded-payload hash with collision resolution; referenced by CompactEncounter._setupHash
+---@field migrationDoneV20Setups boolean|nil True once encounters and shared setups are migrated (failed entries excluded). Never in defaults: existing saves must be checked
 
 ---@class SizePreset
 ---@field key string Preset key
@@ -266,7 +268,7 @@ local storage = {
 BattleScrolls.storage = storage
 
 storage.defaults = {
-    version = 1,
+    version = 4,
     history = {},
     sharedSetups = {},
     settings = {
@@ -300,6 +302,7 @@ storage.defaults = {
         trackBossDebuffs = true, -- track debuffs on bosses
         effectReconciliationPreset = "normal", -- Effect reconciliation precision preset
         storageSizePreset = "medium", -- Storage size preset key
+        playstationShareChunkChars = 7000,
         favoriteEffects = {}, -- Favorite effects keyed by abilityId (account-wide)
         hasCompletedOnboarding = false, -- whether user has completed initial setup
     }
@@ -552,32 +555,60 @@ local function setupPoolsModelBytes(sv)
     return bytes
 end
 
--- Model bytes of everything else the saved global loads, measured once per
--- session: settings, indexes and flags of this world, and any other world's
--- data in the same file. Only settings change it during a session.
+-- Model bytes outside the history and pools, measured once per session:
+-- settings, indexes, flags and the root container of the flat saved table.
 local otherModelBytes = nil
 
 ---@param sv StorageData
 ---@return number modelBytes
-local function otherRootsModelBytes(sv)
+local function otherStorageModelBytes(sv)
     if otherModelBytes then
         return otherModelBytes
-    end
-    local root = rawget(_G, "BattleScrollsSavedVariables")
-    if type(root) ~= "table" then
-        otherModelBytes = 0
-        return 0
     end
     -- Exclude what history and the pools count for themselves
     local visited = { [sv.history] = true }
     if sv.ownSetups then visited[sv.ownSetups] = true end
     if sv.sharedSetups then visited[sv.sharedSetups] = true end
-    otherModelBytes = BattleScrolls.sizeModel.measure(root, visited)
+    otherModelBytes = BattleScrolls.sizeModel.measure(sv, visited)
     return otherModelBytes
 end
 
+---Fill missing defaults without mutating input tables or sharing mutable
+---defaults. Only ancestors of missing values are copied; history/pools are
+---not traversed. Returning the original when complete avoids startup copies.
+---@generic T: table
+---@param data T
+---@param defaults T
+---@return T
+local function withDefaults(data, defaults)
+    local result = data
+    for key, default in pairs(defaults) do
+        local value = data[key]
+        if type(default) == "table" then
+            if value == nil or type(value) == "table" then
+                value = withDefaults(value or {}, default)
+            end
+        elseif value == nil then
+            value = default
+        end
+        if value ~= data[key] then
+            if result == data then
+                result = ZO_ShallowTableCopy(data)
+            end
+            result[key] = value
+        end
+    end
+    return result
+end
+
 function storage:Initialize()
-    self.savedVariables = ZO_SavedVars:NewAccountWide("BattleScrollsSavedVariables", 4, nil, self.defaults, GetWorldName())
+    local root = rawget(_G, "BattleScrollsSavedVariables")
+    local prepared = BattleScrolls.serverMerge.prepare(root, GetDisplayName(), GetWorldName())
+    prepared = withDefaults(prepared, self.defaults)
+    -- Publish the complete graph, including defaults, in one assignment.
+    -- An interrupted preparation leaves the old save intact for next login.
+    BattleScrollsSavedVariables = prepared
+    self.savedVariables = prepared
 end
 
 ---PushInstance adds an instance to the history, cleaning up old entries if necessary and assigning it a unique index
@@ -750,7 +781,7 @@ function storage:CleanupIfNecessaryAsync()
 
     self.cleanupTask = self.writeMutex:WithPermit(LibEffect.Async(function()
         -- Sum sizes (yields per instance); the setup pools and the other saved
-        -- roots count against the limit too, but only instances are evicted.
+        -- settings count against the limit too, but only instances are evicted.
         -- Setups orphaned by an eviction are pruned below, a bonus the
         -- selection does not rely on.
         local instanceSizes = {}
@@ -762,7 +793,7 @@ function storage:CleanupIfNecessaryAsync()
             LibEffect.YieldWithGC():Await()
         end
         local factor = BattleScrolls.sizeModel.GAUGE_PER_CHUNK_BYTE
-        currentBytes = currentBytes + (setupPoolsModelBytes(self.savedVariables) + otherRootsModelBytes(self.savedVariables)) * factor
+        currentBytes = currentBytes + (setupPoolsModelBytes(self.savedVariables) + otherStorageModelBytes(self.savedVariables)) * factor
         LibEffect.YieldWithGC():Await()
 
         -- Check if cleanup needed
@@ -807,7 +838,7 @@ end
 ---@field historyBytes number History instances
 ---@field lockedBytes number The locked instances' share of historyBytes
 ---@field setupBytes number Own and shared setup pools
----@field otherBytes number Everything else in the saved global: settings, indexes, other worlds' data
+---@field otherBytes number Everything else in the saved global: settings, indexes, flags and root container
 ---@field encounterCount number
 ---@field instanceCount number
 
@@ -840,7 +871,7 @@ function storage:EstimateSavedSize()
     end
     local factor = BattleScrolls.sizeModel.GAUGE_PER_CHUNK_BYTE
     estimate.setupBytes = setupPoolsModelBytes(sv) * factor
-    estimate.otherBytes = otherRootsModelBytes(sv) * factor
+    estimate.otherBytes = otherStorageModelBytes(sv) * factor
     estimate.totalBytes = estimate.historyBytes + estimate.setupBytes + estimate.otherBytes
     return estimate
 end
@@ -1014,17 +1045,16 @@ function storage.EncodeEncounterAsync(encounter, setupPooled, registry)
     return BattleScrolls.binaryStorage.encodeEncounterAsync(encounter, setupPooled, registry)
 end
 
----Interns the player's own setup in the ownSetups pool, keyed by the 16-bit
----setup hash. Returns true when the encounter can reference the pool entry;
----false on a hash collision with a different setup (caller keeps it inline).
+---Encodes and interns a personal setup independently of its sharing hash.
+---Returns its persistent pool key and whether a new entry was added.
 ---
 ---Called under writeMutex, which the caller keeps until the referencing
 ---encounter is in the history; the prune takes the same mutex, so the entry
 ---cannot be removed while the encode yields in between.
----@param hash number
 ---@param setup PlayerSetup
----@return boolean pooled
-function storage:InternOwnSetup(hash, setup)
+---@return number key
+---@return boolean added
+function storage:InternOwnSetup(setup)
     local pool = self.savedVariables.ownSetups
     if not pool then
         pool = {}
@@ -1032,20 +1062,7 @@ function storage:InternOwnSetup(hash, setup)
     end
     local chunks, version = BattleScrolls.binaryStorage.encodeSetupStandalone(
         BattleScrolls.binaryStorage.buildPoolableSetup(setup))
-    local existing = pool[hash]
-    if existing then
-        if #existing.c ~= #chunks then
-            return false
-        end
-        for i = 1, #chunks do
-            if existing.c[i] ~= chunks[i] then
-                return false
-            end
-        end
-        return true
-    end
-    pool[hash] = { v = version, c = chunks }
-    return true
+    return BattleScrolls.ownSetupPool.intern(pool, { v = version, c = chunks })
 end
 
 ---Whether the instance table is currently in the history (by reference)

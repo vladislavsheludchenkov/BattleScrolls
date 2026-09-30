@@ -8,6 +8,8 @@
 -- Transport facts this module is built on (measured + esoui source):
 --   * Xbox caps at 32655 total URL chars and FAILS SILENTLY above - chunk
 --     sizes must be clamped client-side.
+--   * PlayStation reports the same silent failure for larger shares. Its
+--     default is conservative and adjustable until the limit is measured.
 --   * There is no queue in the open-URL pipeline: bursts lose everything.
 --     Only serial user-confirmed stepping works for multi-part payloads.
 --   * The "Confirm Open URL" dialog (CONFIRM_UNSAFE_URL) lives in the
@@ -52,6 +54,7 @@ end
 BattleScrolls = BattleScrolls or {}
 
 ---@class BattleScrollsShareUrl
+---@field playstationChunkSizes number[] Supported base64 data sizes for PlayStation browser parts
 ---@field _browserTripPending boolean|nil One-shot: a URL confirm round trip completed and no press has passed the leak guard since (ui/journal/keybinds.lua consumes it)
 ---@field _sourceInstance InstanceStorage|nil What the active chain/build was started for; "Continue" is offered only on an exact source match, any other share entry point silently supersedes the chain
 ---@field _sourceEncounter CompactEncounter|nil Set for encounter shares, nil for instance uploads
@@ -64,9 +67,26 @@ shareUrl.PRIVACY_URL = "https://bs.sheludchenkov.com/privacy"
 -- headroom for the scheme/host/fragment params under the 32655
 -- Xbox cap
 local CHUNK_DATA_CHARS = 32000
+shareUrl.playstationChunkSizes = { 1000, 2000, 4000, 6000, 7000, 7800, 8000, 8192, 9000, 12000, 16000, 24000, 32000 }
 local SESSION_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 local UINT32_MODULUS = 4294967296
 local sessionCounter = 0
+
+---@return number
+local function getChunkDataChars()
+    if GetUIPlatform() ~= UI_PLATFORM_PS5 then
+        return CHUNK_DATA_CHARS
+    end
+    local storage = BattleScrolls.storage
+    local settings = storage.savedVariables and storage.savedVariables.settings
+    local configured = settings and settings.playstationShareChunkChars
+    for _, size in ipairs(shareUrl.playstationChunkSizes) do
+        if size == configured then
+            return size
+        end
+    end
+    return storage.defaults.settings.playstationShareChunkChars
+end
 
 ---@alias SharePhase "idle"|"building"|"choosing"|"sending"|"done"|"failed"
 
@@ -101,6 +121,7 @@ local phase = "idle"
 ---@class ShareVariant
 ---@field result ExportResult
 ---@field parts number
+---@field chunkDataChars number Part size captured when this variant was prepared
 ---@type ShareVariant|nil
 local choiceFull = nil
 ---@type ShareVariant|nil
@@ -377,21 +398,23 @@ EVENT_MANAGER:RegisterForEvent("BattleScrollsShareUrlDecline", EVENT_REMOTE_SCEN
     end)
 
 ---URL parts a byte stream will need once base64-coded (4 chars per 3 bytes,
----padded) and split at CHUNK_DATA_CHARS. Used to compare archive variants
+---padded) and split at the selected size. Used to compare archive variants
 ---without materializing their base64.
 ---@param byteCount number
+---@param chunkDataChars number
 ---@return number
-local function partsForBytes(byteCount)
+local function partsForBytes(byteCount, chunkDataChars)
     local b64Len = math.ceil(byteCount / 3) * 4
-    return math.max(1, math.ceil(b64Len / CHUNK_DATA_CHARS))
+    return math.max(1, math.ceil(b64Len / chunkDataChars))
 end
 
 ---@param exportResult ExportResult
-local function startChain(exportResult)
+---@param chunkDataChars number
+local function startChain(exportResult, chunkDataChars)
     local b64 = BattleScrolls.export.bytesToBase64(exportResult.bytes)
     local parts = {}
-    for start = 1, #b64, CHUNK_DATA_CHARS do
-        parts[#parts + 1] = b64:sub(start, start + CHUNK_DATA_CHARS - 1)
+    for start = 1, #b64, chunkDataChars do
+        parts[#parts + 1] = b64:sub(start, start + chunkDataChars - 1)
     end
     chain = {
         parts = parts,
@@ -432,8 +455,9 @@ function shareUrl.shareEncounter(instance, encounter)
     end
     shareUrl._sourceInstance = instance
     shareUrl._sourceEncounter = encounter
+    local chunkDataChars = getChunkDataChars()
     runBuildFiber(function()
-        startChain(BattleScrolls.export.buildEncounterShareAsync(instance, encounter):Await())
+        startChain(BattleScrolls.export.buildEncounterShareAsync(instance, encounter):Await(), chunkDataChars)
     end)
 end
 
@@ -449,6 +473,7 @@ function shareUrl.uploadInstance(instance)
     end
     shareUrl._sourceInstance = instance
     shareUrl._sourceEncounter = nil
+    local chunkDataChars = getChunkDataChars()
     local bossCount, total = 0, 0
     for _, encounter in ipairs(instance.encounters or {}) do
         total = total + 1
@@ -460,18 +485,18 @@ function shareUrl.uploadInstance(instance)
         local export = BattleScrolls.export
         local full = export.buildInstanceArchiveAsync(instance):Await()
         if bossCount == 0 or bossCount == total then
-            startChain(full)
+            startChain(full, chunkDataChars)
             return
         end
         local bosses = export.buildInstanceArchiveAsync(instance, true):Await()
-        local fullParts = partsForBytes(#full.bytes)
-        local bossParts = partsForBytes(#bosses.bytes)
+        local fullParts = partsForBytes(#full.bytes, chunkDataChars)
+        local bossParts = partsForBytes(#bosses.bytes, chunkDataChars)
         if bossParts == fullParts then
-            startChain(full)
+            startChain(full, chunkDataChars)
             return
         end
-        choiceFull = { result = full, parts = fullParts }
-        choiceBosses = { result = bosses, parts = bossParts }
+        choiceFull = { result = full, parts = fullParts, chunkDataChars = chunkDataChars }
+        choiceBosses = { result = bosses, parts = bossParts, chunkDataChars = chunkDataChars }
         setPhase("choosing")
     end)
 end
@@ -486,6 +511,6 @@ function shareUrl.chooseVariant(which)
     choiceFull = nil
     choiceBosses = nil
     if chosen then
-        startChain(chosen.result)
+        startChain(chosen.result, chosen.chunkDataChars)
     end
 end

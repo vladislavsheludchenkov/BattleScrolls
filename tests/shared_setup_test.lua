@@ -83,6 +83,7 @@ local function migrationClient(saved)
     client.pump = scheduler.pump
     loadModule(client, "core/effect")
     loadModule(client, "storage/sizemodel")
+    loadModule(client, "storage/ownsetups")
     loadModule(client, "storage/storage")
     local Effect = client.LibEffect
     client.BattleScrolls.storage.savedVariables = saved or { history = {}, sharedSetups = {}, settings = {} }
@@ -180,7 +181,68 @@ describe("Migration size caches", function()
     end)
 end)
 
+describe("Personal setup format migration", function()
+    it("pools legacy builds with independent keys and verifies the full encounter round trip", function()
+        local visit = { index = 1, timestampS = 100, encounters = {}, abilityInfo = {} }
+        local client, saved = migrationClient({ history = { visit }, settings = {} })
+        client.BattleScrolls.structures = { makeHealingTotals = function(raw, effective, overheal)
+            return { raw = raw, effective = effective, overheal = overheal }
+        end }
+        loadModule(client, "combat/setup")
+        client.BattleScrolls.setupShare.computeHash = function() error("format migration must not use the sharing hash") end
+        client.BattleScrolls.ownSetupPool.hash = function() return 0 end
+        local codec, storage = client.BattleScrolls.binaryStorage, client.BattleScrolls.storage
+        local setup = { abilities = { front = {}, back = {} }, classId = 7, raceId = 4,
+            foods = { { abilityId = 100, uptimeMs = 5000 } } }
+        for i = 1, 2 do
+            local encode = codec.encodeEncounterAsync({ timestampS = 100 + i, durationMs = 10000,
+                playerAliveTimeMs = 9000, setup = setup }, false, codec.newRegistry()):Run()
+            client.pump(100)
+            assert_true(encode:IsSucceeded(), tostring(encode._error))
+            -- These sections have the same layout in v19 and v20.
+            encode._value._v = 19
+            visit.encounters[i] = encode._value
+        end
+        client.start()
+        client.pump(1000)
+        assert_true(saved.migrationDoneV20Setups)
+        assert_eq(#client.warnings, 0)
+        assert_eq(visit._migrationFailed, nil)
+        assert_eq(visit.encounters[1]._v, codec.CURRENT_VERSION)
+        assert_eq(visit.encounters[1]._setupHash, 0)
+        assert_eq(visit.encounters[2]._setupHash, 0)
+        local count = 0
+        for _ in pairs(saved.ownSetups) do count = count + 1 end
+        assert_eq(count, 1, "both migrated encounters reuse the same personal build")
+        local decode = storage.DecodeEncounterAsync(visit.encounters[1], visit):Run()
+        client.pump(100)
+        assert_true(decode:IsSucceeded(), tostring(decode._error))
+        assert_eq(decode._value.setup.raceId, 4)
+        assert_eq(decode._value.setup.foods[1].uptimeMs, 5000)
+        assert_eq(decode._value.playerAliveTimeMs, 9000)
+    end)
+end)
+
 describe("Shared setup startup migration", function()
+    it("checks imported server data despite the current server's completed format migration", function()
+        local eu = { version = 4, history = {}, settings = {}, migrationDoneV20Setups = true }
+        local na = { version = 4, history = {}, settings = {}, sharedSetups = { group1 = { [100] = fixture() } } }
+        local root = { ["EU Megaserver"] = { ["@me"] = { ["$AccountWide"] = eu } },
+            ["NA Megaserver"] = { ["@me"] = { ["$AccountWide"] = na } } }
+        local client = migrationClient()
+        loadModule(client, "storage/servermerge")
+        root = client.BattleScrolls.serverMerge.prepare(root, "@me", "EU Megaserver")
+        local merged = root
+        assert_eq(merged.migrationDoneV20Setups, nil)
+        local restarted, saved = migrationClient(merged)
+        restarted.start()
+        restarted.pump(500)
+        assert_true(saved.migrationDoneV20Setups)
+        assert_true(saved.sharedSetups.group1[100].c ~= nil)
+        equal(restarted.BattleScrolls.setupShare:getSetup("group1", 100), fixture())
+        assert_eq(#restarted.warnings, 0)
+    end)
+
     it("migrates a setup-only save with existing caches", function()
         local setup = fixture()
         setup._estimatedSize, setup._estimatedSizeV = 999999, 3
@@ -295,11 +357,13 @@ describe("Shared setup export integration", function()
             }) },
         }
         client.BattleScrolls.storage.DecodeEncounterAsync = function() return client.LibEffect.Succeed(encounter) end
-        local instance = { zone = "Test Zone", timestampS = 1699999900, abilityInfo = {}, encounters = { encounter } }
+        local instance = { zone = "Test Zone", worldName = "NA Megaserver", timestampS = 1699999900, abilityInfo = {}, encounters = { encounter } }
         local exporter = client.BattleScrolls.export
         local fiber = exporter.buildEncounterShareAsync(instance, encounter):Run()
         client.pump(1000)
         assert_true(fiber:IsSucceeded(), tostring(fiber._error))
+        assert_true(fiber._value.bytes:find("NA Megaserver", 1, true) ~= nil, "export must use the recorded server")
+        assert_eq(fiber._value.bytes:find("EU Megaserver", 1, true), nil)
         local originalBytes = exporter.chunksToBytes({ ORIGINAL_EXPORT })
         assert_true(fiber._value.bytes:find(originalBytes, 1, true) ~= nil,
             "the pooled member setup must retain the original export layout")

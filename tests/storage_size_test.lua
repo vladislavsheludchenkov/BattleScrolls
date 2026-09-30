@@ -1,8 +1,9 @@
--- storage:EstimateSavedSize composition: history, setup pools and the other
--- saved roots, on top of storage/sizemodel.lua.
+-- storage:EstimateSavedSize composition: history, setup pools and the rest
+-- of the raw saved table, on top of storage/sizemodel.lua.
 
 dofile("BattleScrolls/core/effect.lua")
 dofile("BattleScrolls/storage/sizemodel.lua")
+dofile("BattleScrolls/storage/ownsetups.lua")
 dofile("BattleScrolls/storage/storage.lua")
 local storage = BattleScrolls.storage
 local sizeModel = BattleScrolls.sizeModel
@@ -25,8 +26,7 @@ describe("Storage saved-size estimate", function()
             sharedSetups = { ["@friend"] = { [7] = sharedPayload } },
             settings = { storageSizePreset = "medium" },
         }
-        local otherWorld = { history = { { zone = "Maw of Lorkhaj", encounters = {} } } }
-        BattleScrollsSavedVariables = { Default = { ["@me"] = { ["$AccountWide"] = { ["NA Megaserver"] = sv, ["EU Megaserver"] = otherWorld } } } }
+        BattleScrollsSavedVariables = sv
         storage.savedVariables = sv
         -- Measured before the estimate adds its cache fields to instances and payloads
         local model1, model2 = sizeModel.measure(instance1), sizeModel.measure(instance2)
@@ -45,8 +45,7 @@ describe("Storage saved-size estimate", function()
         assert_eq(ownPayload._estimatedSizeV, sizeModel.VERSION)
         assert_eq(sharedPayload._estimatedSizeV, sizeModel.VERSION)
         local visited = { [sv.history] = true, [sv.ownSetups] = true, [sv.sharedSetups] = true }
-        near(estimate.otherBytes, sizeModel.measure(BattleScrollsSavedVariables, visited) * FACTOR, "other roots, other world included")
-        assert_true(estimate.otherBytes > sizeModel.measure(otherWorld) * FACTOR, "the other world's history is in the other roots")
+        near(estimate.otherBytes, sizeModel.measure(sv, visited) * FACTOR, "settings and root container")
         near(estimate.totalBytes, estimate.historyBytes + estimate.setupBytes + estimate.otherBytes, "total")
 
         -- Instance caches carry the model version; the estimate is stable across calls
@@ -175,12 +174,14 @@ describe("Storage pool writes under the mutex", function()
         if not ok then error(err, 0) end
     end
 
+    local ownKey = BattleScrolls.ownSetupPool.hash({ v = 1, c = { "bow" } })
+
     local function fixture()
-        local stored = { _setupHash = 7 }
+        local stored = { _setupHash = ownKey }
         local instance = { index = 1, zone = "A", encounters = { stored } }
         storage.savedVariables = {
             history = { instance },
-            ownSetups = { [7] = { v = 1, c = { "bow" } } },
+            ownSetups = { [ownKey] = { v = 1, c = { "bow" } } },
             sharedSetups = {},
             settings = {},
             nextInstanceIndex = 2,
@@ -194,13 +195,13 @@ describe("Storage pool writes under the mutex", function()
         local landed = false
         storage.writeMutex:WithPermit(LibEffect.Async(function()
             if setup then
-                assert_true(storage:InternOwnSetup(7, setup))
+                assert_eq(storage:InternOwnSetup(setup), ownKey)
             end
             for _ = 1, frames do
                 LibEffect.Yield():Await()
             end
             if setup then
-                instance.encounters[#instance.encounters + 1] = { _setupHash = 7 }
+                instance.encounters[#instance.encounters + 1] = { _setupHash = ownKey }
                 if not storage:IsInHistory(instance) then
                     storage:PushInstance(instance)
                 end
@@ -215,9 +216,9 @@ describe("Storage pool writes under the mutex", function()
             local instance, stored = fixture()
             local sv = storage.savedVariables
             assert_true(storage:DeleteEncounter(instance, stored))
-            assert_true(sv.ownSetups[7] ~= nil, "the prune is deferred to the mutex, not run inline")
+            assert_true(sv.ownSetups[ownKey] ~= nil, "the prune is deferred to the mutex, not run inline")
             TestEnv.pump(5)
-            assert_eq(sv.ownSetups[7], nil)
+            assert_eq(sv.ownSetups[ownKey], nil)
         end)
     end)
 
@@ -225,16 +226,16 @@ describe("Storage pool writes under the mutex", function()
         withStubs(function()
             local instance, stored = fixture()
             local sv = storage.savedVariables
-            local entry = sv.ownSetups[7]
+            local entry = sv.ownSetups[ownKey]
             local landed = finalizeLike(instance, 6, nil)
             TestEnv.pump(2)
             assert_true(storage:DeleteEncounter(instance, stored))
             TestEnv.pump(3)
             assert_true(not landed(), "the finalize is still encoding")
-            assert_eq(sv.ownSetups[7], entry, "the prune is queued behind it")
+            assert_eq(sv.ownSetups[ownKey], entry, "the prune is queued behind it")
             TestEnv.pump(10)
             assert_true(landed())
-            assert_eq(sv.ownSetups[7], nil, "and runs once the mutex is free")
+            assert_eq(sv.ownSetups[ownKey], nil, "and runs once the mutex is free")
         end)
     end)
 
@@ -242,27 +243,31 @@ describe("Storage pool writes under the mutex", function()
         withStubs(function(removed)
             local instance, stored = fixture()
             local sv = storage.savedVariables
-            local entry = sv.ownSetups[7]
+            local entry = sv.ownSetups[ownKey]
             local landed = finalizeLike(instance, 6, { gear = "bow" })
             TestEnv.pump(2)
-            assert_eq(sv.ownSetups[7], entry, "an identical build reuses the entry")
+            assert_eq(sv.ownSetups[ownKey], entry, "an identical build reuses the entry")
             local _, instanceDeleted = storage:DeleteEncounter(instance, stored)
             assert_true(instanceDeleted)
             assert_eq(removed[1], instance, "the scribe is told before the table leaves the history")
             assert_true(not storage:IsInHistory(instance))
             TestEnv.pump(15)
             assert_true(landed())
-            assert_eq(sv.ownSetups[7], entry, "the landed encounter references it, so the prune keeps it")
+            assert_eq(sv.ownSetups[ownKey], entry, "the landed encounter references it, so the prune keeps it")
             assert_true(storage:IsInHistory(instance), "the fight re-entered the history as its own entry")
             assert_eq(instance.index, 2, "under a fresh index")
             assert_eq(#instance.encounters, 1)
         end)
     end)
 
-    it("keeps a hash collision inline", function()
+    it("stores different personal snapshots under separate keys", function()
         withStubs(function()
             fixture()
-            assert_true(not storage:InternOwnSetup(7, { gear = "staff" }))
+            local key, added = storage:InternOwnSetup({ gear = "staff" })
+            assert_true(added)
+            assert_true(key ~= ownKey)
+            assert_eq(storage.savedVariables.ownSetups[key].c[1], "staff")
+            assert_eq(storage.savedVariables.ownSetups[ownKey].c[1], "bow")
         end)
     end)
 end)

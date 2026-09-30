@@ -35,9 +35,16 @@ df = df or function() end
 -- Lua 5.1 baseline: Havok Script has the global unpack; 5.2+ moved it
 unpack = unpack or table.unpack
 
+function ZO_ShallowTableCopy(source, dest)
+    dest = dest or {}
+    for k, v in pairs(source) do dest[k] = v end
+    return dest
+end
+
 -- Havok Script 32-bit intrinsics. Floor-coerce operands: the game's bitops
 -- accept floats with integral value where Lua 5.4's native operators error.
 function BitAnd(a, b) return math.floor(a) & math.floor(b) end
+function BitXor(a, b) return math.floor(a) ~ math.floor(b) end
 function BitOr(a, b) return math.floor(a) | math.floor(b) end
 function BitLShift(a, n) return (math.floor(a) << n) & 0xFFFFFFFF end
 function BitRShift(a, n) return (math.floor(a) & 0xFFFFFFFF) >> n end

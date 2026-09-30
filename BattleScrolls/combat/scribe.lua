@@ -438,7 +438,8 @@ function scribe:Initialize()
         -- Load instance from history or create new
         local history = BattleScrolls.storage.savedVariables.history
         local lastInstance = history and history[#history]
-        if lastInstance and lastInstance.left == false and not migrationPending(lastInstance) then
+        if lastInstance and lastInstance.left == false and lastInstance.worldName == GetWorldName()
+            and not migrationPending(lastInstance) then
             self.instance = lastInstance
             -- Decode abilityInfo into cache (yields internally)
             local result = BattleScrolls.storage.DecodeInstanceFieldsAsync(lastInstance):Await()
@@ -523,6 +524,7 @@ function scribe:ResetForNewInstance()
     ---@type InstanceStorage
     self.instance = {
         zone = BattleScrolls.utils.FormattedZoneName(),
+        worldName = GetWorldName(),
         isOverland = not isInstanced,
         isHouse = isHouse,
         isPvP = isPvP,
@@ -887,18 +889,15 @@ function scribe:ImportEncounterFromStateAsync()
         capturedState = nil
         LibEffect.YieldWithGC():Await()
 
-        -- Dedup own setup: intern it in the pool and drop the section from the
-        -- encoded stream unless the 16-bit hash collides with a different setup
-        local pooledSetup = false
-        if encounter.setup and setupHash then
-            pooledSetup = BattleScrolls.storage:InternOwnSetup(setupHash, encounter.setup)
+        -- Personal snapshots use their own content hash, independent of sharing.
+        local ownSetupKey = nil
+        if encounter.setup then
+            ownSetupKey = BattleScrolls.storage:InternOwnSetup(encounter.setup)
         end
 
         -- Encode encounter to binary (yields internally based on data volume)
-        local compactEncounter = BattleScrolls.storage.EncodeEncounterAsync(encounter, pooledSetup, registry):Await()
-        if pooledSetup then
-            compactEncounter._setupHash = setupHash
-        end
+        local compactEncounter = BattleScrolls.storage.EncodeEncounterAsync(encounter, ownSetupKey ~= nil, registry):Await()
+        compactEncounter._setupHash = ownSetupKey
 
         -- Re-encode instance fields (yields internally based on data volume),
         -- persisting the registries the encounter encode just appended to

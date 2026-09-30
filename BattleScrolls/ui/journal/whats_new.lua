@@ -12,6 +12,7 @@ local whatsNew = {}
 
 ---@type JournalRelease[]
 whatsNew.releases = {
+    { version = "6.0.1", date = "2026-09-30", notesId = BATTLESCROLLS_RELEASE_6_0_1 },
     { version = "6.0.0", date = "2026-09-28", notesId = BATTLESCROLLS_RELEASE_6_0_0 },
     { version = "5.3.1", date = "2026-06-08", notesId = BATTLESCROLLS_RELEASE_5_3_1 },
     { version = "5.3.0", date = "2026-05-31", notesId = BATTLESCROLLS_RELEASE_5_3_0 },

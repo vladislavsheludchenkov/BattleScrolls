@@ -938,6 +938,8 @@ end
 
 -- Online sharing
 local shareStrings = {
+    [BATTLESCROLLS_SETTINGS_SHARE_PART_SIZE] = "Tamaño de las partes al compartir",
+    [BATTLESCROLLS_SETTINGS_SHARE_PART_SIZE_TEXT] = "Cuántos caracteres de datos de combate se envían cada vez que se abre el navegador. Las partes más pequeñas pueden ayudar si el navegador no se abre al confirmar. Las más grandes requieren menos confirmaciones, pero pueden impedir que se abra. Valor predeterminado: 7000. Para usar otro tamaño, cancela el envío actual y vuelve a compartir.",
     [BATTLESCROLLS_SHARE_FIGHT] = "Compartir combate",
     [BATTLESCROLLS_SHARE_INSTANCE] = "Subir todos los combates",
     [BATTLESCROLLS_SHARE_PREPARING] = "Preparando el enlace...",
@@ -1066,6 +1068,19 @@ end
 -- Release history
 SafeAddString(BATTLESCROLLS_WHATS_NEW, "Novedades", 1)
 SafeAddString(BATTLESCROLLS_WHATS_NEW_DESC, "Consulta los cambios de Pergaminos de Batalla, desde la última actualización hasta el primer lanzamiento público.", 1)
+
+SafeAddString(BATTLESCROLLS_RELEASE_6_0_1, [=[
+|cD4AF37Correcciones:|r
+
+- Los historiales de los distintos servidores se combinaron automáticamente al iniciar sesión y ahora se muestran juntos en el Diario. El historial de otros servidores siempre ha ocupado memoria y espacio de almacenamiento, incluso cuando no aparecía en el Diario.
+
+- El límite de almacenamiento y los ajustes se comparten entre servidores. Se conservó el mayor de tus límites anteriores; los demás ajustes se tomaron del primer servidor en el que iniciaste sesión tras actualizar. Se conservan los favoritos, las consultas guardadas de Análisis, los recorridos bloqueados, los nombres personalizados y los arquetipos personales guardados.
+
+- La limpieza automática ahora tiene en cuenta los recorridos de todos los servidores en conjunto.
+
+- Al compartir en PlayStation, ahora se envían partes más pequeñas para ayudar con los combates que no se abrían en el navegador. Los combates más grandes pueden requerir más pasos; puedes experimentar con el Tamaño de las partes al compartir en Ajustes.
+]=], 1)
+
 SafeAddString(BATTLESCROLLS_RELEASE_6_0_0, [=[
 |cD4AF37Nuevas funciones:|r
 

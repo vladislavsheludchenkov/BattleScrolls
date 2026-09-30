@@ -193,8 +193,18 @@ function InstanceListController.refresh(journalUI)
                 entryData:SetIconDisabledTintOnSelection(true)
                 entryData:SetLocked(instance.locked or false)
 
-                -- Add time as sublabel
-                entryData:AddSubLabel(BattleScrolls.utils.formatTime(instance.timestampS))
+                -- Label records from other servers in the combined history.
+                local sublabel = BattleScrolls.utils.formatTime(instance.timestampS)
+                if instance.worldName and instance.worldName ~= GetWorldName() then
+                    local worldLabel = instance.worldName
+                    if worldLabel:sub(-7) == "live-eu" then
+                        worldLabel = GetString(SI_MEGASERVER2)
+                    elseif worldLabel:sub(-4) == "live" then
+                        worldLabel = GetString(SI_MEGASERVER1)
+                    end
+                    sublabel = string.format("%s - %s", sublabel, worldLabel)
+                end
+                entryData:AddSubLabel(sublabel)
 
                 -- Group by relative time (Today, Yesterday, Earlier)
                 local header = utils.getTimeGroupHeader(instance.timestampS)

@@ -938,6 +938,8 @@ end
 
 -- Online sharing
 local shareStrings = {
+    [BATTLESCROLLS_SETTINGS_SHARE_PART_SIZE] = "Größe der Freigabeteile",
+    [BATTLESCROLLS_SETTINGS_SHARE_PART_SIZE_TEXT] = "Wie viele Zeichen an Kampfdaten bei jedem Öffnen des Browsers gesendet werden. Kleinere Teile können helfen, wenn sich der Browser nach dem Bestätigen nicht öffnet. Größere Teile erfordern weniger Bestätigungen, öffnen sich aber möglicherweise nicht. Standard: 7000. Brich eine laufende Freigabe ab und starte sie erneut, um die neue Größe zu verwenden.",
     [BATTLESCROLLS_SHARE_FIGHT] = "Kampf teilen",
     [BATTLESCROLLS_SHARE_INSTANCE] = "Alle Kämpfe hochladen",
     [BATTLESCROLLS_SHARE_PREPARING] = "Freigabe wird vorbereitet...",
@@ -1066,6 +1068,19 @@ end
 -- Release history
 SafeAddString(BATTLESCROLLS_WHATS_NEW, "Was gibt's Neues?", 1)
 SafeAddString(BATTLESCROLLS_WHATS_NEW_DESC, "Die Änderungen in Battle Scrolls: vom neuesten Update bis zur ersten öffentlichen Veröffentlichung.", 1)
+
+SafeAddString(BATTLESCROLLS_RELEASE_6_0_1, [=[
+|cD4AF37Fehlerbehebungen:|r
+
+- Beim Einloggen wurden die Verläufe der verschiedenen Server automatisch zusammengeführt und sind jetzt gemeinsam im Journal sichtbar. Der Verlauf von anderen Servern hat schon immer Arbeitsspeicher und Speicherplatz belegt, auch wenn er im Journal nicht sichtbar war.
+
+- Speicherlimit und Einstellungen gelten jetzt für alle Server. Das höhere deiner bisherigen Speicherlimits wurde beibehalten; die übrigen Einstellungen wurden von dem Server übernommen, auf dem du dich nach dem Update zuerst eingeloggt hast. Favoriten, gespeicherte Auswertungen, gesperrte Durchläufe, eigene Namen und gespeicherte eigene Zusammenstellungen bleiben erhalten.
+
+- Die automatische Bereinigung berücksichtigt Durchläufe von allen Servern gemeinsam.
+
+- Beim Teilen auf PlayStation werden jetzt kleinere Teile gesendet, damit sich auch Kämpfe öffnen lassen, bei denen der Browser bisher nicht startete. Größere Kämpfe können mehr Schritte benötigen. Unter Einstellungen kannst du mit der Größe der Freigabeteile experimentieren.
+]=], 1)
+
 SafeAddString(BATTLESCROLLS_RELEASE_6_0_0, [=[
 |cD4AF37Neue Funktionen:|r
 

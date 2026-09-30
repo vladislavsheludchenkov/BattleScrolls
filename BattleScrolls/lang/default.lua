@@ -936,6 +936,8 @@ ZO_CreateStringId("BATTLESCROLLS_MIGRATION_DONE", "Storage upgrade complete! <<1
 ZO_CreateStringId("BATTLESCROLLS_MIGRATION_TIP", "You can now lower the memory preset in the settings - the new format fits far more history in every MB.")
 
 -- Online sharing (journal keybinds -> browser upload at the share site)
+ZO_CreateStringId("BATTLESCROLLS_SETTINGS_SHARE_PART_SIZE", "Share Part Size")
+ZO_CreateStringId("BATTLESCROLLS_SETTINGS_SHARE_PART_SIZE_TEXT", "How much combat data to send each time the browser opens, measured in characters. Smaller parts can help if confirming a share does not open the browser. Larger parts need fewer confirmations, but may fail to open. Default: 7000. To use a new size, cancel any current share and start sharing again.")
 ZO_CreateStringId("BATTLESCROLLS_SHARE_FIGHT", "Share Fight")
 ZO_CreateStringId("BATTLESCROLLS_SHARE_INSTANCE", "Upload All Fights")
 ZO_CreateStringId("BATTLESCROLLS_SHARE_PREPARING", "Preparing your share...")
@@ -1052,6 +1054,18 @@ ZO_CreateStringId("BATTLESCROLLS_DETAIL_AT_DOTS", "<<1>> at <<2>>")
 -- Release history (full notes, also available from the Journal).
 ZO_CreateStringId("BATTLESCROLLS_WHATS_NEW", "What's New")
 ZO_CreateStringId("BATTLESCROLLS_WHATS_NEW_DESC", "Read what changed in Battle Scrolls, from the latest update back to the first public release.")
+ZO_CreateStringId("BATTLESCROLLS_RELEASE_6_0_1", [=[
+|cD4AF37Bugfixes:|r
+
+- Your server histories were merged automatically on login and are now visible together in the Journal. History from other servers has always used memory and storage, even when it wasn't visible in the Journal.
+
+- Storage and settings are shared across servers. The larger of your previous storage limits was kept; other settings were taken from the server you first logged into after updating. Favorites, saved Aggregate queries, locked runs, custom names and personal build snapshots are preserved.
+
+- Automatic cleanup now considers runs from all servers together.
+
+- PlayStation shares now use smaller parts to help with fights that would not open in the browser. Larger fights may take more steps; you can experiment with Share Part Size in Settings.
+]=])
+
 ZO_CreateStringId("BATTLESCROLLS_RELEASE_6_0_0", [=[
 |cD4AF37New features:|r
 

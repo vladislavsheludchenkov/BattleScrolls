@@ -980,6 +980,31 @@ local function renderPerformanceSettings(list, settings, defaults, onRefresh, ef
     end
 end
 
+local function renderSharingSettings(list, settings, defaults)
+    if GetUIPlatform() ~= UI_PLATFORM_PS5 then return end
+    local sizes = BattleScrolls.shareUrl.playstationChunkSizes
+    local labels = {}
+    for i, size in ipairs(sizes) do
+        labels[i] = tostring(size)
+    end
+    list:AddEntry("ZO_GamepadHorizontalListRowWithHeader", {
+        text = GetString(BATTLESCROLLS_SETTINGS_SHARE_PART_SIZE),
+        header = GetString(BATTLESCROLLS_SHARE_TITLE),
+        tooltip = textTooltip(GetString(BATTLESCROLLS_SETTINGS_SHARE_PART_SIZE),
+            GetString(BATTLESCROLLS_SETTINGS_SHARE_PART_SIZE_TEXT)),
+        valid = sizes,
+        valueStrings = labels,
+        getFunction = function()
+            return settings and settings.playstationShareChunkChars or defaults.playstationShareChunkChars
+        end,
+        setFunction = function(value)
+            if settings then
+                settings.playstationShareChunkChars = value
+            end
+        end,
+    })
+end
+
 -------------------------
 -- Public API
 -------------------------
@@ -995,6 +1020,7 @@ function SettingsRenderer.renderSettings(list, onRefresh)
 
     local personalEnabled = renderDpsMeterPersonalSettings(list, settings, defaults, onRefresh)
     renderDpsMeterGroupSettings(list, settings, defaults, onRefresh, personalEnabled)
+    renderSharingSettings(list, settings, defaults)
 
     local recordingEnabled = renderRecordingSettings(list, settings, defaults, onRefresh)
     if not recordingEnabled then

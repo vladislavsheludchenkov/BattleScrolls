@@ -311,17 +311,13 @@ local function migrateEncounter(encounter, instance, staged)
     end
 
     -- Setup: normalize historical volatility, then pool the build
-    local pooled = false
     local setupHash = nil
     local poolGrowthBytes = 0
     if decoded.setup then
         BattleScrolls.setupCapture.normalizeSetup(decoded.setup)
-        local setupShare = BattleScrolls.setupShare
-        setupHash = setupShare.computeHash(setupShare.convertToCompact(decoded.setup))
-        local ownSetups = BattleScrolls.storage.savedVariables.ownSetups
-        local existedBefore = ownSetups ~= nil and ownSetups[setupHash] ~= nil
-        pooled = BattleScrolls.storage:InternOwnSetup(setupHash, decoded.setup)
-        if pooled and not existedBefore then
+        local added
+        setupHash, added = BattleScrolls.storage:InternOwnSetup(decoded.setup)
+        if added then
             -- Charge new pool entries against the freed total
             poolGrowthBytes = BattleScrolls.storage:EstimateValueMemory(
                 BattleScrolls.storage.savedVariables.ownSetups[setupHash])
@@ -329,7 +325,7 @@ local function migrateEncounter(encounter, instance, staged)
     end
 
     ---@type CompactEncounter|nil
-    local reencoded = binaryStorage.encodeEncounterAsync(decoded, pooled, staged)
+    local reencoded = binaryStorage.encodeEncounterAsync(decoded, setupHash ~= nil, staged)
         :Recover(function() return nil end):Await()
     if not reencoded then
         return nil, "re-encode failed", poolGrowthBytes
@@ -343,9 +339,7 @@ local function migrateEncounter(encounter, instance, staged)
     if newChars > oldChars + 512 then
         return nil, string.format("re-encode grew %d -> %d chars", oldChars, newChars), poolGrowthBytes
     end
-    if pooled then
-        reencoded._setupHash = setupHash
-    end
+    reencoded._setupHash = setupHash
     -- Compact-only metadata the decode does not carry
     reencoded.gameVersion = encounter.gameVersion
 

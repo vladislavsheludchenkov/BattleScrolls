@@ -938,6 +938,8 @@ end
 
 -- Online sharing
 local shareStrings = {
+    [BATTLESCROLLS_SETTINGS_SHARE_PART_SIZE] = "Taille des parties à partager",
+    [BATTLESCROLLS_SETTINGS_SHARE_PART_SIZE_TEXT] = "Quantité de données de combat envoyée à chaque ouverture du navigateur, en caractères. Des parties plus petites peuvent aider si le navigateur ne s’ouvre pas après confirmation. Des parties plus grandes demandent moins de confirmations, mais peuvent empêcher son ouverture. Par défaut : 7000. Pour utiliser une nouvelle taille, annulez le partage en cours et recommencez.",
     [BATTLESCROLLS_SHARE_FIGHT] = "Partager le combat",
     [BATTLESCROLLS_SHARE_INSTANCE] = "Envoyer tous les combats",
     [BATTLESCROLLS_SHARE_PREPARING] = "Préparation du partage...",
@@ -1066,6 +1068,19 @@ end
 -- Release history
 SafeAddString(BATTLESCROLLS_WHATS_NEW, "Nouveautés", 1)
 SafeAddString(BATTLESCROLLS_WHATS_NEW_DESC, "Découvrez les changements des Parchemins de Bataille, de la dernière mise à jour à la première version publique.", 1)
+
+SafeAddString(BATTLESCROLLS_RELEASE_6_0_1, [=[
+|cD4AF37Corrections :|r
+
+- Les historiques des différents serveurs ont été fusionnés automatiquement à la connexion et sont désormais visibles ensemble dans le Journal. L’historique des autres serveurs a toujours occupé de la mémoire et de l’espace de stockage, même lorsqu’il n’apparaissait pas dans le Journal.
+
+- La limite de stockage et les paramètres sont partagés entre les serveurs. La plus élevée de vos anciennes limites a été conservée ; les autres paramètres ont été repris du premier serveur auquel vous vous êtes connecté après la mise à jour. Les favoris, les requêtes d’Analyse enregistrées, les parcours verrouillés, les noms personnalisés et les archétypes personnels enregistrés sont conservés.
+
+- Le nettoyage automatique prend désormais en compte les parcours de tous les serveurs ensemble.
+
+- Sur PlayStation, les combats sont désormais partagés en parties plus petites pour aider lorsque le navigateur ne s’ouvrait pas. Les combats plus volumineux peuvent demander davantage d’étapes ; vous pouvez expérimenter avec la Taille des parties à partager dans les Paramètres.
+]=], 1)
+
 SafeAddString(BATTLESCROLLS_RELEASE_6_0_0, [=[
 |cD4AF37Nouvelles fonctionnalités :|r
 

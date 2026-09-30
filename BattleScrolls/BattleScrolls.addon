@@ -57,7 +57,9 @@ combat/setup_analysis.lua
 storage/bitcodec.lua
 storage/binary.lua
 storage/sizemodel.lua
+storage/ownsetups.lua
 storage/storage.lua
+storage/servermerge.lua
 storage/migration.lua
 
 ; Network domain

@@ -940,6 +940,8 @@ end
 
 -- Online sharing
 local shareStrings = {
+    [BATTLESCROLLS_SETTINGS_SHARE_PART_SIZE] = "分享分段大小",
+    [BATTLESCROLLS_SETTINGS_SHARE_PART_SIZE_TEXT] = "每次打开浏览器时发送的战斗数据字符数。如果确认分享后浏览器没有打开，减小分段可能会有帮助。较大的分段需要更少的确认次数，但可能导致浏览器无法打开。默认值：7000。要应用新的大小，请取消当前分享并重新开始。",
     [BATTLESCROLLS_SHARE_FIGHT] = "分享战斗",
     [BATTLESCROLLS_SHARE_INSTANCE] = "上传全部战斗",
     [BATTLESCROLLS_SHARE_PREPARING] = "正在准备分享...",
@@ -1068,6 +1070,19 @@ end
 -- Release history
 SafeAddString(BATTLESCROLLS_WHATS_NEW, "更新内容", 1)
 SafeAddString(BATTLESCROLLS_WHATS_NEW_DESC, "查看 Battle Scrolls 的更新历史，从最新版本一直到首次公开发布。", 1)
+
+SafeAddString(BATTLESCROLLS_RELEASE_6_0_1, [=[
+|cD4AF37问题修复：|r
+
+- 登录时，各服务器上的历史记录已自动合并，现在可以在日志中一并查看。其他服务器的历史记录一直都在占用内存和存储空间，即使之前没有在日志中显示。
+
+- 存储上限和设置现在由所有服务器共用。已保留原有上限中较大的一个，并沿用了您更新后首次登录的服务器上的其他设置。收藏、已保存的汇总查询、锁定的记录、自定义名称和个人方案快照均已保留。
+
+- 自动清理现在统一处理所有服务器的记录。
+
+- PlayStation上的战斗分享现在会拆分为更小的部分，以改善确认分享后浏览器无法打开的问题。数据量较大的战斗可能需要更多步骤；你可以在“设置”中尝试不同的“分享分段大小”。
+]=], 1)
+
 SafeAddString(BATTLESCROLLS_RELEASE_6_0_0, [=[
 |cD4AF37新功能：|r
 

@@ -77,19 +77,21 @@ end
 
 describe("What's New", function()
     it("keeps the publishing notes under Bethesda's 2000-character limit", function()
-        local notes = readFile(releaseNotesDir .. "v6.0.0.txt")
+        local notes = readFile(releaseNotesDir .. "v6.0.1.txt")
         assert_true(utf8.len(notes) < 2000)
         assert_true(io.open(releaseNotesDir .. "v5.4.0.txt") == nil)
     end)
 
-    it("includes only the published history plus the dated major release", function()
+    it("includes the dated patch release and previous history", function()
         local env = releaseEnv("default")
         local releases = env.BattleScrolls.journal.whatsNew.releases
-        assert_eq(#releases, 28)
-        assert_eq(releases[1].version, "6.0.0")
-        assert_eq(releases[1].date, "2026-09-28")
-        assert_eq(releases[2].version, "5.3.1")
-        assert_eq(releases[2].date, "2026-06-08")
+        assert_eq(#releases, 29)
+        assert_eq(releases[1].version, "6.0.1")
+        assert_eq(releases[1].date, "2026-09-30")
+        assert_eq(releases[2].version, "6.0.0")
+        assert_eq(releases[2].date, "2026-09-28")
+        assert_eq(releases[3].version, "5.3.1")
+        assert_eq(releases[3].date, "2026-06-08")
         assert_eq(releases[#releases].date, "2026-01-18")
         local seen, lastDate = {}, "9999-12-31"
         for _, release in ipairs(releases) do
@@ -114,7 +116,7 @@ describe("What's New", function()
             local journal = env.BattleScrolls.journal
             local ui = { whatsNewList = listMock(), RefreshTargetTooltip = function(self, row) self.target = row end }
             journal.whatsNew.refresh(ui)
-            assert_eq(ui.target.text, "6.0.0")
+            assert_eq(ui.target.text, "6.0.1")
             for i, release in ipairs(journal.whatsNew.releases) do
                 local notes = env.GetString(release.notesId)
                 assert_true(notes:find("|c", 1, true) ~= nil, "release has no formatting: " .. release.version)
